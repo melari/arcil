@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tagayasu</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Domine:wght@600&display=swap" rel="stylesheet">
+
+
+<style type="text/css">
+body {
+    background-color: #f5f2f8;
+    color: #8e30eb;
+}
+
+    .overlay-container {
+      position: relative;
+      top: -80px;
+      background-image: url('/tagayasu-cover.jpg');
+      background-size: cover;
+      background-position: center;
+      z-index: 0;
+      height: 90vh;
+      box-shadow: inset 0 10vh 5vh -18px #f5f2f8, inset 0 -18vh 10vh -8px #f5f2f8;
+      animation: slideRight 300s ease infinite;
+    }
+
+    @keyframes slideRight {
+        0% {
+            background-position: left;
+        }
+        50% {
+            background-position: right;
+        }
+        100% {
+            background-position: left;
+        }
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #f5f2f8aa; /* Adjust the last value (0.5) to change the opacity of the overlay */
+      z-index: -1;
+    }
+
+.connect-wallet {
+    float: right;
+    color: #8e30eb;
+    background: #e5d0fa;
+    border-radius: 20px;
+    font-weight: bold;
+    max-width: 25vw;
+    overflow: hidden;
+}
+
+h1 {
+    color: #8e30eb;
+    font-family: "domine";
+}
+h1 span.jp {
+    color: #e5d0fa;
+    font-size: 115%;
+    vertical-align: middle;
+}
+
+h2 {
+    font-size: 200%;
+    color: #8e30eb;
+    font-weight: 300;
+}
+
+h2 strong {
+    font-weight: 500;
+}
+
+h3 {
+    color: #8e30eb;
+    font-weight:500;
+}
+
+.read-more {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #8e30eb;
+    background: #e5d0fa;
+    border-radius: 50px;
+    width: 50px;
+    height: 50px;
+    font-weight: bold;
+}
+.btn:hover, .connect-wallet:hover {
+    background: #e0dae6;
+}
+
+.navbar {
+    background: #f5f2f8;
+    box-shadow: 0px 0px 12px 20px #f5f2f8;
+}
+</style>
+</head>
+
+<body>
+    <nav class="navbar sticky-top">
+        <div class="container-fluid" style="max-width: 1320px;">
+        <div class="col-8" style="padding-top: 12px">
+            <h1><span class="jp">耕す</span> t a g a y a s u</h1>
+        </div>
+        <div class="col-4">
+            <a href="https://app.tagayasu.xyz" class="btn connect-wallet">Open App</a>
+        </div>
+    </div>
+    </nav>
+
+<div class="overlay-container">
+    <div class="container" style="margin-top: 20px; height: 100vh">
+        <div class="overlay"></div>
+
+        <div class="row" style="padding-top: 25vh">
+            <h2>Cultivate & Share your <strong>Digital Garden</strong></h2>
+            <h3>on your own terms</h3>
+        </div>
+    </div>
+    <button class="read-more btn" onclick="readMore();">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true" height="20" class="inline text-slate-100"><path stroke-linecap="round" stroke-linejoin="round" d="M19 13l-7 7-7-7m14-8l-7 7-7-7"></path></svg>
+    </button>
+</div>
+
+<div id="read-more-anchor" style="position:relative; top:-100px">&nbsp;</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-sm-6" style="display: flex; align-items:center;">
+            <p>
+            Tagayasu is a writing tool for <strong>non-linear thinkers</strong>. Each note, article, or blog post is bidirectionally linked to related notes, forming a web of knowledge.
+            <br /><br />
+            Cultivate your own Wikipedia-like digital garden as a home for your <strong>ideas, journal, school notes, or professional knowledge base</strong>.
+            </p>
+        </div>
+        <div class="col-sm-6" style="text-align: center">
+            <img src="/non-linear.svg" style="max-width:100%" />
+        </div>
+    </div>
+
+    <hr />
+
+    <div class="row">
+        <div class="col-sm-6" style="display: flex; align-items:center;">
+            <p>
+                Tagayasu is backed by <strong>nostr</strong>, a decentralized storage platform. This means you are in control of your content, even if Tagayasu goes offline.
+                <br /><br />
+                Choose any relay provider to store your content, or even run your own node to <strong>become fully soverign</strong>.
+            </p>
+        </div>
+        <div class="col-sm-6" style="text-align: center; float: left !important;">
+            <img src="/nostr-backed.svg" style="max-width:100%" />
+        </div>
+    </div>
+
+    <hr />
+
+    <div class="row">
+        <div class="col-sm-6" style="display: flex; align-items:center;">
+            <p>
+            Draft your content using a <strong>friendly dual-pane editor</strong>. Write in markdown and visulize a live preview directly in your browser.
+            <br /><br />
+            Include inline images, links, and even formatted code snippets to make your notes appear <strong>just as you like them.</strong>
+            </p>
+        </div>
+        <div class="col-sm-6" style="text-align: center">
+            <img src="/editor-preview.svg" style="max-width:100%" />
+        </div>
+    </div>
+
+    <div class="row" style="margin-top:100px; margin-bottom:100px">
+        <a href="https://app.tagayasu.xyz" class="btn connect-wallet" style="max-width: 300px; margin-left: auto; margin-right: auto;">Start Writing</a>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+<script type="text/javascript">
+function readMore() {
+    $('html,body').animate({
+        scrollTop: $("#read-more-anchor").offset().top},
+        'fast');
+}
+</script>
+
+</body>
+</html>

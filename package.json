@@ -1,0 +1,14 @@
+{
+  "name": "tagayasu",
+  "devDependencies": {
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@nostr-dev-kit/ndk": "^0.7.7",
+    "buffer": "^6.0.3",
+    "crypto-js": "^4.1.1",
+    "triever": "^1.0.5",
+    "web3": "^4.0.3"
+  }
+}
