@@ -7,7 +7,8 @@ class MarkdownRenderer {
     }
 
     renderHtml(markdown) {
-        return this.parse(markdown).html;
+        const _this = self.MarkdownRenderer.instance;
+        return _this.parse(markdown).html;
     }
 
     parse(markdown) {

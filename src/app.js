@@ -28,7 +28,7 @@ function fetchNotes() {
   noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
   notes = {};
 
-  const filter = { authors: [window.nostrUser.hexpubkey()], kinds: [30023] }
+  const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
   window.ndk.fetchEvents(filter).then(function(eventSet) {
       eventSet.forEach(function(e) { saveNoteToDatabase(e); });
       searchNotes(); // trigger a search to generate the initial display
@@ -46,7 +46,7 @@ function loadNote() {
     const filter = PageContext.instance.noteFilterFromUrl();
     window.ndk.fetchEvent(filter).then(function(event) {
       if (!!event) {
-        if (event.pubkey == window.nostrUser.hexpubkey()) {
+        if (event.pubkey == window.nostrUser.hexpubkey) {
           saveNoteToDatabase(event);
           editNote(event.id);
         }

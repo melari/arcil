@@ -1,10 +1,11 @@
 import { ensureReadonlyConnected, atagFor, decryptSelf } from "./common.js"
 
 $(window).on('load', async function() {
-    window.trySeamlessConnection();
-
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
+
+    window.trySeamlessConnection();
+
     if (window.router.pageName == "editor") {
         window.loadNote();
     } else if (window.router.pageName == "browser") {
@@ -15,7 +16,7 @@ $(window).on('load', async function() {
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
     $("#help-npub").html(window.nostrUser.npub);
     if (window.router.pageName == Router.EDITOR) {
-        PageContext.instance.setNoteByAuthorPubkey(window.nostrUser.hexpubkey());
+        PageContext.instance.setNoteByAuthorPubkey(window.nostrUser.hexpubkey);
     }
 });
 
@@ -84,7 +85,7 @@ function updateOwnerOnly() {
     if (
         !!PageContext.instance.note.authorPubkey &&
         !!window.nostrUser &&
-        PageContext.instance.note.authorPubkey == window.nostrUser.hexpubkey()
+        PageContext.instance.note.authorPubkey == window.nostrUser.hexpubkey
     ) {
         $(".owner-only").show();
     } else {

@@ -1,10 +1,12 @@
-import NDK, { NDKNip07Signer, NDKEvent, NDKPrivateKeySigner, filterFromId } from "@nostr-dev-kit/ndk";
+import NDK, { NDKNip07Signer, NDKEvent, NDKPrivateKeySigner } from "@nostr-dev-kit/ndk";
+import { nip19 } from "nostr-tools";
 window.buffer = require('buffer/').Buffer
 const crypto = require('crypto-js');
 
 window.relays = {
   default: [
-    "wss://relay.damus.io"
+    "wss://relay.damus.io",
+    "wss://nos.lol"
   ],
   active: []
 }
@@ -157,7 +159,7 @@ export function atagFor(title, hexpubkey) {
 
 export function encryptSelf(text) {
   if (!!window.nostr && !!window.nostr.nip04) {
-    return window.nostr.nip04.encrypt(window.nostrUser.hexpubkey(), text);
+    return window.nostr.nip04.encrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
     return Promise.resolve(crypto.AES.encrypt(text, window.sessionStorage.privateKey).toString());
   } else {
@@ -167,10 +169,59 @@ export function encryptSelf(text) {
 
 export function decryptSelf(text) {
   if (!!window.nostr && !!window.nostr.nip04) {
-    return window.nostr.nip04.decrypt(window.nostrUser.hexpubkey(), text);
+    return window.nostr.nip04.decrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
     return Promise.resolve(crypto.AES.decrypt(text, window.sessionStorage.privateKey).toString(crypto.enc.Utf8));
   } else {
     return Promise.reject("Did not find any encryption compatible wallet");
   }
 }
+
+/**
+ * Creates a valid nostr filter from an event id or a NIP-19 bech32.
+ * Original: https://github.com/nostr-dev-kit/ndk/blob/master/ndk/src/subscription/utils.ts#L132
+ */
+export function filterFromId(id) {
+    let decoded;
+
+    if (id.match(NIP33_A_REGEX)) {
+        const [kind, pubkey, identifier] = id.split(":");
+
+        const filter = {
+            authors: [pubkey],
+            kinds: [parseInt(kind)],
+        };
+
+        if (identifier) {
+            filter["#d"] = [identifier];
+        }
+
+        return filter;
+    }
+
+    try {
+        decoded = nip19.decode(id);
+
+        switch (decoded.type) {
+            case "nevent":
+                return { ids: [decoded.data.id] };
+            case "note":
+                return { ids: [decoded.data] };
+            case "naddr":
+                return {
+                    authors: [decoded.data.pubkey],
+                    "#d": [decoded.data.identifier],
+                    kinds: [decoded.data.kind],
+                };
+        }
+    } catch (e) {
+        // Empty
+    }
+
+    return { ids: [id] };
+}
+
+/**
+ * Matches an `a` tag of a NIP-33 (kind:pubkey:[identifier])
+ */
+export const NIP33_A_REGEX = /^(\d+):([0-9A-Fa-f]+)(?::(.*))?$/;

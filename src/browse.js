@@ -25,8 +25,7 @@ function openNoteInEditor() {
 window.openNoteInEditor = openNoteInEditor;
 
 async function lookupNpubFromDns() {
-  //const hostname = window.location.hostname;
-  const hostname = "tagayasu.xyz";
+  const hostname = window.location.hostname;
   const url = `https://1.1.1.1/dns-query?name=npub.${hostname}&type=TXT`;
   const headers = {
     'accept': 'application/dns-json'

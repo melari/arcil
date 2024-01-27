@@ -1,4 +1,4 @@
-import { filterFromId } from "@nostr-dev-kit/ndk";
+import { filterFromId } from "./common.js";
 
 class PageContext {
     static NOTE_IN_FOCUS_CHANGED = "note-in-focus-changed";
