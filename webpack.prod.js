@@ -3,6 +3,6 @@ module.exports = {
   mode: 'production',
   output: {
     filename: 'main.min.js',
-    path: path.resolve(__dirname, 'dist', 'app'),
+    path: path.resolve(__dirname, 'dist', 'app', 'assets'),
   },
 }
