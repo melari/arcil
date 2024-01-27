@@ -6,7 +6,7 @@ A bring-your-own-storage digital garden writing platform
 
 `$ npm install`
 `$ npx webpack`
-`npx http-server dist/app --proxy http://localhost:8080?`
+`npx http-server dist/app --proxy 'http://localhost:8080?'`
 OR `$ npx http-server dist/landing`
 
 # Building for Production
