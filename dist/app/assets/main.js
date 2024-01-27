@@ -12804,6 +12804,12 @@ function showMyNotes() {
 }
 window.showMyNotes = showMyNotes;
 
+function showPublishModal() {
+  window.publishModal = new bootstrap.Modal('#publishModal', {});
+  window.publishModal.show();
+}
+window.showPublishModal = showPublishModal;
+
 function fetchNotes() {
   noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
   notes = {};
@@ -12884,6 +12890,7 @@ function newNote() {
 window.newNote = newNote;
 
 function saveNote() {
+  if (!!window.publishModal) { window.publishModal.hide(); }
   (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
     const title = $("#note-title").val();
     if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
@@ -12912,6 +12919,7 @@ function saveNote() {
 window.saveNote = saveNote;
 
 function savePrivateNote() {
+  if (!!window.publishModal) { window.publishModal.hide(); }
   (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
     const title = $("#note-title").val();
     if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
@@ -18515,7 +18523,9 @@ $(".connect-wallet").mouseleave(function() {
 });
 
 window.MDEditor = new SimpleMDE({
-    showIcons: ["code", "table"],
+    toolbar: $(window).width() >= 750
+        ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
+        : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
     renderingConfig: {
         codeSyntaxHighlighting: true
     },

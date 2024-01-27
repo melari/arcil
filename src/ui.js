@@ -58,7 +58,9 @@ $(".connect-wallet").mouseleave(function() {
 });
 
 window.MDEditor = new SimpleMDE({
-    showIcons: ["code", "table"],
+    toolbar: $(window).width() >= 750
+        ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
+        : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
     renderingConfig: {
         codeSyntaxHighlighting: true
     },

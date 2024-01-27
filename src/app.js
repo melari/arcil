@@ -24,6 +24,12 @@ function showMyNotes() {
 }
 window.showMyNotes = showMyNotes;
 
+function showPublishModal() {
+  window.publishModal = new bootstrap.Modal('#publishModal', {});
+  window.publishModal.show();
+}
+window.showPublishModal = showPublishModal;
+
 function fetchNotes() {
   noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
   notes = {};
@@ -104,6 +110,7 @@ function newNote() {
 window.newNote = newNote;
 
 function saveNote() {
+  if (!!window.publishModal) { window.publishModal.hide(); }
   ensureConnected().then(() => {
     const title = $("#note-title").val();
     if (dtagFor(title) == "tagayasu-") {
@@ -132,6 +139,7 @@ function saveNote() {
 window.saveNote = saveNote;
 
 function savePrivateNote() {
+  if (!!window.publishModal) { window.publishModal.hide(); }
   ensureConnected().then(async () => {
     const title = $("#note-title").val();
     if (dtagFor(title) == "tagayasu-") {
