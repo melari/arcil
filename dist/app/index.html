@@ -108,6 +108,11 @@ h3 {
 	flex-grow: 1;
 }
 
+.text-bg-success {
+    background-color: #8e30eb !important;
+    color: #e5d0fa !important;
+}
+
 </style>
 </head>
 
@@ -145,6 +150,19 @@ h3 {
                 </div>
             </div>
         </nav>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body" id="toast-content">
+            Hello, world! This is a toast message.
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>
 </div>
 
 <!-- Note search modal -->
@@ -174,7 +192,7 @@ h3 {
 </div>
 
 <!-- Publish modal -->
-<div class="modal fade" id="publishModal" tabindex="-1" aria-labelledby="publishModalLabel" aria-hidden="true">
+<div class="modal fade" id="publish-modal" tabindex="-1" aria-labelledby="publishModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -201,7 +219,7 @@ h3 {
             <div class="d-flex flex-column flex-lg-row align-items-lg-center w-100">
                 <a href="/" class="navbar-brand mb-2 mb-lg-0 text-center text-lg-start d-none d-lg-block"><span class="jp">耕す</span> t a g a y a s u</a>
                 <div class="d-flex flex-row justify-content-between justify-content-lg-end mt-lg-0 ml-lg-auto w-100 w-lg-auto" style="height:38px;">
-                    <button class="btn btn-link mb-2 mb-lg-0" onclick="openNoteInEditor()"><i class="fa fa-pencil" aria-hidden="true"></i> open in editor</button>
+                    <button class="btn btn-link mb-2 mb-lg-0 owner-only" onclick="openNoteInEditor()"><i class="fa fa-pencil" aria-hidden="true"></i> open in editor</button>
                     <button class="btn connect-wallet" onclick="connectWalletApp()">Connect</button>
                 </div>
             </div>

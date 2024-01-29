@@ -12778,6 +12778,8 @@ __exportStar(__webpack_require__(3088), exports);
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
 /* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2445);
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2171);
+
 
 
 const Trie = __webpack_require__(9372);
@@ -12788,7 +12790,7 @@ window.notes = {};
 // Connect UI button
 function connectWalletApp() {
   (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .toggleConnect */ .Ti)().then(() => {
-    if (window.nip07signer) { showMyNotes(); }
+    if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
   })
 }
 window.connectWalletApp = connectWalletApp;
@@ -12805,7 +12807,7 @@ function showMyNotes() {
 window.showMyNotes = showMyNotes;
 
 function showPublishModal() {
-  window.publishModal = new bootstrap.Modal('#publishModal', {});
+  window.publishModal = new bootstrap.Modal('#publish-modal', {});
   window.publishModal.show();
 }
 window.showPublishModal = showPublishModal;
@@ -12818,7 +12820,7 @@ function fetchNotes() {
   window.ndk.fetchEvents(filter).then(function(eventSet) {
       eventSet.forEach(function(e) { saveNoteToDatabase(e); });
       searchNotes(); // trigger a search to generate the initial display
-  }).catch((error) => console.log(error));
+  }).catch((error) => (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showError */ .x2)(error.message));
 }
 
 // Load the note into the editor given by params
@@ -12894,7 +12896,7 @@ function saveNote() {
   (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
     const title = $("#note-title").val();
     if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-      console.log("empty title is not allowed");
+      (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showError */ .x2)("Title cannot be empty");
       return;
     }
   
@@ -12911,7 +12913,7 @@ function saveNote() {
     });
     console.log(saveEvent);
     saveEvent.publish().then(function(x) {
-        console.log("published event");
+      (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your note has been published!");
         PageContext.instance.setNoteByNostrEvent(saveEvent);
     })
   });
@@ -12923,7 +12925,7 @@ function savePrivateNote() {
   (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
     const title = $("#note-title").val();
     if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-      console.log("empty title is not allowed");
+      (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showError */ .x2)("Title cannot be empty");
       return;
     }
   
@@ -12937,7 +12939,7 @@ function savePrivateNote() {
       ["published_at", Math.floor(Date.now() / 1000).toString()]
     ]
     saveEvent.publish().then(function(x) {
-        console.log("published event");
+      ;(0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your note has been saved privately.");
         PageContext.instance.setNoteByNostrEvent(saveEvent);
     })
   });
@@ -17931,7 +17933,10 @@ async function validateEvent2(event, url, method, body) {
 }
 
 
+// EXTERNAL MODULE: ./src/error.js
+var error = __webpack_require__(2171);
 ;// CONCATENATED MODULE: ./src/common.js
+
 
 
 window.buffer = (__webpack_require__(8764)/* .Buffer */ .lW)
@@ -18034,9 +18039,9 @@ async function connectNostrViaEthereum() {
       if (err.code === 4001) {
         // EIP-1193 userRejectedRequest error
         // If this happens, the user rejected the connection request.
-        console.log('Please connect to MetaMask.');
+        (0,error/* showError */.x2)('User rejected the connection request');
       } else {
-        console.error(err);
+        (0,error/* showError */.x2)(err.message);
       }
     });
   const account = accounts[0];
@@ -18047,11 +18052,21 @@ async function connectNostrViaEthereum() {
   // For historical reasons, you must submit the message to sign in hex-encoded UTF-8.
   // This uses a Node.js-style buffer shim in the browser.
   const msg = `0x${window.buffer.from(message, 'utf8').toString('hex')}`;
-  const sign = await ethereum.request({
+  return await ethereum.request({
     method: 'personal_sign',
     params: [msg, account],
-  });
-  return connectNostrViaPrivateKey(common_crypto.SHA256(sign).toString(common_crypto.enc.Hex).slice(0, 64));
+  })
+    .then(sign => {
+      return connectNostrViaPrivateKey(common_crypto.SHA256(sign).toString(common_crypto.enc.Hex).slice(0, 64));
+    }).catch((err) => {
+      if (err.code === 4001) {
+        // EIP-1193 userRejectedRequest error
+        // If this happens, the user rejected the connection request.
+        (0,error/* showError */.x2)('User rejected the signature request');
+      } else {
+        (0,error/* showError */.x2)(err.message);
+      }
+    });
 }
 
 function connectNostrViaPassphrase() {
@@ -18200,6 +18215,31 @@ class DnsClient {
     }
 }
 window.DnsClient = DnsClient;
+
+/***/ }),
+
+/***/ 2171:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   FZ: () => (/* binding */ NOTICE_EVENT),
+/* harmony export */   qi: () => (/* binding */ ERROR_EVENT),
+/* harmony export */   s6: () => (/* binding */ showNotice),
+/* harmony export */   x2: () => (/* binding */ showError)
+/* harmony export */ });
+const ERROR_EVENT = "error-event";
+const NOTICE_EVENT = "notice-event";
+
+function showError(message) {
+    console.error(message);
+    window.dispatchEvent(new CustomEvent(ERROR_EVENT, { detail: { message } }));
+}
+
+function showNotice(message) {
+    console.log(message);
+    window.dispatchEvent(new CustomEvent(NOTICE_EVENT, { detail: { message } }));
+}
 
 /***/ }),
 
@@ -18463,6 +18503,8 @@ window.Router = Router;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2171);
+
 
 
 $(window).on('load', async function() {
@@ -18579,6 +18621,27 @@ function loadBackrefs() {
     });
 }
 
+window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_1__/* .ERROR_EVENT */ .qi, function (e) {
+    $("#toast").removeClass("text-bg-success");
+    $("#toast").addClass("text-bg-danger");
+    showToast(e.detail.message);
+})
+
+window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_1__/* .NOTICE_EVENT */ .FZ, function (e) {
+    $("#toast").removeClass("text-bg-danger");
+    $("#toast").addClass("text-bg-success");
+    showToast(e.detail.message);
+})
+
+function showToast(content) {
+    $("#toast-content").html(content);
+    window.toast = bootstrap.Toast.getOrCreateInstance(document.getElementById('toast'));
+    toast.show();
+}
+
+$("#toast").on("click", function () {
+    if (!!window.toast) { window.toast.hide(); }
+});
 
 /***/ }),
 

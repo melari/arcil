@@ -1,5 +1,6 @@
 import NDK, { NDKNip07Signer, NDKEvent, NDKPrivateKeySigner } from "@nostr-dev-kit/ndk";
 import { nip19 } from "nostr-tools";
+import { showError } from "./error.js";
 window.buffer = require('buffer/').Buffer
 const crypto = require('crypto-js');
 
@@ -100,9 +101,9 @@ async function connectNostrViaEthereum() {
       if (err.code === 4001) {
         // EIP-1193 userRejectedRequest error
         // If this happens, the user rejected the connection request.
-        console.log('Please connect to MetaMask.');
+        showError('User rejected the connection request');
       } else {
-        console.error(err);
+        showError(err.message);
       }
     });
   const account = accounts[0];
@@ -113,11 +114,21 @@ async function connectNostrViaEthereum() {
   // For historical reasons, you must submit the message to sign in hex-encoded UTF-8.
   // This uses a Node.js-style buffer shim in the browser.
   const msg = `0x${window.buffer.from(message, 'utf8').toString('hex')}`;
-  const sign = await ethereum.request({
+  return await ethereum.request({
     method: 'personal_sign',
     params: [msg, account],
-  });
-  return connectNostrViaPrivateKey(crypto.SHA256(sign).toString(crypto.enc.Hex).slice(0, 64));
+  })
+    .then(sign => {
+      return connectNostrViaPrivateKey(crypto.SHA256(sign).toString(crypto.enc.Hex).slice(0, 64));
+    }).catch((err) => {
+      if (err.code === 4001) {
+        // EIP-1193 userRejectedRequest error
+        // If this happens, the user rejected the connection request.
+        showError('User rejected the signature request');
+      } else {
+        showError(err.message);
+      }
+    });
 }
 
 function connectNostrViaPassphrase() {

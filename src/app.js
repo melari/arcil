@@ -1,5 +1,6 @@
 import { ensureConnected, toggleConnect, dtagFor, encryptSelf } from "./common.js"
 import { NDKEvent } from "@nostr-dev-kit/ndk";
+import { showError, showNotice } from "./error.js"
 const Trie = require("triever");
 
 window.noteTitleTrie = new Trie();
@@ -8,7 +9,7 @@ window.notes = {};
 // Connect UI button
 function connectWalletApp() {
   toggleConnect().then(() => {
-    if (window.nip07signer) { showMyNotes(); }
+    if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
   })
 }
 window.connectWalletApp = connectWalletApp;
@@ -25,7 +26,7 @@ function showMyNotes() {
 window.showMyNotes = showMyNotes;
 
 function showPublishModal() {
-  window.publishModal = new bootstrap.Modal('#publishModal', {});
+  window.publishModal = new bootstrap.Modal('#publish-modal', {});
   window.publishModal.show();
 }
 window.showPublishModal = showPublishModal;
@@ -38,7 +39,7 @@ function fetchNotes() {
   window.ndk.fetchEvents(filter).then(function(eventSet) {
       eventSet.forEach(function(e) { saveNoteToDatabase(e); });
       searchNotes(); // trigger a search to generate the initial display
-  }).catch((error) => console.log(error));
+  }).catch((error) => showError(error.message));
 }
 
 // Load the note into the editor given by params
@@ -114,7 +115,7 @@ function saveNote() {
   ensureConnected().then(() => {
     const title = $("#note-title").val();
     if (dtagFor(title) == "tagayasu-") {
-      console.log("empty title is not allowed");
+      showError("Title cannot be empty");
       return;
     }
   
@@ -131,7 +132,7 @@ function saveNote() {
     });
     console.log(saveEvent);
     saveEvent.publish().then(function(x) {
-        console.log("published event");
+      showNotice("Your note has been published!");
         PageContext.instance.setNoteByNostrEvent(saveEvent);
     })
   });
@@ -143,7 +144,7 @@ function savePrivateNote() {
   ensureConnected().then(async () => {
     const title = $("#note-title").val();
     if (dtagFor(title) == "tagayasu-") {
-      console.log("empty title is not allowed");
+      showError("Title cannot be empty");
       return;
     }
   
@@ -157,7 +158,7 @@ function savePrivateNote() {
       ["published_at", Math.floor(Date.now() / 1000).toString()]
     ]
     saveEvent.publish().then(function(x) {
-        console.log("published event");
+      showNotice("Your note has been saved privately.");
         PageContext.instance.setNoteByNostrEvent(saveEvent);
     })
   });

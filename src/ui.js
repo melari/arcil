@@ -1,4 +1,5 @@
 import { ensureReadonlyConnected, atagFor, decryptSelf } from "./common.js"
+import { ERROR_EVENT, NOTICE_EVENT } from "./error.js"
 
 $(window).on('load', async function() {
     window.router = await new Router().route();
@@ -113,3 +114,25 @@ function loadBackrefs() {
         });
     });
 }
+
+window.addEventListener(ERROR_EVENT, function (e) {
+    $("#toast").removeClass("text-bg-success");
+    $("#toast").addClass("text-bg-danger");
+    showToast(e.detail.message);
+})
+
+window.addEventListener(NOTICE_EVENT, function (e) {
+    $("#toast").removeClass("text-bg-danger");
+    $("#toast").addClass("text-bg-success");
+    showToast(e.detail.message);
+})
+
+function showToast(content) {
+    $("#toast-content").html(content);
+    window.toast = bootstrap.Toast.getOrCreateInstance(document.getElementById('toast'));
+    toast.show();
+}
+
+$("#toast").on("click", function () {
+    if (!!window.toast) { window.toast.hide(); }
+});
