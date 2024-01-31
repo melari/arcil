@@ -1,11 +1,12 @@
-import { ensureReadonlyConnected, atagFor, decryptSelf } from "./common.js"
+import { ensureReadonlyConnected, atagFor, decryptSelf, delay } from "./common.js"
 import { ERROR_EVENT, NOTICE_EVENT } from "./error.js"
 
 $(window).on('load', async function() {
+    createMDE();
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
 
-    window.trySeamlessConnection();
+    await window.trySeamlessConnection();
 
     if (window.router.pageName == "editor") {
         window.loadNote();
@@ -58,16 +59,20 @@ $(".connect-wallet").mouseleave(function() {
     renderConnectButtons({ hover: false });
 });
 
-window.MDEditor = new SimpleMDE({
-    toolbar: $(window).width() >= 750
-        ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
-        : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
-    renderingConfig: {
-        codeSyntaxHighlighting: true
-    },
-    tabSize: 2,
-    previewRender: MarkdownRenderer.instance.renderHtml
-});
+function createMDE() {
+    if (!!window.MDEditor) { window.MDEditor.toTextArea(); }
+    window.MDEditor = new SimpleMDE({
+        toolbar: $(window).width() >= 750
+            ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
+            : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
+        spellChecker: Preferences.instance.current.spellCheckEnabled,
+        renderingConfig: {
+            codeSyntaxHighlighting: true
+        },
+        tabSize: 2,
+        previewRender: MarkdownRenderer.instance.renderHtml
+    });
+}
 
 function renderConnectButtons({ hover }) {
     $(".connect-wallet").each(function(_i, _obj) {
@@ -135,4 +140,8 @@ function showToast(content) {
 
 $("#toast").on("click", function () {
     if (!!window.toast) { window.toast.hide(); }
+});
+
+window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
+    createMDE();
 });

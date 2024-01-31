@@ -13,6 +13,12 @@ window.relays = {
 }
 window.relays.active = window.relays.default;
 
+export async function delay(milliseconds) {
+  return new Promise(resolve => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
 // Swaps between connected / disconnected
 export function toggleConnect() {
   if (window.nip07signer) {
@@ -31,7 +37,7 @@ export function toggleConnect() {
 }
 
 // Will try to get a connection without user interaction if possible
-function trySeamlessConnection() {
+async function trySeamlessConnection() {
   if (window.nip07signer && isNostrConnectionHealthy()) { 
     return Promise.resolve("already connected");
   } else if (window.sessionStorage.lastKeyProvider == "nip07" && !!window.nostr) {
@@ -44,7 +50,7 @@ function trySeamlessConnection() {
 }
 window.trySeamlessConnection = trySeamlessConnection;
 
-export function ensureConnected() {
+export async function ensureConnected() {
   return trySeamlessConnection().catch(() => {
     if (!!window.nostr) {
       return connectNostrViaNip07();
@@ -70,26 +76,26 @@ function isNostrConnectionHealthy() {
   return connectionStats.connected / connectionStats.total >= 0.5
 }
   
-function connectNostr(nip07signer) {
+async function connectNostr(nip07signer) {
   window.nip07signer = nip07signer;
   window.ndk = new NDK({ signer: window.nip07signer, explicitRelayUrls: window.relays.active });
 
-  return nip07signer.user().then(async (user) => {
+  return await nip07signer.user().then(async (user) => {
       if (!!user.npub) {
-          window.nostrUser = user;
-          console.log("Permission granted to read their public key:", user.npub);
-          window.dispatchEvent(new Event(Wallet.WALLET_CONNECTED_EVENT));
-          window.ndk.connect();
+        window.nostrUser = user;
+        console.log("Permission granted to read their public key:", user.npub);
+        window.ndk.connect();
+        window.dispatchEvent(new Event(Wallet.WALLET_CONNECTED_EVENT));
       }
   });
 };
 
-function connectNostrViaNip07() {
+async function connectNostrViaNip07() {
   window.sessionStorage.lastKeyProvider = "nip07";
   return connectNostr(new NDKNip07Signer());
 }
 
-function connectNostrViaPrivateKey(privateKey) {
+async function connectNostrViaPrivateKey(privateKey) {
   window.sessionStorage.privateKey = privateKey;
   window.sessionStorage.lastKeyProvider = "private-key";
   return connectNostr(new NDKPrivateKeySigner(window.sessionStorage.privateKey));

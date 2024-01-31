@@ -13028,7 +13028,7 @@ __webpack_require__.d(__webpack_exports__, {
   Ti: () => (/* binding */ toggleConnect)
 });
 
-// UNUSED EXPORTS: NIP33_A_REGEX
+// UNUSED EXPORTS: NIP33_A_REGEX, delay
 
 // NAMESPACE OBJECT: ./node_modules/nostr-tools/node_modules/@noble/curves/esm/abstract/utils.js
 var abstract_utils_namespaceObject = {};
@@ -17951,6 +17951,12 @@ window.relays = {
 }
 window.relays.active = window.relays.default;
 
+async function delay(milliseconds) {
+  return new Promise(resolve => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
 // Swaps between connected / disconnected
 function toggleConnect() {
   if (window.nip07signer) {
@@ -17969,7 +17975,7 @@ function toggleConnect() {
 }
 
 // Will try to get a connection without user interaction if possible
-function trySeamlessConnection() {
+async function trySeamlessConnection() {
   if (window.nip07signer && isNostrConnectionHealthy()) { 
     return Promise.resolve("already connected");
   } else if (window.sessionStorage.lastKeyProvider == "nip07" && !!window.nostr) {
@@ -17982,7 +17988,7 @@ function trySeamlessConnection() {
 }
 window.trySeamlessConnection = trySeamlessConnection;
 
-function ensureConnected() {
+async function ensureConnected() {
   return trySeamlessConnection().catch(() => {
     if (!!window.nostr) {
       return connectNostrViaNip07();
@@ -18008,26 +18014,26 @@ function isNostrConnectionHealthy() {
   return connectionStats.connected / connectionStats.total >= 0.5
 }
   
-function connectNostr(nip07signer) {
+async function connectNostr(nip07signer) {
   window.nip07signer = nip07signer;
   window.ndk = new dist/* default */.ZP({ signer: window.nip07signer, explicitRelayUrls: window.relays.active });
 
-  return nip07signer.user().then(async (user) => {
+  return await nip07signer.user().then(async (user) => {
       if (!!user.npub) {
-          window.nostrUser = user;
-          console.log("Permission granted to read their public key:", user.npub);
-          window.dispatchEvent(new Event(Wallet.WALLET_CONNECTED_EVENT));
-          window.ndk.connect();
+        window.nostrUser = user;
+        console.log("Permission granted to read their public key:", user.npub);
+        window.ndk.connect();
+        window.dispatchEvent(new Event(Wallet.WALLET_CONNECTED_EVENT));
       }
   });
 };
 
-function connectNostrViaNip07() {
+async function connectNostrViaNip07() {
   window.sessionStorage.lastKeyProvider = "nip07";
   return connectNostr(new dist/* NDKNip07Signer */.fJ());
 }
 
-function connectNostrViaPrivateKey(privateKey) {
+async function connectNostrViaPrivateKey(privateKey) {
   window.sessionStorage.privateKey = privateKey;
   window.sessionStorage.lastKeyProvider = "private-key";
   return connectNostr(new dist/* NDKPrivateKeySigner */.Gg(window.sessionStorage.privateKey));
@@ -18413,6 +18419,81 @@ window.PageContext = PageContext;
 
 /***/ }),
 
+/***/ 7909:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2445);
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2171);
+
+
+
+
+class Preferences {
+    static PREFERENCES_CHANGED_EVENT = "preferences-changed";
+
+    static D_TAG = "tagayasu/preferences";
+    static KIND = 30078;
+
+    static DEFAULTS = {
+        spellCheckEnabled: true,
+    }
+    current = Preferences.DEFAULTS;
+
+    static instance = new Preferences();
+    constructor() {
+        if (!!Preferences.instance) { throw new Error('Use singleton instance'); }
+    }
+
+    async set(partial) {
+        this.current = Object.assign(this.current, partial);
+        window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
+        await this.saveToNostr();
+    }
+
+    // Does NOT ensureConnected, because this is triggered by the wallet connection event
+    // so we are likely still in the process of connecting and therefore the connection
+    // is not healthy yet. Using ensureConnected will cause an infinite reconnection loop.
+    async setFromNostr() {
+        const filter = {
+            authors: [window.nostrUser.hexpubkey],
+            kinds: [Preferences.KIND],
+            "#d": [Preferences.D_TAG],
+        };
+        window.ndk.fetchEvent(filter).then((event) => {
+            if (!!event) {
+                const parsed = JSON.parse(event.content);
+                this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
+                window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
+            }
+        });
+    }
+
+    async saveToNostr() {
+        await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+            const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+            event.kind = Preferences.KIND;
+            event.tags = [
+                ["d", Preferences.D_TAG],
+                ["published_at", Math.floor(Date.now() / 1000).toString()]
+            ];
+            event.content = JSON.stringify(this.current);
+            event.publish().then(() => {
+                (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your preferences have been saved.");
+            });
+        });
+    }
+}
+window.Preferences = Preferences;
+
+window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, async function (e) {
+    Preferences.instance.setFromNostr();
+});
+
+/***/ }),
+
 /***/ 8751:
 /***/ (() => {
 
@@ -18508,10 +18589,11 @@ __webpack_require__.r(__webpack_exports__);
 
 
 $(window).on('load', async function() {
+    createMDE();
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
 
-    window.trySeamlessConnection();
+    await window.trySeamlessConnection();
 
     if (window.router.pageName == "editor") {
         window.loadNote();
@@ -18564,16 +18646,20 @@ $(".connect-wallet").mouseleave(function() {
     renderConnectButtons({ hover: false });
 });
 
-window.MDEditor = new SimpleMDE({
-    toolbar: $(window).width() >= 750
-        ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
-        : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
-    renderingConfig: {
-        codeSyntaxHighlighting: true
-    },
-    tabSize: 2,
-    previewRender: MarkdownRenderer.instance.renderHtml
-});
+function createMDE() {
+    if (!!window.MDEditor) { window.MDEditor.toTextArea(); }
+    window.MDEditor = new SimpleMDE({
+        toolbar: $(window).width() >= 750
+            ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
+            : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
+        spellChecker: Preferences.instance.current.spellCheckEnabled,
+        renderingConfig: {
+            codeSyntaxHighlighting: true
+        },
+        tabSize: 2,
+        previewRender: MarkdownRenderer.instance.renderHtml
+    });
+}
 
 function renderConnectButtons({ hover }) {
     $(".connect-wallet").each(function(_i, _obj) {
@@ -18641,6 +18727,10 @@ function showToast(content) {
 
 $("#toast").on("click", function () {
     if (!!window.toast) { window.toast.hide(); }
+});
+
+window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
+    createMDE();
 });
 
 /***/ }),
@@ -33407,6 +33497,7 @@ __webpack_require__(5284);
 __webpack_require__(5857);
 __webpack_require__(8751);
 __webpack_require__(5123);
+__webpack_require__(7909);
 __webpack_require__(6044);
 __webpack_require__(8281); // last
 })();
