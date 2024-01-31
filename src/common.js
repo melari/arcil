@@ -174,7 +174,7 @@ export function atagFor(title, hexpubkey) {
   return `30023:${hexpubkey}:${dtagFor(title)}`
 }
 
-export function encryptSelf(text) {
+export async function encryptSelf(text) {
   if (!!window.nostr && !!window.nostr.nip04) {
     return window.nostr.nip04.encrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
@@ -184,7 +184,7 @@ export function encryptSelf(text) {
   }
 }
 
-export function decryptSelf(text) {
+export async function decryptSelf(text) {
   if (!!window.nostr && !!window.nostr.nip04) {
     return window.nostr.nip04.decrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {

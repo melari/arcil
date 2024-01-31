@@ -1,4 +1,4 @@
-import { ensureConnected } from "./common";
+import { ensureConnected, encryptSelf, decryptSelf } from "./common";
 import { NDKEvent } from "@nostr-dev-kit/ndk";
 import { showNotice } from "./error.js";
 
@@ -33,9 +33,9 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        window.ndk.fetchEvent(filter).then((event) => {
+        window.ndk.fetchEvent(filter).then(async (event) => {
             if (!!event) {
-                const parsed = JSON.parse(event.content);
+                const parsed = JSON.parse(await decryptSelf(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
                 window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
             }
@@ -43,14 +43,14 @@ class Preferences {
     }
 
     async saveToNostr() {
-        await ensureConnected().then(() => {
+        await ensureConnected().then(async () => {
             const event = new NDKEvent(window.ndk);
             event.kind = Preferences.KIND;
             event.tags = [
                 ["d", Preferences.D_TAG],
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
-            event.content = JSON.stringify(this.current);
+            event.content = await encryptSelf(JSON.stringify(this.current));
             event.publish().then(() => {
                 showNotice("Your preferences have been saved.");
             });

@@ -18112,7 +18112,7 @@ function atagFor(title, hexpubkey) {
   return `30023:${hexpubkey}:${dtagFor(title)}`
 }
 
-function encryptSelf(text) {
+async function encryptSelf(text) {
   if (!!window.nostr && !!window.nostr.nip04) {
     return window.nostr.nip04.encrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
@@ -18122,7 +18122,7 @@ function encryptSelf(text) {
   }
 }
 
-function decryptSelf(text) {
+async function decryptSelf(text) {
   if (!!window.nostr && !!window.nostr.nip04) {
     return window.nostr.nip04.decrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
@@ -18462,9 +18462,9 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        window.ndk.fetchEvent(filter).then((event) => {
+        window.ndk.fetchEvent(filter).then(async (event) => {
             if (!!event) {
-                const parsed = JSON.parse(event.content);
+                const parsed = JSON.parse(await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
                 window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
             }
@@ -18472,14 +18472,14 @@ class Preferences {
     }
 
     async saveToNostr() {
-        await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+        await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
             const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
             event.kind = Preferences.KIND;
             event.tags = [
                 ["d", Preferences.D_TAG],
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
-            event.content = JSON.stringify(this.current);
+            event.content = await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(this.current));
             event.publish().then(() => {
                 (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your preferences have been saved.");
             });
