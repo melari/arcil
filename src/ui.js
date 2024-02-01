@@ -3,10 +3,11 @@ import { ERROR_EVENT, NOTICE_EVENT } from "./error.js"
 
 $(window).on('load', async function() {
     createMDE();
+
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
 
-    await window.trySeamlessConnection();
+    await window.trySeamlessConnection().catch(() => { });
 
     if (window.router.pageName == "editor") {
         window.loadNote();

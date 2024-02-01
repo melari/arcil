@@ -12784,6 +12784,8 @@ __webpack_require__.r(__webpack_exports__);
 
 const Trie = __webpack_require__(9372);
 
+const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
+
 window.noteTitleTrie = new Trie();
 window.notes = {};
 
@@ -12827,7 +12829,7 @@ function fetchNotes() {
 function loadNote() {
   if (!PageContext.instance.noteIdentifierFromUrl()) { 
     if (!!window.nip07signer) { return showMyNotes(); }
-    else { return newNote(); }
+    else { return newNote(INTRO_TEXT); }
   }
 
   (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
@@ -12857,6 +12859,12 @@ function saveNoteToDatabase(event) {
 }
 
 function searchNotes() {
+  // If the trie is empty
+  if (Object.keys(window.noteTitleTrie._childPaths).length === 0) {
+    $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
+    return;
+  }
+
   $("#notes-list").empty();
   const uniqueNotes = new Set();
   $("#note-search-box").val().toLowerCase().split(" ").forEach(function(searchWord) {
@@ -12883,9 +12891,9 @@ async function editNote(noteId) {
 }
 window.editNote = editNote
 
-function newNote() {
+function newNote(content = "") {
   if (!!window.notesModal) { window.notesModal.hide(); }
-  window.MDEditor.value("# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!");
+  window.MDEditor.value(content);
   $("#note-title").val("");
   PageContext.instance.setNoteByAuthorPubkey(PageContext.instance.note.authorPubkey);
 }
@@ -18590,10 +18598,11 @@ __webpack_require__.r(__webpack_exports__);
 
 $(window).on('load', async function() {
     createMDE();
+
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
 
-    await window.trySeamlessConnection();
+    await window.trySeamlessConnection().catch(() => { });
 
     if (window.router.pageName == "editor") {
         window.loadNote();
