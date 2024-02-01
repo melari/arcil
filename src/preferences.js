@@ -9,7 +9,7 @@ class Preferences {
     static KIND = 30078;
 
     static DEFAULTS = {
-        spellCheckEnabled: true,
+        spellCheckEnabled: false,
     }
     current = Preferences.DEFAULTS;
 

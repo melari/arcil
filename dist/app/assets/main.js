@@ -12771,198 +12771,6 @@ __exportStar(__webpack_require__(3088), exports);
 
 /***/ }),
 
-/***/ 6672:
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
-/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2445);
-/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2171);
-
-
-
-const Trie = __webpack_require__(9372);
-
-const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
-
-window.noteTitleTrie = new Trie();
-window.notes = {};
-
-// Connect UI button
-function connectWalletApp() {
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .toggleConnect */ .Ti)().then(() => {
-    if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
-  })
-}
-window.connectWalletApp = connectWalletApp;
-
-function showMyNotes() {
-  $("#notes-list").empty();
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
-    window.notesModal = new bootstrap.Modal('#myNotesModal', {});
-    window.notesModal.show();
-    $("#note-search-box").focus();
-    fetchNotes();
-  })
-}
-window.showMyNotes = showMyNotes;
-
-function showPublishModal() {
-  window.publishModal = new bootstrap.Modal('#publish-modal', {});
-  window.publishModal.show();
-}
-window.showPublishModal = showPublishModal;
-
-function fetchNotes() {
-  noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
-  notes = {};
-
-  const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
-  window.ndk.fetchEvents(filter).then(function(eventSet) {
-      eventSet.forEach(function(e) { saveNoteToDatabase(e); });
-      searchNotes(); // trigger a search to generate the initial display
-  }).catch((error) => (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showError */ .x2)(error.message));
-}
-
-// Load the note into the editor given by params
-function loadNote() {
-  if (!PageContext.instance.noteIdentifierFromUrl()) { 
-    if (!!window.nip07signer) { return showMyNotes(); }
-    else { return newNote(INTRO_TEXT); }
-  }
-
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
-    const filter = PageContext.instance.noteFilterFromUrl();
-    window.ndk.fetchEvent(filter).then(function(event) {
-      if (!!event) {
-        if (event.pubkey == window.nostrUser.hexpubkey) {
-          saveNoteToDatabase(event);
-          editNote(event.id);
-        }
-      } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on nattr d-tag if present
-        const title = filter["#d"][0].slice(9).split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        window.MDEditor.value(`# ${title}`);
-        $("#note-title").val(title);
-      }
-    });
-  });
-}
-window.loadNote = loadNote;
-
-function saveNoteToDatabase(event) {
-  const note = Note.fromNostrEvent(event);
-  notes[event.id] = note;
-  note.title.split(" ").forEach(function(word) {
-    noteTitleTrie.add(word.toLowerCase(), event.id);
-  });
-}
-
-function searchNotes() {
-  // If the trie is empty
-  if (Object.keys(window.noteTitleTrie._childPaths).length === 0) {
-    $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
-    return;
-  }
-
-  $("#notes-list").empty();
-  const uniqueNotes = new Set();
-  $("#note-search-box").val().toLowerCase().split(" ").forEach(function(searchWord) {
-    const searchResults = noteTitleTrie.getData(searchWord);
-    if (!!searchResults) {
-      searchResults.forEach(function(noteId) {
-        uniqueNotes.add(noteId);
-      });
-    }
-  });
-
-  let notesDisplayed = 0;
-  uniqueNotes.forEach(function(noteId) {
-    const note = window.notes[noteId];
-    if (notesDisplayed > 20) { return; }
-    $("#notes-list").append("<button class='list-group-item list-group-item-action' onclick=\"editNote('" + note.id + "')\">" + note.title + "</button>");
-    notesDisplayed++;
-  });
-}
-window.searchNotes = searchNotes;
-
-async function editNote(noteId) {
-  PageContext.instance.setNote(window.notes[noteId]);
-}
-window.editNote = editNote
-
-function newNote(content = "") {
-  if (!!window.notesModal) { window.notesModal.hide(); }
-  window.MDEditor.value(content);
-  $("#note-title").val("");
-  PageContext.instance.setNoteByAuthorPubkey(PageContext.instance.note.authorPubkey);
-}
-window.newNote = newNote;
-
-function saveNote() {
-  if (!!window.publishModal) { window.publishModal.hide(); }
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
-    const title = $("#note-title").val();
-    if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-      (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showError */ .x2)("Title cannot be empty");
-      return;
-    }
-  
-    const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
-    saveEvent.kind = 30023;
-    saveEvent.content = window.MDEditor.value();
-    saveEvent.tags = [
-      ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
-      ["title", title],
-      ["published_at", Math.floor(Date.now() / 1000).toString()]
-    ]
-    MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function(backref) {
-      saveEvent.tags.push(["a", backref]);
-    });
-    console.log(saveEvent);
-    saveEvent.publish().then(function(x) {
-      (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your note has been published!");
-        PageContext.instance.setNoteByNostrEvent(saveEvent);
-    })
-  });
-}
-window.saveNote = saveNote;
-
-function savePrivateNote() {
-  if (!!window.publishModal) { window.publishModal.hide(); }
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
-    const title = $("#note-title").val();
-    if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-      (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showError */ .x2)("Title cannot be empty");
-      return;
-    }
-  
-    const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
-    saveEvent.kind = 30023;
-    saveEvent.content = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(window.MDEditor.value());
-    saveEvent.tags = [
-      ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
-      ["title", title],
-      ["private", "true"],
-      ["published_at", Math.floor(Date.now() / 1000).toString()]
-    ]
-    saveEvent.publish().then(function(x) {
-      ;(0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your note has been saved privately.");
-        PageContext.instance.setNoteByNostrEvent(saveEvent);
-    })
-  });
-}
-window.savePrivateNote = savePrivateNote;
-
-function viewPublishedNote() {
-  window.location.href = window.router.urlFor(Router.BROWSER, PageContext.instance.note.handle);
-}
-window.viewPublishedNote = viewPublishedNote
-
-
-
-/***/ }),
-
 /***/ 2451:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
@@ -17953,7 +17761,14 @@ const common_crypto = __webpack_require__(1354);
 window.relays = {
   default: [
     "wss://relay.damus.io",
-    "wss://nos.lol"
+    "wss://nos.lol",
+    "wss://nostr.mom",
+    "wss://nostr.oxtr.dev",
+    "wss://nostr.wine",
+    "wss://nostr-pub.wellorder.net",
+    "wss://relay.nostr.band",
+    "wss://relay.snort.social",
+    "wss://puravida.nostr.land"
   ],
   active: []
 }
@@ -18315,6 +18130,35 @@ window.MarkdownRenderer = MarkdownRenderer;
 
 /***/ }),
 
+/***/ 7295:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   startNostrMonitoring: () => (/* binding */ startNostrMonitoring)
+/* harmony export */ });
+function startNostrMonitoring() {
+    setInterval(executeNostrMonitoring, 100);
+    executeNostrMonitoring();
+}
+
+function executeNostrMonitoring() {
+    updateStats();
+}
+
+function updateStats() {
+    const connected = window.ndk?.pool?.stats()?.connected ?? 0;
+    const total = window.ndk?.pool?.stats()?.total ?? window.relays.default.length;
+    let stats = `relays connected: ${connected}/${total}`
+
+    $('.autosave').css("float", "left");
+    $('.autosave').html(stats);
+}
+
+
+/***/ }),
+
 /***/ 3797:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
@@ -18446,7 +18290,7 @@ class Preferences {
     static KIND = 30078;
 
     static DEFAULTS = {
-        spellCheckEnabled: true,
+        spellCheckEnabled: false,
     }
     current = Preferences.DEFAULTS;
 
@@ -18517,7 +18361,6 @@ window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, async function (e) {
 class Router {
     editorDomains = [
         'app.tagayasu.xyz',
-        'melari-organic-goggles-g4q45x579r2v4w6-8080.app.github.dev'
     ];
 
     static EDITOR = 'editor';
@@ -18592,12 +18435,23 @@ window.Router = Router;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
-/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2171);
+/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2445);
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(2171);
+/* harmony import */ var _nostr_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(7295);
 
 
+
+
+const Trie = __webpack_require__(9372);
+
+const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
+
+window.noteTitleTrie = new Trie();
+window.notes = {};
 
 $(window).on('load', async function() {
     createMDE();
+    (0,_nostr_js__WEBPACK_IMPORTED_MODULE_2__.startNostrMonitoring)();
 
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
@@ -18610,6 +18464,176 @@ $(window).on('load', async function() {
         window.browseNote();
     }
 });
+
+// Connect UI button
+function connectWalletApp() {
+    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .toggleConnect */ .Ti)().then(() => {
+        if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
+    })
+}
+window.connectWalletApp = connectWalletApp;
+
+function showMyNotes() {
+    $("#notes-list").empty();
+    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+        window.notesModal = new bootstrap.Modal('#myNotesModal', {});
+        window.notesModal.show();
+        $("#note-search-box").focus();
+        fetchNotes();
+    })
+}
+window.showMyNotes = showMyNotes;
+
+function showPublishModal() {
+    window.publishModal = new bootstrap.Modal('#publish-modal', {});
+    window.publishModal.show();
+}
+window.showPublishModal = showPublishModal;
+
+function fetchNotes() {
+    noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
+    notes = {};
+
+    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
+    window.ndk.fetchEvents(filter).then(function (eventSet) {
+        eventSet.forEach(function (e) { saveNoteToDatabase(e); });
+        searchNotes(); // trigger a search to generate the initial display
+    }).catch((error) => (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)(error.message));
+}
+
+// Load the note into the editor given by params
+function loadNote() {
+    if (!PageContext.instance.noteIdentifierFromUrl()) {
+        if (!!window.nip07signer) { return showMyNotes(); }
+        else { return newNote(INTRO_TEXT); }
+    }
+
+    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+        const filter = PageContext.instance.noteFilterFromUrl();
+        window.ndk.fetchEvent(filter).then(function (event) {
+            if (!!event) {
+                if (event.pubkey == window.nostrUser.hexpubkey) {
+                    saveNoteToDatabase(event);
+                    editNote(event.id);
+                }
+            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on nattr d-tag if present
+                const title = filter["#d"][0].slice(9).split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                window.MDEditor.value(`# ${title}`);
+                $("#note-title").val(title);
+            }
+        });
+    });
+}
+window.loadNote = loadNote;
+
+function saveNoteToDatabase(event) {
+    const note = Note.fromNostrEvent(event);
+    notes[event.id] = note;
+    note.title.split(" ").forEach(function (word) {
+        noteTitleTrie.add(word.toLowerCase(), event.id);
+    });
+}
+
+function searchNotes() {
+    // If the trie is empty
+    if (Object.keys(window.noteTitleTrie._childPaths).length === 0) {
+        $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
+        return;
+    }
+
+    $("#notes-list").empty();
+    const uniqueNotes = new Set();
+    $("#note-search-box").val().toLowerCase().split(" ").forEach(function (searchWord) {
+        const searchResults = noteTitleTrie.getData(searchWord);
+        if (!!searchResults) {
+            searchResults.forEach(function (noteId) {
+                uniqueNotes.add(noteId);
+            });
+        }
+    });
+
+    let notesDisplayed = 0;
+    uniqueNotes.forEach(function (noteId) {
+        const note = window.notes[noteId];
+        if (notesDisplayed > 20) { return; }
+        $("#notes-list").append("<button class='list-group-item list-group-item-action' onclick=\"editNote('" + note.id + "')\">" + note.title + "</button>");
+        notesDisplayed++;
+    });
+}
+window.searchNotes = searchNotes;
+
+async function editNote(noteId) {
+    PageContext.instance.setNote(window.notes[noteId]);
+}
+window.editNote = editNote
+
+function newNote(content = "") {
+    if (!!window.notesModal) { window.notesModal.hide(); }
+    window.MDEditor.value(content);
+    $("#note-title").val("");
+    PageContext.instance.setNoteByAuthorPubkey(PageContext.instance.note.authorPubkey);
+}
+window.newNote = newNote;
+
+function saveNote() {
+    if (!!window.publishModal) { window.publishModal.hide(); }
+    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+        const title = $("#note-title").val();
+        if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
+            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
+            return;
+        }
+
+        const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+        saveEvent.kind = 30023;
+        saveEvent.content = window.MDEditor.value();
+        saveEvent.tags = [
+            ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
+            ["title", title],
+            ["published_at", Math.floor(Date.now() / 1000).toString()]
+        ]
+        MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
+            saveEvent.tags.push(["a", backref]);
+        });
+        console.log(saveEvent);
+        saveEvent.publish().then(function (x) {
+            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your note has been published!");
+            PageContext.instance.setNoteByNostrEvent(saveEvent);
+        })
+    });
+}
+window.saveNote = saveNote;
+
+function savePrivateNote() {
+    if (!!window.publishModal) { window.publishModal.hide(); }
+    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
+        const title = $("#note-title").val();
+        if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
+            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
+            return;
+        }
+
+        const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+        saveEvent.kind = 30023;
+        saveEvent.content = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(window.MDEditor.value());
+        saveEvent.tags = [
+            ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
+            ["title", title],
+            ["private", "true"],
+            ["published_at", Math.floor(Date.now() / 1000).toString()]
+        ]
+        saveEvent.publish().then(function (x) {
+            ;(0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your note has been saved privately.");
+            PageContext.instance.setNoteByNostrEvent(saveEvent);
+        })
+    });
+}
+window.savePrivateNote = savePrivateNote;
+
+function viewPublishedNote() {
+    window.location.href = window.router.urlFor(Router.BROWSER, PageContext.instance.note.handle);
+}
+window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
     $("#help-npub").html(window.nostrUser.npub);
@@ -18716,13 +18740,13 @@ function loadBackrefs() {
     });
 }
 
-window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_1__/* .ERROR_EVENT */ .qi, function (e) {
+window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .ERROR_EVENT */ .qi, function (e) {
     $("#toast").removeClass("text-bg-success");
     $("#toast").addClass("text-bg-danger");
     showToast(e.detail.message);
 })
 
-window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_1__/* .NOTICE_EVENT */ .FZ, function (e) {
+window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .NOTICE_EVENT */ .FZ, function (e) {
     $("#toast").removeClass("text-bg-danger");
     $("#toast").addClass("text-bg-success");
     showToast(e.detail.message);
@@ -33499,8 +33523,8 @@ const bytes = (/* unused pure expression or super */ null && (stringToBytes));
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
-__webpack_require__(6672);
 __webpack_require__(2451);
+__webpack_require__(7295);
 __webpack_require__(3797);
 __webpack_require__(5284);
 __webpack_require__(5857);

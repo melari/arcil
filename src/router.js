@@ -10,7 +10,6 @@
 class Router {
     editorDomains = [
         'app.tagayasu.xyz',
-        'melari-organic-goggles-g4q45x579r2v4w6-8080.app.github.dev'
     ];
 
     static EDITOR = 'editor';

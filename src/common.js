@@ -7,7 +7,14 @@ const crypto = require('crypto-js');
 window.relays = {
   default: [
     "wss://relay.damus.io",
-    "wss://nos.lol"
+    "wss://nos.lol",
+    "wss://nostr.mom",
+    "wss://nostr.oxtr.dev",
+    "wss://nostr.wine",
+    "wss://nostr-pub.wellorder.net",
+    "wss://relay.nostr.band",
+    "wss://relay.snort.social",
+    "wss://puravida.nostr.land"
   ],
   active: []
 }

@@ -1,5 +1,5 @@
-require("./app.js");
 require("./browse.js");
+require("./nostr.js");
 require("./note.js");
 require("./pageContext.js");
 require("./dnsClient.js");
