@@ -175,7 +175,7 @@ h3 {
         </div>
         <div class="modal-body">
             <div class="row">
-                <form class="form-inline">
+                <form class="form-inline" action="#">
                     <input id="note-search-box" class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search" style="margin-top: 7px" onkeyup="searchNotes()"/>
                 </form>
             </div>
@@ -267,22 +267,24 @@ h3 {
           <h1 class="modal-title fs-5" id="keyEntryModalLabel">Connect</h1>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-            <div class="row">
-                <div class="col-12">
-                    <p>Looks like you don't have a key vault available. You can login by using a passphrase below, but for the most secure experience we recommend installing the <a href="https://www.getflamingo.org/" target="_blank">Flamingo</a> or <a href="https://chrome.google.com/webstore/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp" target="_blank">nos2x</a> browser extension (and then refresh this page).</p>
-                    <p>Be sure to choose a strong and <strong>unique</strong> Passphrase</p>
+        <form class="form-inline" action="#">
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-12">
+                        <p>Looks like you don't have a key vault available. You can login by using a passphrase below, but for the most secure experience we recommend installing the <a href="https://www.getflamingo.org/" target="_blank">Flamingo</a> or <a href="https://chrome.google.com/webstore/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp" target="_blank">nos2x</a> browser extension (and then refresh this page).</p>
+                        <p>Be sure to choose a strong and <strong>unique</strong> Passphrase</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div clas="col-12">
+                        <input type="password" id="pass-phrase" class="form-control mr-sm-2" type="search" placeholder="Passphrase" aria-label="PassPhrase" style="margin-top: 7px" />
+                    </div>
                 </div>
             </div>
-            <div class="row">
-                <form class="form-inline">
-                    <input id="pass-phrase" class="form-control mr-sm-2" type="search" placeholder="Passphrase" aria-label="PassPhrase" style="margin-top: 7px" />
-                </form>
+            <div class="modal-footer">
+                <input type="submit" id="connectWithPassPhraseButton" class="btn" value="Login" />
             </div>
-        </div>
-        <div class="modal-footer">
-          <button id="connectWithPassPhraseButton" type="button" class="btn">Login</button>
-        </div>
+        </form>
       </div>
     </div>
   </div>
