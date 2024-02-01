@@ -8,8 +8,8 @@ window.connectWalletBrowse = connectWalletBrowse;
 
 
 // Run on page ready; loads the note content from nostr
-function browseNote() {
-  ensureReadonlyConnected();
+async function browseNote() {
+  await ensureReadonlyConnected();
    
   const filters = PageContext.instance.noteFilterFromUrl();
   if (!!filters.authors) { PageContext.instance.setNoteByAuthorPubkey(filters.authors[0]); } // save the author from the params (if possible) rather than event in case the event does not exist.

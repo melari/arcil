@@ -281,8 +281,10 @@ function updateOwnerOnly() {
     }
 }
 
-function loadBackrefs() {
-    ensureReadonlyConnected();
+async function loadBackrefs() {
+    if (window.router.pageName !== Router.BROWSER) { return; }
+
+    await ensureReadonlyConnected();
 
     $("#backref-content").empty();
 

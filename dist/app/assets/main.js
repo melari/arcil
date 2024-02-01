@@ -12787,8 +12787,8 @@ window.connectWalletBrowse = connectWalletBrowse;
 
 
 // Run on page ready; loads the note content from nostr
-function browseNote() {
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
+async function browseNote() {
+  await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
    
   const filters = PageContext.instance.noteFilterFromUrl();
   if (!!filters.authors) { PageContext.instance.setNoteByAuthorPubkey(filters.authors[0]); } // save the author from the params (if possible) rather than event in case the event does not exist.
@@ -17823,7 +17823,7 @@ async function ensureConnected() {
   });
 }
   
-function ensureReadonlyConnected() {
+async function ensureReadonlyConnected() {
   if (!isNostrConnectionHealthy()) {
     window.ndk = new dist/* default */.ZP({explicitRelayUrls: window.relays.active});
     window.ndk.connect();
@@ -18721,8 +18721,10 @@ function updateOwnerOnly() {
     }
 }
 
-function loadBackrefs() {
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
+async function loadBackrefs() {
+    if (window.router.pageName !== Router.BROWSER) { return; }
+
+    await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
 
     $("#backref-content").empty();
 

@@ -69,7 +69,7 @@ export async function ensureConnected() {
   });
 }
   
-export function ensureReadonlyConnected() {
+export async function ensureReadonlyConnected() {
   if (!isNostrConnectionHealthy()) {
     window.ndk = new NDK({explicitRelayUrls: window.relays.active});
     window.ndk.connect();
