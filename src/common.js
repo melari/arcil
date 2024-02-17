@@ -10,11 +10,10 @@ window.relays = {
     "wss://nos.lol",
     "wss://nostr.mom",
     "wss://nostr.oxtr.dev",
-    "wss://nostr.wine",
-    "wss://nostr-pub.wellorder.net",
     "wss://relay.nostr.band",
-    "wss://relay.snort.social",
-    "wss://puravida.nostr.land"
+    "wss://offchain.pub",
+    "wss://purplerelay.com",
+    "wss://nostr.bitcoiner.social"
   ],
   active: []
 }
@@ -24,6 +23,10 @@ export async function delay(milliseconds) {
   return new Promise(resolve => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+export function shortHash(input, length = 64) {
+  return crypto.SHA256(input).toString(crypto.enc.Hex).slice(0, length);
 }
 
 // Swaps between connected / disconnected
@@ -132,7 +135,7 @@ async function connectNostrViaEthereum() {
     params: [msg, account],
   })
     .then(sign => {
-      return connectNostrViaPrivateKey(crypto.SHA256(sign).toString(crypto.enc.Hex).slice(0, 64));
+      return connectNostrViaPrivateKey(shortHash(sign));
     }).catch((err) => {
       if (err.code === 4001) {
         // EIP-1193 userRejectedRequest error
@@ -160,13 +163,13 @@ function connectNostrViaPassphrase() {
       // Remove the event listener to avoid memory leaks
       submitButton.removeEventListener('click', onButtonClick);
       modal.hide();
-      connectNostrViaPrivateKey(crypto.SHA256($("#pass-phrase").val()).toString(crypto.enc.Hex).slice(0, 64)).then(resolve("user logged in with passphrase"));
+      connectNostrViaPrivateKey(shortHash($("#pass-phrase").val())).then(resolve("user logged in with passphrase"));
     });
   });
 }
 
 export function dtagFor(title) {
-  return "tagayasu-" + title.replace(/[^\w\s]/g, '').toLowerCase().replace(/\s+/g, '-');
+  return `tagayasu-${title.toLowerCase()}`;
 }
 
 export function naddrFor(title, hexpubkey) {

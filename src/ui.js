@@ -1,6 +1,6 @@
-import { ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptSelf, decryptSelf } from "./common.js"
+import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptSelf, decryptSelf } from "./common.js"
 import { NDKEvent } from "@nostr-dev-kit/ndk";
-import { showError, showNotice, ERROR_EVENT, NOTICE_EVENT } from "./error.js"
+import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
 const Trie = require("triever");
 
@@ -9,7 +9,7 @@ const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you 
 window.noteTitleTrie = new Trie();
 window.notes = {};
 
-$(window).on('load', async function() {
+$(window).on('DOMContentLoaded', async function () {
     createMDE();
     startNostrMonitoring();
 
@@ -50,15 +50,35 @@ function showPublishModal() {
 }
 window.showPublishModal = showPublishModal;
 
-function fetchNotes() {
-    noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
-    notes = {};
-
+async function fetchNotes() {
+    searchNotes(); // show the notes we have in memory already, if any.
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
-    window.ndk.fetchEvents(filter).then(function (eventSet) {
-        eventSet.forEach(function (e) { saveNoteToDatabase(e); });
-        searchNotes(); // trigger a search to generate the initial display
-    }).catch((error) => showError(error.message));
+
+    const subscription = await window.ndk.subscribe(filter);
+    subscription.on("event", (e) => {
+        saveNoteToDatabase(e);
+        searchNotes(); // trigger a search to update the UI
+    });
+
+    // Well keep the subscription around for 5 seconds after the last event is received,
+    // or if no events are received, for 5 seconds after the subscription is created.
+    const startAt = Date.now();
+    while (
+        Date.now() - startAt < 1000 * 5
+        || (!!subscription.lastEventReceivedAt && Date.now() - subscription.lastEventReceivedAt < 1000 * 5)
+    ) {
+        let foundNew = false;
+        subscription.eventsPerRelay.forEach((eventIds, relay) => {
+            for (const eventId of eventIds) {
+                if (notes[eventId] && !notes[eventId].onRelays.includes(relay)) {
+                    notes[eventId].onRelays.push(relay);
+                    foundNew = true;
+                }
+            }
+        });
+        if (foundNew) { searchNotes(); }
+        await delay(100);
+    }
 }
 
 // Load the note into the editor given by params
@@ -88,10 +108,31 @@ window.loadNote = loadNote;
 
 function saveNoteToDatabase(event) {
     const note = Note.fromNostrEvent(event);
+    if (notes[event.id]) { return; }
+
     notes[event.id] = note;
     note.title.split(" ").forEach(function (word) {
         noteTitleTrie.add(word.toLowerCase(), event.id);
     });
+
+    Object.values(notes)
+        .filter(n => n.dtag === note.dtag)
+        .sort((a, b) => a.nostrEvent.created_at - b.nostrEvent.created_at)
+        .slice(0, -1)
+        .forEach(n => delete notes[n.id]);
+}
+
+function colorForRelay(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    const c = (hash & 0x00FFFFFF)
+        .toString(16)
+        .toUpperCase();
+
+    return "00000".substring(0, 6 - c.length) + c;
 }
 
 function searchNotes() {
@@ -112,15 +153,27 @@ function searchNotes() {
         }
     });
 
+    window.tooltipList.forEach(tooltip => tooltip.dispose());
+
     let notesDisplayed = 0;
     uniqueNotes.forEach(function (noteId) {
         const note = window.notes[noteId];
+        if (!note) { return; }
         if (notesDisplayed > 20) { return; }
-        $("#notes-list").append("<button class='list-group-item list-group-item-action' onclick=\"editNote('" + note.id + "')\">" + note.title + "</button>");
+        let noteRelays = "";
+        for (const relay of note.onRelays) {
+            const color = colorForRelay(relay.url);
+            noteRelays += `<div class="relay-indicator" style="background-color:#${color}" data-bs-toggle="tooltip" data-bs-title="${relay.url}">&nbsp;</div>`;
+        }
+        $("#notes-list").append("<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + note.title + "</div><div>" + noteRelays + "</div></button>");
         notesDisplayed++;
     });
+
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    window.tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
 window.searchNotes = searchNotes;
+window.tooltipList = [];
 
 async function editNote(noteId) {
     PageContext.instance.setNote(window.notes[noteId]);
@@ -136,6 +189,7 @@ function newNote(content = "") {
 window.newNote = newNote;
 
 function saveNote() {
+    showPending("Publishing...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     ensureConnected().then(() => {
         const title = $("#note-title").val();
@@ -165,6 +219,7 @@ function saveNote() {
 window.saveNote = saveNote;
 
 function savePrivateNote() {
+    showPending("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     ensureConnected().then(async () => {
         const title = $("#note-title").val();
@@ -205,6 +260,11 @@ window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
 window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
     renderConnectButtons({ hover: false });
     updateOwnerOnly();
+});
+
+window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
+    window.noteTitleTrie = new Trie();
+    window.notes = {};
 });
 
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
@@ -304,13 +364,22 @@ async function loadBackrefs() {
 
 window.addEventListener(ERROR_EVENT, function (e) {
     $("#toast").removeClass("text-bg-success");
+    $("#toast").removeClass("text-bg-secondary");
     $("#toast").addClass("text-bg-danger");
     showToast(e.detail.message);
 })
 
 window.addEventListener(NOTICE_EVENT, function (e) {
     $("#toast").removeClass("text-bg-danger");
+    $("#toast").removeClass("text-bg-secondary");
     $("#toast").addClass("text-bg-success");
+    showToast(e.detail.message);
+})
+
+window.addEventListener(PENDING_EVENT, function (e) {
+    $("#toast").removeClass("text-bg-danger");
+    $("#toast").removeClass("text-bg-success");
+    $("#toast").addClass("text-bg-secondary");
     showToast(e.detail.message);
 })
 

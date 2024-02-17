@@ -12835,6 +12835,7 @@ window.lookupNpubFromDns = lookupNpubFromDns;
 __webpack_require__.d(__webpack_exports__, {
   Mf: () => (/* binding */ atagFor),
   Gk: () => (/* binding */ decryptSelf),
+  gw: () => (/* binding */ delay),
   oF: () => (/* binding */ dtagFor),
   DE: () => (/* binding */ encryptSelf),
   zs: () => (/* binding */ ensureConnected),
@@ -12844,7 +12845,7 @@ __webpack_require__.d(__webpack_exports__, {
   Ti: () => (/* binding */ toggleConnect)
 });
 
-// UNUSED EXPORTS: NIP33_A_REGEX, delay
+// UNUSED EXPORTS: NIP33_A_REGEX, shortHash
 
 // NAMESPACE OBJECT: ./node_modules/nostr-tools/node_modules/@noble/curves/esm/abstract/utils.js
 var abstract_utils_namespaceObject = {};
@@ -17764,11 +17765,10 @@ window.relays = {
     "wss://nos.lol",
     "wss://nostr.mom",
     "wss://nostr.oxtr.dev",
-    "wss://nostr.wine",
-    "wss://nostr-pub.wellorder.net",
     "wss://relay.nostr.band",
-    "wss://relay.snort.social",
-    "wss://puravida.nostr.land"
+    "wss://offchain.pub",
+    "wss://purplerelay.com",
+    "wss://nostr.bitcoiner.social"
   ],
   active: []
 }
@@ -17778,6 +17778,10 @@ async function delay(milliseconds) {
   return new Promise(resolve => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+function shortHash(input, length = 64) {
+  return common_crypto.SHA256(input).toString(common_crypto.enc.Hex).slice(0, length);
 }
 
 // Swaps between connected / disconnected
@@ -17886,7 +17890,7 @@ async function connectNostrViaEthereum() {
     params: [msg, account],
   })
     .then(sign => {
-      return connectNostrViaPrivateKey(common_crypto.SHA256(sign).toString(common_crypto.enc.Hex).slice(0, 64));
+      return connectNostrViaPrivateKey(shortHash(sign));
     }).catch((err) => {
       if (err.code === 4001) {
         // EIP-1193 userRejectedRequest error
@@ -17914,13 +17918,13 @@ function connectNostrViaPassphrase() {
       // Remove the event listener to avoid memory leaks
       submitButton.removeEventListener('click', onButtonClick);
       modal.hide();
-      connectNostrViaPrivateKey(common_crypto.SHA256($("#pass-phrase").val()).toString(common_crypto.enc.Hex).slice(0, 64)).then(resolve("user logged in with passphrase"));
+      connectNostrViaPrivateKey(shortHash($("#pass-phrase").val())).then(resolve("user logged in with passphrase"));
     });
   });
 }
 
 function dtagFor(title) {
-  return "tagayasu-" + title.replace(/[^\w\s]/g, '').toLowerCase().replace(/\s+/g, '-');
+  return `tagayasu-${title.toLowerCase()}`;
 }
 
 function naddrFor(title, hexpubkey) {
@@ -18053,12 +18057,15 @@ window.DnsClient = DnsClient;
 "use strict";
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   FZ: () => (/* binding */ NOTICE_EVENT),
+/* harmony export */   Si: () => (/* binding */ showPending),
+/* harmony export */   k7: () => (/* binding */ PENDING_EVENT),
 /* harmony export */   qi: () => (/* binding */ ERROR_EVENT),
 /* harmony export */   s6: () => (/* binding */ showNotice),
 /* harmony export */   x2: () => (/* binding */ showError)
 /* harmony export */ });
 const ERROR_EVENT = "error-event";
 const NOTICE_EVENT = "notice-event";
+const PENDING_EVENT = "pending-event";
 
 function showError(message) {
     console.error(message);
@@ -18068,6 +18075,11 @@ function showError(message) {
 function showNotice(message) {
     console.log(message);
     window.dispatchEvent(new CustomEvent(NOTICE_EVENT, { detail: { message } }));
+}
+
+function showPending(message) {
+    console.log(message);
+    window.dispatchEvent(new CustomEvent(PENDING_EVENT, { detail: { message } }));
 }
 
 /***/ }),
@@ -18165,6 +18177,8 @@ function updateStats() {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(2445);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6213);
+
 
 
 class Note {
@@ -18176,12 +18190,14 @@ class Note {
         note.private = !!event.tags.find(t => t[0] == "private");
         note.content = event.content;
         note.authorPubkey = event.pubkey;
+        note.onRelays = [];
         return note;
     }
 
     static fromHexPubkey(pubkey) {
         const note = new Note();
         note.authorPubkey = pubkey;
+        note.onRelays = [];
         return note;
     }
 
@@ -18194,7 +18210,7 @@ class Note {
     }
 
     get dtag() {
-        return "tagayasu-" + this.title.replace(/[^\w\s]/g, '').toLowerCase().replace(/\s+/g, '-');
+        return (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .dtagFor */ .oF)(this.title);
     }
 }
 window.Note = Note;
@@ -18449,7 +18465,7 @@ const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you 
 window.noteTitleTrie = new Trie();
 window.notes = {};
 
-$(window).on('load', async function() {
+$(window).on('DOMContentLoaded', async function () {
     createMDE();
     (0,_nostr_js__WEBPACK_IMPORTED_MODULE_2__.startNostrMonitoring)();
 
@@ -18490,15 +18506,35 @@ function showPublishModal() {
 }
 window.showPublishModal = showPublishModal;
 
-function fetchNotes() {
-    noteTitleTrie = new Trie(); // This is a full reload, so we empty out the existing index.
-    notes = {};
-
+async function fetchNotes() {
+    searchNotes(); // show the notes we have in memory already, if any.
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
-    window.ndk.fetchEvents(filter).then(function (eventSet) {
-        eventSet.forEach(function (e) { saveNoteToDatabase(e); });
-        searchNotes(); // trigger a search to generate the initial display
-    }).catch((error) => (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)(error.message));
+
+    const subscription = await window.ndk.subscribe(filter);
+    subscription.on("event", (e) => {
+        saveNoteToDatabase(e);
+        searchNotes(); // trigger a search to update the UI
+    });
+
+    // Well keep the subscription around for 5 seconds after the last event is received,
+    // or if no events are received, for 5 seconds after the subscription is created.
+    const startAt = Date.now();
+    while (
+        Date.now() - startAt < 1000 * 5
+        || (!!subscription.lastEventReceivedAt && Date.now() - subscription.lastEventReceivedAt < 1000 * 5)
+    ) {
+        let foundNew = false;
+        subscription.eventsPerRelay.forEach((eventIds, relay) => {
+            for (const eventId of eventIds) {
+                if (notes[eventId] && !notes[eventId].onRelays.includes(relay)) {
+                    notes[eventId].onRelays.push(relay);
+                    foundNew = true;
+                }
+            }
+        });
+        if (foundNew) { searchNotes(); }
+        await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .delay */ .gw)(100);
+    }
 }
 
 // Load the note into the editor given by params
@@ -18528,10 +18564,31 @@ window.loadNote = loadNote;
 
 function saveNoteToDatabase(event) {
     const note = Note.fromNostrEvent(event);
+    if (notes[event.id]) { return; }
+
     notes[event.id] = note;
     note.title.split(" ").forEach(function (word) {
         noteTitleTrie.add(word.toLowerCase(), event.id);
     });
+
+    Object.values(notes)
+        .filter(n => n.dtag === note.dtag)
+        .sort((a, b) => a.nostrEvent.created_at - b.nostrEvent.created_at)
+        .slice(0, -1)
+        .forEach(n => delete notes[n.id]);
+}
+
+function colorForRelay(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    const c = (hash & 0x00FFFFFF)
+        .toString(16)
+        .toUpperCase();
+
+    return "00000".substring(0, 6 - c.length) + c;
 }
 
 function searchNotes() {
@@ -18552,15 +18609,27 @@ function searchNotes() {
         }
     });
 
+    window.tooltipList.forEach(tooltip => tooltip.dispose());
+
     let notesDisplayed = 0;
     uniqueNotes.forEach(function (noteId) {
         const note = window.notes[noteId];
+        if (!note) { return; }
         if (notesDisplayed > 20) { return; }
-        $("#notes-list").append("<button class='list-group-item list-group-item-action' onclick=\"editNote('" + note.id + "')\">" + note.title + "</button>");
+        let noteRelays = "";
+        for (const relay of note.onRelays) {
+            const color = colorForRelay(relay.url);
+            noteRelays += `<div class="relay-indicator" style="background-color:#${color}" data-bs-toggle="tooltip" data-bs-title="${relay.url}">&nbsp;</div>`;
+        }
+        $("#notes-list").append("<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + note.title + "</div><div>" + noteRelays + "</div></button>");
         notesDisplayed++;
     });
+
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    window.tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
 window.searchNotes = searchNotes;
+window.tooltipList = [];
 
 async function editNote(noteId) {
     PageContext.instance.setNote(window.notes[noteId]);
@@ -18576,6 +18645,7 @@ function newNote(content = "") {
 window.newNote = newNote;
 
 function saveNote() {
+    (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Publishing...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
         const title = $("#note-title").val();
@@ -18605,6 +18675,7 @@ function saveNote() {
 window.saveNote = saveNote;
 
 function savePrivateNote() {
+    (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
         const title = $("#note-title").val();
@@ -18645,6 +18716,11 @@ window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
 window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
     renderConnectButtons({ hover: false });
     updateOwnerOnly();
+});
+
+window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
+    window.noteTitleTrie = new Trie();
+    window.notes = {};
 });
 
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
@@ -18744,13 +18820,22 @@ async function loadBackrefs() {
 
 window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .ERROR_EVENT */ .qi, function (e) {
     $("#toast").removeClass("text-bg-success");
+    $("#toast").removeClass("text-bg-secondary");
     $("#toast").addClass("text-bg-danger");
     showToast(e.detail.message);
 })
 
 window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .NOTICE_EVENT */ .FZ, function (e) {
     $("#toast").removeClass("text-bg-danger");
+    $("#toast").removeClass("text-bg-secondary");
     $("#toast").addClass("text-bg-success");
+    showToast(e.detail.message);
+})
+
+window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .PENDING_EVENT */ .k7, function (e) {
+    $("#toast").removeClass("text-bg-danger");
+    $("#toast").removeClass("text-bg-success");
+    $("#toast").addClass("text-bg-secondary");
     showToast(e.detail.message);
 })
 
@@ -20458,7 +20543,7 @@ __webpack_require__.d(__webpack_exports__, {
   ZP: () => (/* binding */ NDK)
 });
 
-// UNUSED EXPORTS: NDKAppHandlerEvent, NDKArticle, NDKDVMJobFeedback, NDKDVMJobResult, NDKDVMRequest, NDKDvmJobFeedbackStatus, NDKHighlight, NDKKind, NDKList, NDKListKinds, NDKNip46Backend, NDKNip46Signer, NDKNostrRpc, NDKRelay, NDKRelayAuthPolicies, NDKRelayList, NDKRelaySet, NDKRelayStatus, NDKRepost, NDKSimpleGroup, NDKSubscription, NDKSubscriptionCacheUsage, NDKTranscriptionDVM, NDKUser, NDKVideo, NDKZap, PublishError, calculateGroupableId, defaultOpts, mergeFilters, profileFromEvent, serializeProfile, zapInvoiceFromEvent
+// UNUSED EXPORTS: NDKAppHandlerEvent, NDKArticle, NDKDVMJobFeedback, NDKDVMJobResult, NDKDVMRequest, NDKDvmJobFeedbackStatus, NDKHighlight, NDKKind, NDKList, NDKListKinds, NDKNip46Backend, NDKNip46Signer, NDKNostrRpc, NDKRelay, NDKRelayAuthPolicies, NDKRelayList, NDKRelaySet, NDKRelayStatus, NDKRepost, NDKSimpleGroup, NDKSubscription, NDKSubscriptionCacheUsage, NDKSubscriptionReceipt, NDKSubscriptionStart, NDKSubscriptionTier, NDKTranscriptionDVM, NDKUser, NDKVideo, NDKZap, PublishError, calculateGroupableId, calculateTermDurationInSeconds, defaultOpts, dvmSchedule, mergeFilters, newAmount, parseTagToSubscriptionAmount, pinEvent, possibleIntervalFrequencies, profileFromEvent, serializeProfile, zapInvoiceFromEvent
 
 // NAMESPACE OBJECT: ./node_modules/@noble/curves/esm/abstract/utils.js
 var utils_namespaceObject = {};
@@ -27843,7 +27928,7 @@ var NDKRelayConnectivity = class {
       setTimeout(() => this.connect(), 2e3);
       this.debug(this.relay.url, "Relay complaining?", notice);
     }
-    this.ndkRelay.emit("notice", this, notice);
+    this.ndkRelay.emit("notice", this.relay, notice);
   }
   /**
    * Called when the relay is unexpectedly disconnected.
@@ -28144,10 +28229,10 @@ var NDKGroupedSubscriptions = class extends lib.EventEmitter {
   subscriptions;
   req;
   debug;
-  constructor(subscriptions, debug4) {
+  constructor(subscriptions, debug7) {
     super();
     this.subscriptions = subscriptions;
-    this.debug = debug4 || this.subscriptions[0].subscription.debug.extend("grouped");
+    this.debug = debug7 || this.subscriptions[0].subscription.debug.extend("grouped");
     for (const subscription of subscriptions) {
       this.handleSubscriptionClosure(subscription);
     }
@@ -28544,8 +28629,15 @@ var PublishError = class extends Error {
     super(message);
     this.errors = errors;
   }
+  get relayErrors() {
+    const errors = [];
+    for (const [relay, err] of this.errors) {
+      errors.push(`${relay.url}: ${err}`);
+    }
+    return errors.join("\n");
+  }
 };
-var NDKRelaySet = class _NDKRelaySet {
+var NDKRelaySet = class {
   relays;
   debug;
   ndk;
@@ -28582,13 +28674,30 @@ var NDKRelaySet = class _NDKRelaySet {
         relays.add(temporaryRelay);
       }
     }
-    return new _NDKRelaySet(new Set(relays), ndk);
+    return new NDKRelaySet(new Set(relays), ndk);
   }
   /**
    * Publish an event to all relays in this set. Returns the number of relays that have received the event.
    * @param event
    * @param timeoutMs - timeout in milliseconds for each publish operation and connection operation
    * @returns A set where the event was successfully published to
+   * @throws PublishError if no relay was able to receive the event
+   * @example
+   * ```typescript
+   * const event = new NDKEvent(ndk, {kinds: [NDKKind.Message], "#d": ["123"]});
+   * try {
+   *    const publishedToRelays = await relaySet.publish(event);
+   *    console.log(`published to ${publishedToRelays.size} relays`)
+   * } catch (error) {
+   *   console.error("error publishing to relays", error);
+   *
+   *   if (error instanceof PublishError) {
+   *      for (const [relay, err] of error.errors) {
+   *         console.error(`error publishing to relay ${relay.url}`, err);
+   *       }
+   *   }
+   * }
+   * ```
    */
   async publish(event, timeoutMs) {
     const publishedToRelays = /* @__PURE__ */ new Set();
@@ -28596,7 +28705,7 @@ var NDKRelaySet = class _NDKRelaySet {
     const isEphemeral2 = event.isEphemeral();
     const promises = Array.from(this.relays).map((relay) => {
       return new Promise((resolve) => {
-        relay.publish(event, timeoutMs).then(() => {
+        relay.publish(event, timeoutMs).then((e) => {
           publishedToRelays.add(relay);
           resolve();
         }).catch((err) => {
@@ -28619,7 +28728,7 @@ var NDKRelaySet = class _NDKRelaySet {
     }
     return publishedToRelays;
   }
-  size() {
+  get size() {
     return this.relays.size;
   }
 };
@@ -28702,6 +28811,8 @@ function calculateRelaySetsFromFilters(ndk, filters) {
 
 
 
+
+var debug2 = browser("ndk:zap");
 var DEFAULT_RELAYS = [
   "wss://nos.lol",
   "wss://relay.nostr.band",
@@ -28725,10 +28836,12 @@ var Zap = class extends lib.EventEmitter {
     let lud16;
     let zapEndpoint;
     let zapEndpointCallback;
+    let profile;
     if (this.zappedUser) {
       if (!this.zappedUser.profile) {
         await this.zappedUser.fetchProfile({ groupable: false });
       }
+      profile = this.zappedUser.profile;
       lud06 = (this.zappedUser.profile || {}).lud06;
       lud16 = (this.zappedUser.profile || {}).lud16;
     }
@@ -28742,6 +28855,7 @@ var Zap = class extends lib.EventEmitter {
       zapEndpoint = utf8Decoder.decode(data);
     }
     if (!zapEndpoint) {
+      debug2("No zap endpoint found", profile, { lud06, lud16 });
       throw new Error("No zap endpoint found");
     }
     try {
@@ -28780,6 +28894,7 @@ var Zap = class extends lib.EventEmitter {
     await event.sign(signer);
     let invoice;
     try {
+      debug2(`Getting invoice for zap request: ${zapEndpoint}`);
       invoice = await this.getInvoice(event, amount, zapEndpoint);
     } catch (e) {
       throw new Error("Failed to get invoice: " + e);
@@ -28787,12 +28902,27 @@ var Zap = class extends lib.EventEmitter {
     return invoice;
   }
   async getInvoice(event, amount, zapEndpoint) {
-    const response = await fetch(
-      `${zapEndpoint}?` + new URLSearchParams({
+    debug2(
+      `Fetching invoice from ${zapEndpoint}?` + new URLSearchParams({
         amount: amount.toString(),
-        nostr: JSON.stringify(event.rawEvent())
+        nostr: encodeURIComponent(JSON.stringify(event.rawEvent()))
       })
     );
+    const url = new URL(zapEndpoint);
+    url.searchParams.append("amount", amount.toString());
+    url.searchParams.append("nostr", JSON.stringify(event.rawEvent()));
+    debug2(`Fetching invoice from ${url.toString()}`);
+    const response = await fetch(url.toString());
+    debug2(`Got response from zap endpoint: ${zapEndpoint}`, { status: response.status });
+    if (response.status !== 200) {
+      debug2(`Received non-200 status from zap endpoint: ${zapEndpoint}`, {
+        status: response.status,
+        amount,
+        nostr: JSON.stringify(event.rawEvent())
+      });
+      const text = await response.text();
+      throw new Error(`Unable to fetch zap endpoint ${zapEndpoint}: ${text}`);
+    }
     const body = await response.json();
     return body.pr;
   }
@@ -28813,7 +28943,8 @@ var Zap = class extends lib.EventEmitter {
     });
     if (this.zappedEvent) {
       const tags = this.zappedEvent.referenceTags();
-      zapRequest.tags.push(...tags);
+      const nonPTags = tags.filter((tag) => tag[0] !== "p");
+      zapRequest.tags.push(...nonPTags);
     }
     zapRequest.tags.push(["lnurl", zapEndpoint]);
     const event = new NDKEvent(this.ndk, zapRequest);
@@ -28993,11 +29124,15 @@ var NDKKind = /* @__PURE__ */ ((NDKKind2) => {
   NDKKind2[NDKKind2["DVMReqDiscoveryNostrContent"] = 5300] = "DVMReqDiscoveryNostrContent";
   NDKKind2[NDKKind2["DVMReqDiscoveryNostrPeople"] = 5301] = "DVMReqDiscoveryNostrPeople";
   NDKKind2[NDKKind2["DVMReqTimestamping"] = 5900] = "DVMReqTimestamping";
+  NDKKind2[NDKKind2["DVMEventSchedule"] = 5905] = "DVMEventSchedule";
   NDKKind2[NDKKind2["DVMJobFeedback"] = 7e3] = "DVMJobFeedback";
-  NDKKind2[NDKKind2["SubscriptionStart"] = 7001] = "SubscriptionStart";
-  NDKKind2[NDKKind2["SubscriptionStop"] = 7002] = "SubscriptionStop";
+  NDKKind2[NDKKind2["Subscribe"] = 7001] = "Subscribe";
+  NDKKind2[NDKKind2["Unsubscribe"] = 7002] = "Unsubscribe";
+  NDKKind2[NDKKind2["SubscriptionReceipt"] = 7003] = "SubscriptionReceipt";
   NDKKind2[NDKKind2["GroupAdminAddUser"] = 9e3] = "GroupAdminAddUser";
   NDKKind2[NDKKind2["GroupAdminRemoveUser"] = 9001] = "GroupAdminRemoveUser";
+  NDKKind2[NDKKind2["GroupAdminEditMetadata"] = 9002] = "GroupAdminEditMetadata";
+  NDKKind2[NDKKind2["GroupAdminEditStatus"] = 9006] = "GroupAdminEditStatus";
   NDKKind2[NDKKind2["MuteList"] = 1e4] = "MuteList";
   NDKKind2[NDKKind2["PinList"] = 10001] = "PinList";
   NDKKind2[NDKKind2["RelayList"] = 10002] = "RelayList";
@@ -29009,7 +29144,6 @@ var NDKKind = /* @__PURE__ */ ((NDKKind2) => {
   NDKKind2[NDKKind2["InterestList"] = 10015] = "InterestList";
   NDKKind2[NDKKind2["EmojiList"] = 10030] = "EmojiList";
   NDKKind2[NDKKind2["TierList"] = 17e3] = "TierList";
-  NDKKind2[NDKKind2["SuperFollowList"] = 17001] = "SuperFollowList";
   NDKKind2[NDKKind2["FollowSet"] = 3e4] = "FollowSet";
   NDKKind2[NDKKind2["CategorizedPeopleList"] = 3e4 /* FollowSet */] = "CategorizedPeopleList";
   NDKKind2[NDKKind2["CategorizedBookmarkList"] = 30001] = "CategorizedBookmarkList";
@@ -29017,6 +29151,8 @@ var NDKKind = /* @__PURE__ */ ((NDKKind2) => {
   NDKKind2[NDKKind2["CategorizedRelayList"] = 30002 /* RelaySet */] = "CategorizedRelayList";
   NDKKind2[NDKKind2["BookmarkSet"] = 30003] = "BookmarkSet";
   NDKKind2[NDKKind2["CurationSet"] = 30004] = "CurationSet";
+  NDKKind2[NDKKind2["ArticleCurationSet"] = 30004] = "ArticleCurationSet";
+  NDKKind2[NDKKind2["VideoCurationSet"] = 30005] = "VideoCurationSet";
   NDKKind2[NDKKind2["InterestSet"] = 30015] = "InterestSet";
   NDKKind2[NDKKind2["InterestsList"] = 30015 /* InterestSet */] = "InterestsList";
   NDKKind2[NDKKind2["EmojiSet"] = 30030] = "EmojiSet";
@@ -29028,7 +29164,6 @@ var NDKKind = /* @__PURE__ */ ((NDKKind2) => {
   NDKKind2[NDKKind2["Highlight"] = 9802] = "Highlight";
   NDKKind2[NDKKind2["ClientAuth"] = 22242] = "ClientAuth";
   NDKKind2[NDKKind2["NostrConnect"] = 24133] = "NostrConnect";
-  NDKKind2[NDKKind2["NostrConnectAdmin"] = 24134] = "NostrConnectAdmin";
   NDKKind2[NDKKind2["HttpAuth"] = 27235] = "HttpAuth";
   NDKKind2[NDKKind2["ProfileBadge"] = 30008] = "ProfileBadge";
   NDKKind2[NDKKind2["BadgeDefinition"] = 30009] = "BadgeDefinition";
@@ -29038,6 +29173,7 @@ var NDKKind = /* @__PURE__ */ ((NDKKind2) => {
   NDKKind2[NDKKind2["AppSpecificData"] = 30078] = "AppSpecificData";
   NDKKind2[NDKKind2["Classified"] = 30402] = "Classified";
   NDKKind2[NDKKind2["HorizontalVideo"] = 34235] = "HorizontalVideo";
+  NDKKind2[NDKKind2["GroupMetadata"] = 39e3] = "GroupMetadata";
   NDKKind2[NDKKind2["GroupMembers"] = 39002] = "GroupMembers";
   NDKKind2[NDKKind2["AppRecommendation"] = 31989] = "AppRecommendation";
   NDKKind2[NDKKind2["AppHandler"] = 31990] = "AppHandler";
@@ -29059,7 +29195,8 @@ var NDKListKinds = (/* unused pure expression or super */ null && ([
   30001 /* CategorizedBookmarkList */,
   // Backwards compatibility
   30002 /* RelaySet */,
-  30004 /* CurationSet */,
+  30004 /* ArticleCurationSet */,
+  30005 /* VideoCurationSet */,
   30015 /* InterestSet */,
   30030 /* EmojiSet */,
   39802 /* HighlightSet */
@@ -29100,17 +29237,23 @@ async function dist_decrypt(sender, signer) {
 // src/events/nip19.ts
 
 function encode() {
+  let relays = [];
+  if (this.onRelays.length > 0) {
+    relays = this.onRelays.map((relay) => relay.url);
+  } else if (this.relay) {
+    relays = [this.relay.url];
+  }
   if (this.isParamReplaceable()) {
     return nip19_exports.naddrEncode({
       kind: this.kind,
       pubkey: this.pubkey,
       identifier: this.replaceableDTag(),
-      relays: this.relay ? [this.relay.url] : []
+      relays
     });
-  } else if (this.relay) {
+  } else if (relays.length > 0) {
     return nip19_exports.neventEncode({
       id: this.tagId(),
-      relays: [this.relay.url],
+      relays,
       author: this.pubkey
     });
   } else {
@@ -29148,7 +29291,7 @@ function getKind(event) {
 }
 
 // src/events/index.ts
-var NDKEvent = class _NDKEvent extends lib.EventEmitter {
+var NDKEvent = class extends lib.EventEmitter {
   ndk;
   created_at;
   content = "";
@@ -29162,6 +29305,10 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
    * The relay that this event was first received from.
    */
   relay;
+  /**
+   * The relays that this event was received from and/or successfully published to.
+   */
+  onRelays = [];
   constructor(ndk, event) {
     super();
     this.ndk = ndk;
@@ -29203,16 +29350,17 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
     this._author = user;
     return user;
   }
-  tag(userOrTagOrEvent, marker) {
+  tag(userOrTagOrEvent, marker, skipAuthorTag) {
     let tags = [];
-    if (userOrTagOrEvent instanceof NDKUser) {
+    const isNDKUser = userOrTagOrEvent.fetchProfile !== void 0;
+    if (isNDKUser) {
       const tag = ["p", userOrTagOrEvent.pubkey];
       if (marker)
-        tag.push(marker);
+        tag.push(...["", marker]);
       tags.push(tag);
-    } else if (userOrTagOrEvent instanceof _NDKEvent) {
+    } else if (userOrTagOrEvent instanceof NDKEvent) {
       const event = userOrTagOrEvent;
-      const skipAuthorTag = event?.pubkey === this.pubkey;
+      skipAuthorTag ??= event?.pubkey === this.pubkey;
       tags = event.referenceTags(marker, skipAuthorTag);
       for (const pTag of event.getMatchingTags("p")) {
         if (pTag[1] === this.pubkey)
@@ -29221,8 +29369,10 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
           continue;
         this.tags.push(["p", pTag[1]]);
       }
-    } else {
+    } else if (Array.isArray(userOrTagOrEvent)) {
       tags = [userOrTagOrEvent];
+    } else {
+      throw new Error("Invalid argument", userOrTagOrEvent);
     }
     this.tags = mergeTags(this.tags, tags);
   }
@@ -29259,6 +29409,7 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
   /**
    * Encodes a bech32 id.
    *
+   * @param relays {string[]} The relays to encode in the id
    * @returns {string} - Encoded naddr, note or nevent.
    */
   encode = encode.bind(this);
@@ -29298,6 +29449,20 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
     this.removeTag("alt");
     if (alt)
       this.tags.push(["alt", alt]);
+  }
+  /**
+   * Gets the NIP-33 "d" tag of the event.
+   */
+  get dTag() {
+    return this.tagValue("d");
+  }
+  /**
+   * Sets the NIP-33 "d" tag of the event.
+   */
+  set dTag(value) {
+    this.removeTag("d");
+    if (value)
+      this.tags.push(["d", value]);
   }
   /**
    * Remove all tags with the given name (e.g. "d", "a", "p")
@@ -29344,7 +29509,10 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
     if (!relaySet) {
       relaySet = this.ndk.devWriteRelaySet || calculateRelaySetFromEvent(this.ndk, this);
     }
-    return relaySet.publish(this, timeoutMs);
+    this.ndk.debug(`publish to ${relaySet.size} relays`, this.rawEvent());
+    const relays = await relaySet.publish(this, timeoutMs);
+    this.onRelays = Array.from(relays);
+    return relays;
   }
   /**
    * Generates tags for users, notes, and other events tagged in content.
@@ -29556,18 +29724,20 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
    * Generates a deletion event of the current event
    *
    * @param reason The reason for the deletion
+   * @param publish Whether to publish the deletion event automatically
    * @returns The deletion event
    */
-  async delete(reason) {
+  async delete(reason, publish = true) {
     if (!this.ndk)
       throw new Error("No NDK instance found");
     this.ndk.assertSigner();
-    const e = new _NDKEvent(this.ndk, {
+    const e = new NDKEvent(this.ndk, {
       kind: 5 /* EventDeletion */,
       content: reason || ""
     });
     e.tag(this);
-    await e.publish();
+    if (publish)
+      await e.publish();
     return e;
   }
   /**
@@ -29589,7 +29759,7 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
     if (!this.ndk)
       throw new Error("No NDK instance found");
     this.ndk.assertSigner();
-    const e = new _NDKEvent(this.ndk, {
+    const e = new NDKEvent(this.ndk, {
       kind: 7 /* Reaction */,
       content
     });
@@ -29601,45 +29771,16 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
     }
     return e;
   }
-};
-
-// src/events/kinds/NDKRelayList.ts
-var READ_MARKER = "read";
-var WRITE_MARKER = "write";
-var NDKRelayList = class _NDKRelayList extends NDKEvent {
-  constructor(ndk, rawEvent) {
-    super(ndk, rawEvent);
-    this.kind ??= 10002 /* RelayList */;
-  }
-  static from(ndkEvent) {
-    return new _NDKRelayList(ndkEvent.ndk, ndkEvent.rawEvent());
-  }
-  get readRelayUrls() {
-    return this.getMatchingTags("r").filter((tag) => !tag[2] || tag[2] && tag[2] === READ_MARKER).map((tag) => tag[1]);
-  }
-  set readRelayUrls(relays) {
-    for (const relay of relays) {
-      this.tags.push(["r", relay, READ_MARKER]);
-    }
-  }
-  get writeRelayUrls() {
-    return this.getMatchingTags("r").filter((tag) => !tag[2] || tag[2] && tag[2] === WRITE_MARKER).map((tag) => tag[1]);
-  }
-  set writeRelayUrls(relays) {
-    for (const relay of relays) {
-      this.tags.push(["r", relay, WRITE_MARKER]);
-    }
-  }
-  get bothRelayUrls() {
-    return this.getMatchingTags("r").filter((tag) => !tag[2]).map((tag) => tag[1]);
-  }
-  set bothRelayUrls(relays) {
-    for (const relay of relays) {
-      this.tags.push(["r", relay]);
-    }
-  }
-  get relays() {
-    return this.getMatchingTags("r").map((tag) => tag[1]);
+  /**
+   * Checks whether the event is valid per underlying NIPs.
+   *
+   * This method is meant to be overridden by subclasses that implement specific NIPs
+   * to allow the enforcement of NIP-specific validation rules.
+   *
+   *
+   */
+  get isValid() {
+    return true;
   }
 };
 
@@ -29665,6 +29806,7 @@ var NDKSubscription = class extends lib.EventEmitter {
   opts;
   pool;
   skipVerification = false;
+  skipValidation = false;
   /**
    * Tracks the filters as they are executed on each relay
    */
@@ -29703,6 +29845,7 @@ var NDKSubscription = class extends lib.EventEmitter {
     this.debug = ndk.debug.extend(`subscription[${opts?.subId ?? this.internalId}]`);
     this.eoseDebug = this.debug.extend("eose");
     this.skipVerification = opts?.skipVerification || false;
+    this.skipValidation = opts?.skipValidation || false;
     if (!this.opts.closeOnEose) {
       this.debug(
         `Creating a permanent subscription`,
@@ -29811,10 +29954,18 @@ var NDKSubscription = class extends lib.EventEmitter {
    * @param fromCache Whether the event was received from the cache
    */
   eventReceived(event, relay, fromCache = false) {
-    if (relay)
-      event.relay = relay;
+    if (relay) {
+      event.relay ??= relay;
+      event.onRelays.push(relay);
+    }
     if (!relay)
       relay = event.relay;
+    if (!this.skipValidation) {
+      if (!event.isValid) {
+        this.debug(`Event failed validation`, event);
+        return;
+      }
+    }
     if (!fromCache && relay) {
       let events = this.eventsPerRelay.get(relay);
       if (!events) {
@@ -30002,8 +30153,334 @@ function serializeProfile(profile) {
   return JSON.stringify(payload);
 }
 
+// src/user/nip05.ts
+var dist_NIP05_REGEX = /^(?:([\w.+-]+)@)?([\w.-]+)$/;
+async function getNip05For(fullname, _fetch = fetch, fetchOpts = {}) {
+  const match = fullname.match(dist_NIP05_REGEX);
+  if (!match)
+    return null;
+  const [_, name = "_", domain] = match;
+  try {
+    const res = await _fetch(
+      `https://${domain}/.well-known/nostr.json?name=${name}`,
+      fetchOpts
+    );
+    const { names, relays, nip46 } = dist_parseNIP05Result(await res.json());
+    const pubkey = names[name];
+    return pubkey ? {
+      pubkey,
+      relays: relays?.[pubkey],
+      nip46: nip46?.[pubkey]
+    } : null;
+  } catch (_e) {
+    return null;
+  }
+}
+function dist_parseNIP05Result(json) {
+  const result = {
+    names: {}
+  };
+  for (const [name, pubkey] of Object.entries(json.names)) {
+    if (typeof name === "string" && typeof pubkey === "string") {
+      result.names[name] = pubkey;
+    }
+  }
+  if (json.relays) {
+    result.relays = {};
+    for (const [pubkey, relays] of Object.entries(json.relays)) {
+      if (typeof pubkey === "string" && Array.isArray(relays)) {
+        result.relays[pubkey] = relays.filter(
+          (relay) => typeof relay === "string"
+        );
+      }
+    }
+  }
+  if (json.nip46) {
+    result.nip46 = {};
+    for (const [pubkey, nip46] of Object.entries(json.relays)) {
+      if (typeof pubkey === "string" && Array.isArray(nip46)) {
+        result.nip46[pubkey] = nip46.filter((relay) => typeof relay === "string");
+      }
+    }
+  }
+  return result;
+}
+
+// src/user/index.ts
+var NDKUser = class {
+  ndk;
+  profile;
+  _npub;
+  _pubkey;
+  relayUrls = [];
+  nip46Urls = [];
+  constructor(opts) {
+    if (opts.npub)
+      this._npub = opts.npub;
+    if (opts.hexpubkey)
+      this._pubkey = opts.hexpubkey;
+    if (opts.pubkey)
+      this._pubkey = opts.pubkey;
+    if (opts.relayUrls)
+      this.relayUrls = opts.relayUrls;
+    if (opts.nip46Urls)
+      this.nip46Urls = opts.nip46Urls;
+  }
+  get npub() {
+    if (!this._npub) {
+      if (!this._pubkey)
+        throw new Error("hexpubkey not set");
+      this._npub = nip19_exports.npubEncode(this.pubkey);
+    }
+    return this._npub;
+  }
+  set npub(npub) {
+    this._npub = npub;
+  }
+  /**
+   * Get the user's hexpubkey
+   * @returns {Hexpubkey} The user's hexpubkey
+   *
+   * @deprecated Use `pubkey` instead
+   */
+  get hexpubkey() {
+    return this.pubkey;
+  }
+  /**
+   * Set the user's hexpubkey
+   * @param pubkey {Hexpubkey} The user's hexpubkey
+   * @deprecated Use `pubkey` instead
+   */
+  set hexpubkey(pubkey) {
+    this._pubkey = pubkey;
+  }
+  /**
+   * Get the user's pubkey
+   * @returns {string} The user's pubkey
+   */
+  get pubkey() {
+    if (!this._pubkey) {
+      if (!this._npub)
+        throw new Error("npub not set");
+      this._pubkey = nip19_exports.decode(this.npub).data;
+    }
+    return this._pubkey;
+  }
+  /**
+   * Set the user's pubkey
+   * @param pubkey {string} The user's pubkey
+   */
+  set pubkey(pubkey) {
+    this._pubkey = pubkey;
+  }
+  /**
+   * Instantiate an NDKUser from a NIP-05 string
+   * @param nip05Id {string} The user's NIP-05
+   * @param ndk {NDK} An NDK instance
+   * @param skipCache {boolean} Whether to skip the cache or not
+   * @returns {NDKUser | undefined} An NDKUser if one is found for the given NIP-05, undefined otherwise.
+   */
+  static async fromNip05(nip05Id, ndk, skipCache = false) {
+    if (ndk?.cacheAdapter && ndk.cacheAdapter.loadNip05) {
+      const profile2 = await ndk.cacheAdapter.loadNip05(nip05Id);
+      if (profile2) {
+        const user = new NDKUser({
+          pubkey: profile2.pubkey,
+          relayUrls: profile2.relays,
+          nip46Urls: profile2.nip46
+        });
+        user.ndk = ndk;
+        return user;
+      }
+    }
+    let opts = {};
+    if (skipCache)
+      opts.cache = "no-cache";
+    const profile = await getNip05For(nip05Id, ndk?.httpFetch, opts);
+    if (profile && ndk?.cacheAdapter && ndk.cacheAdapter.saveNip05) {
+      ndk?.cacheAdapter.saveNip05(nip05Id, profile);
+    }
+    if (profile) {
+      const user = new NDKUser({
+        pubkey: profile.pubkey,
+        relayUrls: profile.relays,
+        nip46Urls: profile.nip46
+      });
+      user.ndk = ndk;
+      return user;
+    }
+  }
+  /**
+   * Fetch a user's profile
+   * @param opts {NDKSubscriptionOptions} A set of NDKSubscriptionOptions
+   * @returns User Profile
+   */
+  async fetchProfile(opts) {
+    if (!this.ndk)
+      throw new Error("NDK not set");
+    if (!this.profile)
+      this.profile = {};
+    let setMetadataEvents = null;
+    if (this.ndk.cacheAdapter && this.ndk.cacheAdapter.fetchProfile && opts?.cacheUsage !== "ONLY_RELAY" /* ONLY_RELAY */) {
+      const profile = await this.ndk.cacheAdapter.fetchProfile(this.pubkey);
+      if (profile) {
+        this.profile = profile;
+        return profile;
+      }
+    }
+    if (!opts && // if no options have been set
+    this.ndk.cacheAdapter && // and we have a cache
+    this.ndk.cacheAdapter.locking) {
+      setMetadataEvents = await this.ndk.fetchEvents(
+        {
+          kinds: [0],
+          authors: [this.pubkey]
+        },
+        {
+          cacheUsage: "ONLY_CACHE" /* ONLY_CACHE */,
+          closeOnEose: true,
+          groupable: false
+        }
+      );
+      opts = {
+        cacheUsage: "ONLY_RELAY" /* ONLY_RELAY */,
+        closeOnEose: true,
+        groupable: true,
+        groupableDelay: 250
+      };
+    }
+    if (!setMetadataEvents || setMetadataEvents.size === 0) {
+      setMetadataEvents = await this.ndk.fetchEvents(
+        {
+          kinds: [0],
+          authors: [this.pubkey]
+        },
+        opts
+      );
+    }
+    const sortedSetMetadataEvents = Array.from(setMetadataEvents).sort(
+      (a, b) => a.created_at - b.created_at
+    );
+    if (sortedSetMetadataEvents.length === 0)
+      return null;
+    this.profile = profileFromEvent(sortedSetMetadataEvents[0]);
+    if (this.profile && this.ndk.cacheAdapter && this.ndk.cacheAdapter.saveProfile) {
+      this.ndk.cacheAdapter.saveProfile(this.pubkey, this.profile);
+    }
+    return this.profile;
+  }
+  /**
+   * Returns a set of users that this user follows.
+   */
+  follows = follows.bind(this);
+  /** @deprecated Use referenceTags instead. */
+  /**
+   * Get the tag that can be used to reference this user in an event
+   * @returns {NDKTag} an NDKTag
+   */
+  tagReference() {
+    return ["p", this.pubkey];
+  }
+  /**
+   * Get the tags that can be used to reference this user in an event
+   * @returns {NDKTag[]} an array of NDKTag
+   */
+  referenceTags(marker) {
+    const tag = [["p", this.pubkey]];
+    if (!marker)
+      return tag;
+    tag[0].push("", marker);
+    return tag;
+  }
+  /**
+   * Publishes the current profile.
+   */
+  async publish() {
+    if (!this.ndk)
+      throw new Error("No NDK instance found");
+    if (!this.profile)
+      throw new Error("No profile available");
+    this.ndk.assertSigner();
+    const event = new NDKEvent(this.ndk, {
+      kind: 0,
+      content: serializeProfile(this.profile)
+    });
+    await event.publish();
+  }
+  /**
+   * Add a follow to this user's contact list
+   *
+   * @param newFollow {NDKUser} The user to follow
+   * @param currentFollowList {Set<NDKUser>} The current follow list
+   * @param kind {NDKKind} The kind to use for this contact list (defaults to `3`)
+   * @returns {Promise<boolean>} True if the follow was added, false if the follow already exists
+   */
+  async follow(newFollow, currentFollowList, kind = 3 /* Contacts */) {
+    if (!this.ndk)
+      throw new Error("No NDK instance found");
+    this.ndk.assertSigner();
+    if (!currentFollowList) {
+      currentFollowList = await this.follows(void 0, void 0, kind);
+    }
+    if (currentFollowList.has(newFollow)) {
+      return false;
+    }
+    currentFollowList.add(newFollow);
+    const event = new NDKEvent(this.ndk, { kind });
+    for (const follow of currentFollowList) {
+      event.tag(follow);
+    }
+    await event.publish();
+    return true;
+  }
+  /**
+   * Validate a user's NIP-05 identifier (usually fetched from their kind:0 profile data)
+   *
+   * @param nip05Id The NIP-05 string to validate
+   * @returns {Promise<boolean | null>} True if the NIP-05 is found and matches this user's pubkey,
+   * False if the NIP-05 is found but doesn't match this user's pubkey,
+   * null if the NIP-05 isn't found on the domain or we're unable to verify (because of network issues, etc.)
+   */
+  async validateNip05(nip05Id) {
+    if (!this.ndk)
+      throw new Error("No NDK instance found");
+    const profilePointer = await getNip05For(nip05Id);
+    if (profilePointer === null)
+      return null;
+    return profilePointer.pubkey === this.pubkey;
+  }
+  /**
+   * Zap a user
+   *
+   * @param amount The amount to zap in millisatoshis
+   * @param comment A comment to add to the zap request
+   * @param extraTags Extra tags to add to the zap request
+   * @param signer The signer to use (will default to the NDK instance's signer)
+   */
+  async zap(amount, comment, extraTags, signer) {
+    if (!this.ndk)
+      throw new Error("No NDK instance found");
+    if (!signer) {
+      this.ndk.assertSigner();
+    }
+    const zap = new Zap({
+      ndk: this.ndk,
+      zappedUser: this
+    });
+    const relays = Array.from(this.ndk.pool.relays.keys());
+    const paymentRequest = await zap.createZapRequest(
+      amount,
+      comment,
+      extraTags,
+      relays,
+      signer
+    );
+    return paymentRequest;
+  }
+};
+
 // src/events/kinds/lists/index.ts
-var NDKList = class _NDKList extends NDKEvent {
+var NDKList = class extends NDKEvent {
   _encryptedTags;
   /**
    * Stores the number of bytes the content was before decryption
@@ -30018,7 +30495,7 @@ var NDKList = class _NDKList extends NDKEvent {
    * Wrap a NDKEvent into a NDKList
    */
   static from(ndkEvent) {
-    return new _NDKList(ndkEvent.ndk, ndkEvent.rawEvent());
+    return new NDKList(ndkEvent.ndk, ndkEvent.rawEvent());
   }
   /**
    * Returns the title of the list. Falls back on fetching the name tag value.
@@ -30181,7 +30658,8 @@ var NDKList = class _NDKList extends NDKEvent {
         "thumb",
         "alt",
         "expiration",
-        "subject"
+        "subject",
+        "client"
       ].includes(t[0]);
     });
   }
@@ -30250,432 +30728,80 @@ var NDKList = class _NDKList extends NDKEvent {
     this.emit("change");
     return this;
   }
+  /**
+   * Creates a filter that will result in fetching
+   * the items of this list
+   * @example
+   * const list = new NDKList(...);
+   * const filters = list.filterForItems();
+   * const events = await ndk.fetchEvents(filters);
+   */
+  filterForItems() {
+    const ids = /* @__PURE__ */ new Set();
+    const nip33Queries = /* @__PURE__ */ new Map();
+    const filters = [];
+    for (const tag of this.items) {
+      if (tag[0] === "e" && tag[1]) {
+        ids.add(tag[1]);
+      } else if (tag[0] === "a" && tag[1]) {
+        const [kind, pubkey, dTag] = tag[1].split(":");
+        if (!kind || !pubkey)
+          continue;
+        const key = `${kind}:${pubkey}`;
+        const item = nip33Queries.get(key) || [];
+        item.push(dTag || "");
+        nip33Queries.set(key, item);
+      }
+    }
+    if (ids.size > 0) {
+      filters.push({ ids: Array.from(ids) });
+    }
+    if (nip33Queries.size > 0) {
+      for (const [key, values] of nip33Queries.entries()) {
+        const [kind, pubkey] = key.split(":");
+        filters.push({
+          kinds: [parseInt(kind)],
+          authors: [pubkey],
+          "#d": values
+        });
+      }
+    }
+    return filters;
+  }
 };
 var lists_default = NDKList;
 
 // src/user/pin.ts
-async function pin(event, pinEvent, publish) {
+async function pinEvent(user, event, pinEvent2, publish) {
   const kind = 10001 /* PinList */;
-  if (!this.ndk)
+  if (!user.ndk)
     throw new Error("No NDK instance found");
-  this.ndk.assertSigner();
-  if (!pinEvent) {
-    const events = await this.ndk.fetchEvents(
-      { kinds: [kind], authors: [this.pubkey] },
+  user.ndk.assertSigner();
+  if (!pinEvent2) {
+    const events = await user.ndk.fetchEvents(
+      { kinds: [kind], authors: [user.pubkey] },
       { cacheUsage: "ONLY_RELAY" /* ONLY_RELAY */ }
     );
     if (events.size > 0) {
-      pinEvent = lists_default.from(Array.from(events)[0]);
+      pinEvent2 = lists_default.from(Array.from(events)[0]);
     } else {
-      pinEvent = new NDKEvent(this.ndk, {
+      pinEvent2 = new NDKEvent(user.ndk, {
         kind
       });
     }
   }
-  pinEvent.tag(event);
+  pinEvent2.tag(event);
   if (publish) {
-    await pinEvent.publish();
+    await pinEvent2.publish();
   }
-  return pinEvent;
+  return pinEvent2;
 }
-
-// src/user/nip05.ts
-var dist_NIP05_REGEX = /^(?:([\w.+-]+)@)?([\w.-]+)$/;
-async function getNip05For(fullname, _fetch = fetch, fetchOpts = {}) {
-  const match = fullname.match(dist_NIP05_REGEX);
-  if (!match)
-    return null;
-  const [_, name = "_", domain] = match;
-  try {
-    const res = await _fetch(
-      `https://${domain}/.well-known/nostr.json?name=${name}`,
-      fetchOpts
-    );
-    const { names, relays, nip46 } = dist_parseNIP05Result(await res.json());
-    const pubkey = names[name];
-    return pubkey ? {
-      pubkey,
-      relays: relays?.[pubkey],
-      nip46: nip46?.[pubkey]
-    } : null;
-  } catch (_e) {
-    return null;
-  }
-}
-function dist_parseNIP05Result(json) {
-  const result = {
-    names: {}
-  };
-  for (const [name, pubkey] of Object.entries(json.names)) {
-    if (typeof name === "string" && typeof pubkey === "string") {
-      result.names[name] = pubkey;
-    }
-  }
-  if (json.relays) {
-    result.relays = {};
-    for (const [pubkey, relays] of Object.entries(json.relays)) {
-      if (typeof pubkey === "string" && Array.isArray(relays)) {
-        result.relays[pubkey] = relays.filter(
-          (relay) => typeof relay === "string"
-        );
-      }
-    }
-  }
-  if (json.nip46) {
-    result.nip46 = {};
-    for (const [pubkey, nip46] of Object.entries(json.relays)) {
-      if (typeof pubkey === "string" && Array.isArray(nip46)) {
-        result.nip46[pubkey] = nip46.filter((relay) => typeof relay === "string");
-      }
-    }
-  }
-  return result;
-}
-
-// src/user/index.ts
-var NDKUser = class _NDKUser {
-  ndk;
-  profile;
-  _npub;
-  _pubkey;
-  relayUrls = [];
-  nip46Urls = [];
-  constructor(opts) {
-    if (opts.npub)
-      this._npub = opts.npub;
-    if (opts.hexpubkey)
-      this._pubkey = opts.hexpubkey;
-    if (opts.pubkey)
-      this._pubkey = opts.pubkey;
-    if (opts.relayUrls)
-      this.relayUrls = opts.relayUrls;
-    if (opts.nip46Urls)
-      this.nip46Urls = opts.nip46Urls;
-  }
-  get npub() {
-    if (!this._npub) {
-      if (!this._pubkey)
-        throw new Error("hexpubkey not set");
-      this._npub = nip19_exports.npubEncode(this.pubkey);
-    }
-    return this._npub;
-  }
-  set npub(npub) {
-    this._npub = npub;
-  }
-  /**
-   * Get the user's hexpubkey
-   * @returns {Hexpubkey} The user's hexpubkey
-   *
-   * @deprecated Use `pubkey` instead
-   */
-  get hexpubkey() {
-    return this.pubkey;
-  }
-  /**
-   * Set the user's hexpubkey
-   * @param pubkey {Hexpubkey} The user's hexpubkey
-   * @deprecated Use `pubkey` instead
-   */
-  set hexpubkey(pubkey) {
-    this._pubkey = pubkey;
-  }
-  /**
-   * Get the user's pubkey
-   * @returns {string} The user's pubkey
-   */
-  get pubkey() {
-    if (!this._pubkey) {
-      if (!this._npub)
-        throw new Error("npub not set");
-      this._pubkey = nip19_exports.decode(this.npub).data;
-    }
-    return this._pubkey;
-  }
-  /**
-   * Set the user's pubkey
-   * @param pubkey {string} The user's pubkey
-   */
-  set pubkey(pubkey) {
-    this._pubkey = pubkey;
-  }
-  /**
-   * Instantiate an NDKUser from a NIP-05 string
-   * @param nip05Id {string} The user's NIP-05
-   * @param ndk {NDK} An NDK instance
-   * @param skipCache {boolean} Whether to skip the cache or not
-   * @returns {NDKUser | undefined} An NDKUser if one is found for the given NIP-05, undefined otherwise.
-   */
-  static async fromNip05(nip05Id, ndk, skipCache = false) {
-    if (ndk?.cacheAdapter && ndk.cacheAdapter.loadNip05) {
-      const profile2 = await ndk.cacheAdapter.loadNip05(nip05Id);
-      if (profile2) {
-        const user = new _NDKUser({
-          pubkey: profile2.pubkey,
-          relayUrls: profile2.relays,
-          nip46Urls: profile2.nip46
-        });
-        user.ndk = ndk;
-        return user;
-      }
-    }
-    let opts = {};
-    if (skipCache)
-      opts.cache = "no-cache";
-    const profile = await getNip05For(nip05Id, ndk?.httpFetch, opts);
-    if (profile && ndk?.cacheAdapter && ndk.cacheAdapter.saveNip05) {
-      ndk?.cacheAdapter.saveNip05(nip05Id, profile);
-    }
-    if (profile) {
-      const user = new _NDKUser({
-        pubkey: profile.pubkey,
-        relayUrls: profile.relays,
-        nip46Urls: profile.nip46
-      });
-      user.ndk = ndk;
-      return user;
-    }
-  }
-  /**
-   * Fetch a user's profile
-   * @param opts {NDKSubscriptionOptions} A set of NDKSubscriptionOptions
-   * @returns User Profile
-   */
-  async fetchProfile(opts) {
-    if (!this.ndk)
-      throw new Error("NDK not set");
-    if (!this.profile)
-      this.profile = {};
-    let setMetadataEvents = null;
-    if (this.ndk.cacheAdapter && this.ndk.cacheAdapter.fetchProfile && opts?.cacheUsage !== "ONLY_RELAY" /* ONLY_RELAY */) {
-      const profile = await this.ndk.cacheAdapter.fetchProfile(this.pubkey);
-      if (profile) {
-        this.profile = profile;
-        return profile;
-      }
-    }
-    if (!opts && // if no options have been set
-    this.ndk.cacheAdapter && // and we have a cache
-    this.ndk.cacheAdapter.locking) {
-      setMetadataEvents = await this.ndk.fetchEvents(
-        {
-          kinds: [0],
-          authors: [this.pubkey]
-        },
-        {
-          cacheUsage: "ONLY_CACHE" /* ONLY_CACHE */,
-          closeOnEose: true,
-          groupable: false
-        }
-      );
-      opts = {
-        cacheUsage: "ONLY_RELAY" /* ONLY_RELAY */,
-        closeOnEose: true,
-        groupable: true,
-        groupableDelay: 250
-      };
-    }
-    if (!setMetadataEvents || setMetadataEvents.size === 0) {
-      setMetadataEvents = await this.ndk.fetchEvents(
-        {
-          kinds: [0],
-          authors: [this.pubkey]
-        },
-        opts
-      );
-    }
-    const sortedSetMetadataEvents = Array.from(setMetadataEvents).sort(
-      (a, b) => a.created_at - b.created_at
-    );
-    if (sortedSetMetadataEvents.length === 0)
-      return null;
-    this.profile = profileFromEvent(sortedSetMetadataEvents[0]);
-    if (this.profile && this.ndk.cacheAdapter && this.ndk.cacheAdapter.saveProfile) {
-      this.ndk.cacheAdapter.saveProfile(this.pubkey, this.profile);
-    }
-    return this.profile;
-  }
-  /**
-   * Returns a set of users that this user follows.
-   */
-  follows = follows.bind(this);
-  /**
-   * Pins a user or an event
-   */
-  pin = pin.bind(this);
-  /**
-   * Returns a set of relay list events for a user.
-   * @returns {Promise<Set<NDKEvent>>} A set of NDKEvents returned for the given user.
-   */
-  async relayList() {
-    if (!this.ndk)
-      throw new Error("NDK not set");
-    const pool = this.ndk.outboxPool || this.ndk.pool;
-    const set = /* @__PURE__ */ new Set();
-    for (const relay of pool.relays.values())
-      set.add(relay);
-    const relaySet = new NDKRelaySet(set, this.ndk);
-    const event = await this.ndk.fetchEvent(
-      {
-        kinds: [10002],
-        authors: [this.pubkey]
-      },
-      {
-        closeOnEose: true,
-        pool,
-        groupable: true,
-        subId: `relay-list-${this.pubkey.slice(0, 6)}`
-      },
-      relaySet
-    );
-    if (event)
-      return NDKRelayList.from(event);
-    return await this.relayListFromKind3();
-  }
-  async relayListFromKind3() {
-    if (!this.ndk)
-      throw new Error("NDK not set");
-    const followList = await this.ndk.fetchEvent({
-      kinds: [3],
-      authors: [this.pubkey]
-    });
-    if (followList) {
-      try {
-        const content = JSON.parse(followList.content);
-        const relayList = new NDKRelayList(this.ndk);
-        const readRelays = /* @__PURE__ */ new Set();
-        const writeRelays = /* @__PURE__ */ new Set();
-        for (const [key, config] of Object.entries(content)) {
-          if (!config) {
-            readRelays.add(key);
-            writeRelays.add(key);
-          } else {
-            const relayConfig = config;
-            if (relayConfig.write)
-              writeRelays.add(key);
-            if (relayConfig.read)
-              readRelays.add(key);
-          }
-        }
-        relayList.readRelayUrls = Array.from(readRelays);
-        relayList.writeRelayUrls = Array.from(writeRelays);
-        return relayList;
-      } catch (e) {
-      }
-    }
-    return void 0;
-  }
-  /** @deprecated Use referenceTags instead. */
-  /**
-   * Get the tag that can be used to reference this user in an event
-   * @returns {NDKTag} an NDKTag
-   */
-  tagReference() {
-    return ["p", this.pubkey];
-  }
-  /**
-   * Get the tags that can be used to reference this user in an event
-   * @returns {NDKTag[]} an array of NDKTag
-   */
-  referenceTags(marker) {
-    const tag = [["p", this.pubkey]];
-    if (!marker)
-      return tag;
-    tag[0].push("", marker);
-    return tag;
-  }
-  /**
-   * Publishes the current profile.
-   */
-  async publish() {
-    if (!this.ndk)
-      throw new Error("No NDK instance found");
-    if (!this.profile)
-      throw new Error("No profile available");
-    this.ndk.assertSigner();
-    const event = new NDKEvent(this.ndk, {
-      kind: 0,
-      content: serializeProfile(this.profile)
-    });
-    await event.publish();
-  }
-  /**
-   * Add a follow to this user's contact list
-   *
-   * @param newFollow {NDKUser} The user to follow
-   * @param currentFollowList {Set<NDKUser>} The current follow list
-   * @param kind {NDKKind} The kind to use for this contact list (defaults to `3`)
-   * @returns {Promise<boolean>} True if the follow was added, false if the follow already exists
-   */
-  async follow(newFollow, currentFollowList, kind = 3 /* Contacts */) {
-    if (!this.ndk)
-      throw new Error("No NDK instance found");
-    this.ndk.assertSigner();
-    if (!currentFollowList) {
-      currentFollowList = await this.follows(void 0, void 0, kind);
-    }
-    if (currentFollowList.has(newFollow)) {
-      return false;
-    }
-    currentFollowList.add(newFollow);
-    const event = new NDKEvent(this.ndk, { kind });
-    for (const follow of currentFollowList) {
-      event.tag(follow);
-    }
-    await event.publish();
-    return true;
-  }
-  /**
-   * Validate a user's NIP-05 identifier (usually fetched from their kind:0 profile data)
-   *
-   * @param nip05Id The NIP-05 string to validate
-   * @returns {Promise<boolean | null>} True if the NIP-05 is found and matches this user's pubkey,
-   * False if the NIP-05 is found but doesn't match this user's pubkey,
-   * null if the NIP-05 isn't found on the domain or we're unable to verify (because of network issues, etc.)
-   */
-  async validateNip05(nip05Id) {
-    if (!this.ndk)
-      throw new Error("No NDK instance found");
-    const profilePointer = await getNip05For(nip05Id);
-    if (profilePointer === null)
-      return null;
-    return profilePointer.pubkey === this.pubkey;
-  }
-  /**
-   * Zap a user
-   *
-   * @param amount The amount to zap in millisatoshis
-   * @param comment A comment to add to the zap request
-   * @param extraTags Extra tags to add to the zap request
-   * @param signer The signer to use (will default to the NDK instance's signer)
-   */
-  async zap(amount, comment, extraTags, signer) {
-    if (!this.ndk)
-      throw new Error("No NDK instance found");
-    if (!signer) {
-      this.ndk.assertSigner();
-    }
-    const zap = new Zap({
-      ndk: this.ndk,
-      zappedUser: this
-    });
-    const relays = Array.from(this.ndk.pool.relays.keys());
-    const paymentRequest = await zap.createZapRequest(
-      amount,
-      comment,
-      extraTags,
-      relays,
-      signer
-    );
-    return paymentRequest;
-  }
-};
 
 // src/events/kinds/article.ts
-var NDKArticle = class _NDKArticle extends (/* unused pure expression or super */ null && (NDKEvent)) {
+var NDKArticle = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
   constructor(ndk, rawEvent) {
     super(ndk, rawEvent);
-    this.kind = 30023 /* Article */;
+    this.kind ??= 30023 /* Article */;
   }
   /**
    * Creates a NDKArticle from an existing NDKEvent.
@@ -30684,7 +30810,7 @@ var NDKArticle = class _NDKArticle extends (/* unused pure expression or super *
    * @returns NDKArticle
    */
   static from(event) {
-    return new _NDKArticle(event.ndk, event.rawEvent());
+    return new NDKArticle(event.ndk, event.rawEvent());
   }
   /**
    * Getter for the article title.
@@ -30791,7 +30917,7 @@ var NDKArticle = class _NDKArticle extends (/* unused pure expression or super *
 };
 
 // src/events/kinds/video.ts
-var NDKVideo = class _NDKVideo extends (/* unused pure expression or super */ null && (NDKEvent)) {
+var NDKVideo = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
   constructor(ndk, rawEvent) {
     super(ndk, rawEvent);
     this.kind ??= 34235 /* HorizontalVideo */;
@@ -30803,7 +30929,7 @@ var NDKVideo = class _NDKVideo extends (/* unused pure expression or super */ nu
    * @returns NDKArticle
    */
   static from(event) {
-    return new _NDKVideo(event.ndk, event.rawEvent());
+    return new NDKVideo(event.ndk, event.rawEvent());
   }
   /**
    * Getter for the article title.
@@ -30909,14 +31035,14 @@ var NDKVideo = class _NDKVideo extends (/* unused pure expression or super */ nu
 
 // src/events/kinds/highlight.ts
 
-var NDKHighlight = class _NDKHighlight extends (/* unused pure expression or super */ null && (NDKEvent)) {
+var NDKHighlight = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
   _article;
   constructor(ndk, rawEvent) {
     super(ndk, rawEvent);
     this.kind ??= 9802 /* Highlight */;
   }
   static from(event) {
-    return new _NDKHighlight(event.ndk, event.rawEvent());
+    return new NDKHighlight(event.ndk, event.rawEvent());
   }
   get url() {
     return this.tagValue("r");
@@ -30990,40 +31116,621 @@ var NDKHighlight = class _NDKHighlight extends (/* unused pure expression or sup
   }
 };
 
-// src/events/kinds/dvm/NDKDVMJobFeedback.ts
-var NDKDvmJobFeedbackStatus = /* @__PURE__ */ ((NDKDvmJobFeedbackStatus2) => {
-  NDKDvmJobFeedbackStatus2["Processing"] = "processing";
-  NDKDvmJobFeedbackStatus2["Success"] = "success";
-  NDKDvmJobFeedbackStatus2["Scheduled"] = "scheduled";
-  NDKDvmJobFeedbackStatus2["PayReq"] = "payment_required";
-  return NDKDvmJobFeedbackStatus2;
-})(NDKDvmJobFeedbackStatus || {});
-var NDKDVMJobFeedback = class _NDKDVMJobFeedback extends (/* unused pure expression or super */ null && (NDKEvent)) {
-  constructor(ndk, event) {
-    super(ndk, event);
-    this.kind ??= 7e3 /* DVMJobFeedback */;
+// src/events/kinds/NDKRelayList.ts
+var READ_MARKER = "read";
+var WRITE_MARKER = "write";
+var NDKRelayList = class extends NDKEvent {
+  constructor(ndk, rawEvent) {
+    super(ndk, rawEvent);
+    this.kind ??= 10002 /* RelayList */;
+  }
+  static from(ndkEvent) {
+    return new NDKRelayList(ndkEvent.ndk, ndkEvent.rawEvent());
+  }
+  /**
+   * Returns a set of relay list events for a user.
+   * @returns {Promise<Set<NDKEvent>>} A set of NDKEvents returned for the given user.
+   */
+  static async forUser(user, ndk) {
+    const pool = ndk.outboxPool || ndk.pool;
+    const set = /* @__PURE__ */ new Set();
+    for (const relay of pool.relays.values())
+      set.add(relay);
+    const relaySet = new NDKRelaySet(set, ndk);
+    const event = await ndk.fetchEvent(
+      {
+        kinds: [10002],
+        authors: [user.pubkey]
+      },
+      {
+        closeOnEose: true,
+        pool,
+        groupable: true,
+        subId: `relay-list-${user.pubkey.slice(0, 6)}`
+      },
+      relaySet
+    );
+    if (event)
+      return NDKRelayList.from(event);
+    return await relayListFromKind3(user, ndk);
+  }
+  get readRelayUrls() {
+    return this.getMatchingTags("r").filter((tag) => !tag[2] || tag[2] && tag[2] === READ_MARKER).map((tag) => tag[1]);
+  }
+  set readRelayUrls(relays) {
+    for (const relay of relays) {
+      this.tags.push(["r", relay, READ_MARKER]);
+    }
+  }
+  get writeRelayUrls() {
+    return this.getMatchingTags("r").filter((tag) => !tag[2] || tag[2] && tag[2] === WRITE_MARKER).map((tag) => tag[1]);
+  }
+  set writeRelayUrls(relays) {
+    for (const relay of relays) {
+      this.tags.push(["r", relay, WRITE_MARKER]);
+    }
+  }
+  get bothRelayUrls() {
+    return this.getMatchingTags("r").filter((tag) => !tag[2]).map((tag) => tag[1]);
+  }
+  set bothRelayUrls(relays) {
+    for (const relay of relays) {
+      this.tags.push(["r", relay]);
+    }
+  }
+  get relays() {
+    return this.getMatchingTags("r").map((tag) => tag[1]);
+  }
+};
+async function relayListFromKind3(user, ndk) {
+  const followList = await ndk.fetchEvent({
+    kinds: [3],
+    authors: [user.pubkey]
+  });
+  if (followList) {
+    try {
+      const content = JSON.parse(followList.content);
+      const relayList = new NDKRelayList(ndk);
+      const readRelays = /* @__PURE__ */ new Set();
+      const writeRelays = /* @__PURE__ */ new Set();
+      for (const [key, config] of Object.entries(content)) {
+        if (!config) {
+          readRelays.add(key);
+          writeRelays.add(key);
+        } else {
+          const relayConfig = config;
+          if (relayConfig.write)
+            writeRelays.add(key);
+          if (relayConfig.read)
+            readRelays.add(key);
+        }
+      }
+      relayList.readRelayUrls = Array.from(readRelays);
+      relayList.writeRelayUrls = Array.from(writeRelays);
+      return relayList;
+    } catch (e) {
+    }
+  }
+  return void 0;
+}
+
+// src/events/kinds/repost.ts
+var NDKRepost = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
+  _repostedEvents;
+  constructor(ndk, rawEvent) {
+    super(ndk, rawEvent);
   }
   static from(event) {
-    return new _NDKDVMJobFeedback(event.ndk, event.rawEvent());
+    return new NDKRepost(event.ndk, event.rawEvent());
   }
-  get status() {
-    return this.tagValue("status");
+  /**
+   * Returns all reposted events by the current event.
+   *
+   * @param klass Optional class to convert the events to.
+   * @returns
+   */
+  async repostedEvents(klass, opts) {
+    const items = [];
+    if (!this.ndk)
+      throw new Error("NDK instance not set");
+    if (this._repostedEvents !== void 0)
+      return this._repostedEvents;
+    for (const eventId of this.repostedEventIds()) {
+      const filter = filterForId(eventId);
+      const event = await this.ndk.fetchEvent(filter, opts);
+      if (event) {
+        items.push(klass ? klass.from(event) : event);
+      }
+    }
+    return items;
   }
-  set status(status) {
-    this.removeTag("status");
-    if (status !== void 0) {
-      this.tags.push(["status", status]);
+  /**
+   * Returns the reposted event IDs.
+   */
+  repostedEventIds() {
+    return this.tags.filter((t) => t[0] === "e" || t[0] === "a").map((t) => t[1]);
+  }
+};
+function filterForId(id) {
+  if (id.match(/:/)) {
+    const [kind, pubkey, identifier] = id.split(":");
+    return {
+      kinds: [parseInt(kind)],
+      authors: [pubkey],
+      "#d": [identifier]
+    };
+  } else {
+    return { ids: [id] };
+  }
+}
+
+// src/events/kinds/nip89/NDKAppHandler.ts
+var NDKAppHandlerEvent = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
+  profile;
+  constructor(ndk, rawEvent) {
+    super(ndk, rawEvent);
+    this.kind ??= 31990 /* AppHandler */;
+  }
+  static from(ndkEvent) {
+    return new NDKAppHandlerEvent(ndkEvent.ndk, ndkEvent.rawEvent());
+  }
+  /**
+   * Fetches app handler information
+   * If no app information is available on the kind:31990,
+   * we fetch the event's author's profile and return that instead.
+   */
+  async fetchProfile() {
+    if (this.profile === void 0 && this.content.length > 0) {
+      try {
+        const profile = JSON.parse(this.content);
+        if (profile && profile.name) {
+          return profile;
+        } else {
+          this.profile = null;
+        }
+      } catch (e) {
+        this.profile = null;
+      }
+    }
+    return new Promise((resolve, reject) => {
+      const author = this.author;
+      author.fetchProfile().then(() => {
+        resolve(author.profile);
+      }).catch(reject);
+    });
+  }
+};
+
+// src/events/kinds/subscriptions/amount.ts
+var possibleIntervalFrequencies = (/* unused pure expression or super */ null && ([
+  "daily",
+  "weekly",
+  "monthly",
+  "quarterly",
+  "yearly"
+]));
+function calculateTermDurationInSeconds(term) {
+  switch (term) {
+    case "daily":
+      return 24 * 60 * 60;
+    case "weekly":
+      return 7 * 24 * 60 * 60;
+    case "monthly":
+      return 30 * 24 * 60 * 60;
+    case "quarterly":
+      return 3 * 30 * 24 * 60 * 60;
+    case "yearly":
+      return 365 * 24 * 60 * 60;
+  }
+}
+function newAmount(amount, currency, term) {
+  return ["amount", amount.toString(), currency, term];
+}
+function parseTagToSubscriptionAmount(tag) {
+  const amount = parseInt(tag[1]);
+  if (isNaN(amount) || amount === void 0 || amount === null || amount <= 0)
+    return void 0;
+  const currency = tag[2];
+  if (currency === void 0 || currency === "")
+    return void 0;
+  const term = tag[3];
+  if (term === void 0)
+    return void 0;
+  if (!possibleIntervalFrequencies.includes(term))
+    return void 0;
+  return {
+    amount,
+    currency,
+    term
+  };
+}
+
+// src/events/kinds/subscriptions/tier.ts
+var NDKSubscriptionTier = class extends (/* unused pure expression or super */ null && (NDKArticle)) {
+  constructor(ndk, rawEvent) {
+    super(ndk, rawEvent);
+    this.kind ??= 37001 /* SubscriptionTier */;
+  }
+  /**
+   * Creates a new NDKSubscriptionTier from an event
+   * @param event
+   * @returns NDKSubscriptionTier
+   */
+  static from(event) {
+    return new NDKSubscriptionTier(event.ndk, event.rawEvent());
+  }
+  /**
+   * Returns perks for this tier
+   */
+  get perks() {
+    return this.getMatchingTags("perk").map((tag) => tag[1]).filter((perk) => perk !== void 0);
+  }
+  /**
+   * Adds a perk to this tier
+   */
+  addPerk(perk) {
+    this.tags.push(["perk", perk]);
+  }
+  /**
+   * Returns the amount for this tier
+   */
+  get amounts() {
+    return this.getMatchingTags("amount").map((tag) => parseTagToSubscriptionAmount(tag)).filter((a) => a !== void 0);
+  }
+  /**
+   * Adds an amount to this tier
+   * @param amount Amount in the smallest unit of the currency (e.g. cents, msats)
+   * @param currency Currency code. Use msat for millisatoshis
+   * @param term One of daily, weekly, monthly, quarterly, yearly
+   */
+  addAmount(amount, currency, term) {
+    this.tags.push(newAmount(amount, currency, term));
+  }
+  /**
+   * Sets a relay where content related to this tier can be found
+   * @param relayUrl URL of the relay
+   */
+  set relayUrl(relayUrl) {
+    this.tags.push(["r", relayUrl]);
+  }
+  /**
+   * Returns the relay URLs for this tier
+   */
+  get relayUrls() {
+    return this.getMatchingTags("r").map((tag) => tag[1]).filter((relay) => relay !== void 0);
+  }
+  /**
+   * Gets the verifier pubkey for this tier. This is the pubkey that will generate
+   * subscription payment receipts
+   */
+  get verifierPubkey() {
+    return this.tagValue("p");
+  }
+  /**
+   * Sets the verifier pubkey for this tier.
+   */
+  set verifierPubkey(pubkey) {
+    this.removeTag("p");
+    if (pubkey)
+      this.tags.push(["p", pubkey]);
+  }
+  /**
+   * Checks if this tier is valid
+   */
+  get isValid() {
+    return this.title !== void 0 && // Must have a title
+    this.amounts.length > 0;
+  }
+};
+
+// src/events/kinds/subscriptions/subscription-start.ts
+
+var NDKSubscriptionStart = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
+  debug;
+  constructor(ndk, rawEvent) {
+    super(ndk, rawEvent);
+    this.kind ??= 7001 /* Subscribe */;
+    this.debug = ndk?.debug.extend("subscription-start") ?? debug3("ndk:subscription-start");
+  }
+  static from(event) {
+    return new NDKSubscriptionStart(event.ndk, event.rawEvent());
+  }
+  /**
+   * Recipient of the subscription. I.e. THe author of this event subscribes to this user.
+   */
+  get targetUser() {
+    const pTag = this.getMatchingTags("p")?.[0];
+    if (!pTag)
+      return void 0;
+    const user = new NDKUser({ pubkey: pTag[1] });
+    return user;
+  }
+  /**
+   * The amount of the subscription.
+   */
+  get amount() {
+    const amountTag = this.getMatchingTags("amount")?.[0];
+    if (!amountTag)
+      return void 0;
+    return parseTagToSubscriptionAmount(amountTag);
+  }
+  set amount(amount) {
+    this.removeTag("amount");
+    if (!amount)
+      return;
+    this.tags.push(newAmount(amount.amount, amount.currency, amount.term));
+  }
+  /**
+   * The event id or NIP-33 tag id of the tier that the user is subscribing to.
+   */
+  get tierId() {
+    const eTag = this.getMatchingTags("e")?.[0];
+    const aTag = this.getMatchingTags("a")?.[0];
+    if (!eTag || !aTag)
+      return void 0;
+    return eTag[1] ?? aTag[1];
+  }
+  set tier(tier) {
+    this.removeTag("e");
+    this.removeTag("a");
+    this.removeTag("event");
+    if (!tier)
+      return;
+    this.tag(tier);
+    this.removeTag("p");
+    this.tags.push(["p", tier.pubkey]);
+    this.tags.push(["event", JSON.stringify(tier.rawEvent())]);
+  }
+  /**
+   * Fetches the tier that the user is subscribing to.
+   */
+  async fetchTier() {
+    const eventTag = this.tagValue("event");
+    if (eventTag) {
+      try {
+        const parsedEvent = JSON.parse(eventTag);
+        return NDKSubscriptionTier.from(parsedEvent);
+      } catch {
+        this.debug("Failed to parse event tag");
+      }
+    }
+    const tierId = this.tierId;
+    if (!tierId)
+      return void 0;
+    const e = await this.ndk?.fetchEvent(tierId);
+    if (!e)
+      return void 0;
+    return NDKSubscriptionTier.from(e);
+  }
+  get isValid() {
+    if (this.getMatchingTags("amount").length !== 1) {
+      this.debug("Invalid # of amount tag");
+      return false;
+    }
+    if (!this.amount) {
+      this.debug("Invalid amount tag");
+      return false;
+    }
+    if (this.getMatchingTags("p").length !== 1) {
+      this.debug("Invalid # of p tag");
+      return false;
+    }
+    if (!this.targetUser) {
+      this.debug("Invalid p tag");
+      return false;
+    }
+    return true;
+  }
+};
+
+// src/events/kinds/subscriptions/receipt.ts
+
+var NDKSubscriptionReceipt = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
+  debug;
+  constructor(ndk, rawEvent) {
+    super(ndk, rawEvent);
+    this.kind ??= 7003 /* SubscriptionReceipt */;
+    this.debug = ndk?.debug.extend("subscription-start") ?? debug4("ndk:subscription-start");
+  }
+  static from(event) {
+    return new NDKSubscriptionReceipt(event.ndk, event.rawEvent());
+  }
+  set subscriptionStart(event) {
+    this.debug(`before setting subscription start: ${this.rawEvent}`);
+    this.removeTag("e");
+    this.tag(event, "subscription", true);
+    this.debug(`after setting subscription start: ${this.rawEvent}`);
+  }
+  get isValid() {
+    const period = this.validPeriod;
+    if (!period)
+      return false;
+    if (period.start > period.end)
+      return false;
+    return true;
+  }
+  get validPeriod() {
+    const tag = this.getMatchingTags("valid")?.[0];
+    if (!tag)
+      return void 0;
+    try {
+      return {
+        start: new Date(parseInt(tag[1]) * 1e3),
+        end: new Date(parseInt(tag[2]) * 1e3)
+      };
+    } catch {
+      return void 0;
+    }
+  }
+  set validPeriod(period) {
+    this.removeTag("valid");
+    if (!period)
+      return;
+    this.tags.push([
+      "valid",
+      Math.floor(period.start.getTime() / 1e3).toString(),
+      Math.floor(period.end.getTime() / 1e3).toString()
+    ]);
+  }
+  get startPeriod() {
+    return this.validPeriod?.start;
+  }
+  get endPeriod() {
+    return this.validPeriod?.end;
+  }
+  /**
+   * Whether the subscription is currently active
+   */
+  isActive(time) {
+    time ??= /* @__PURE__ */ new Date();
+    const period = this.validPeriod;
+    if (!period)
+      return false;
+    if (time < period.start)
+      return false;
+    if (time > period.end)
+      return false;
+    return true;
+  }
+};
+
+// src/events/kinds/dvm/request.ts
+var NDKDVMRequest = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
+  constructor(ndk, event) {
+    super(ndk, event);
+  }
+  static from(event) {
+    return new NDKDVMRequest(event.ndk, event.rawEvent());
+  }
+  set bid(msatAmount) {
+    if (msatAmount === void 0) {
+      this.removeTag("bid");
+    } else {
+      this.tags.push(["bid", msatAmount.toString()]);
+    }
+  }
+  get bid() {
+    const v = this.tagValue("bid");
+    if (v === void 0)
+      return void 0;
+    return parseInt(v);
+  }
+  /**
+   * Adds a new input to the job
+   * @param args The arguments to the input
+   */
+  addInput(...args) {
+    this.tags.push(["i", ...args]);
+  }
+  /**
+   * Adds a new parameter to the job
+   */
+  addParam(...args) {
+    this.tags.push(["param", ...args]);
+  }
+  set output(output) {
+    if (output === void 0) {
+      this.removeTag("output");
+    } else {
+      if (typeof output === "string")
+        output = [output];
+      this.tags.push(["output", ...output]);
+    }
+  }
+  get output() {
+    const outputTag = this.getMatchingTags("output")[0];
+    return outputTag ? outputTag.slice(1) : void 0;
+  }
+  get params() {
+    const paramTags = this.getMatchingTags("param");
+    return paramTags.map((t) => t.slice(1));
+  }
+  getParam(name) {
+    const paramTag = this.getMatchingTags("param").find((t) => t[1] === name);
+    return paramTag ? paramTag[2] : void 0;
+  }
+  /**
+   * Enables job encryption for this event
+   * @param dvm DVM that will receive the event
+   * @param signer Signer to use for encryption
+   */
+  async encryption(dvm, signer) {
+    const dvmTags = ["i", "param", "output", "relays", "bid"];
+    const tags = this.tags.filter((t) => dvmTags.includes(t[0]));
+    this.tags = this.tags.filter((t) => !dvmTags.includes(t[0]));
+    this.content = JSON.stringify(tags);
+    this.tag(dvm);
+    this.tags.push(["encrypted"]);
+    await this.encrypt(dvm, signer);
+  }
+  /**
+   * Sets the DVM that will receive the event
+   */
+  set dvm(dvm) {
+    this.removeTag("p");
+    if (dvm)
+      this.tag(dvm);
+  }
+};
+
+// src/events/kinds/dvm/NDKTranscriptionDVM.ts
+var NDKTranscriptionDVM = class extends (/* unused pure expression or super */ null && (NDKDVMRequest)) {
+  constructor(ndk, event) {
+    super(ndk, event);
+    this.kind = 5e3 /* DVMReqTextExtraction */;
+  }
+  static from(event) {
+    return new NDKTranscriptionDVM(event.ndk, event.rawEvent());
+  }
+  /**
+   * Returns the original source of the transcription
+   */
+  get url() {
+    const inputTags = this.getMatchingTags("i");
+    if (inputTags.length !== 1) {
+      return void 0;
+    }
+    return inputTags[0][1];
+  }
+  /**
+   * Getter for the title tag
+   */
+  get title() {
+    return this.tagValue("title");
+  }
+  /**
+   * Setter for the title tag
+   */
+  set title(value) {
+    this.removeTag("title");
+    if (value) {
+      this.tags.push(["title", value]);
+    }
+  }
+  /**
+   * Getter for the image tag
+   */
+  get image() {
+    return this.tagValue("image");
+  }
+  /**
+   * Setter for the image tag
+   */
+  set image(value) {
+    this.removeTag("image");
+    if (value) {
+      this.tags.push(["image", value]);
     }
   }
 };
 
-// src/events/kinds/dvm/NDKDVMJobResult.ts
-var NDKDVMJobResult = class _NDKDVMJobResult extends (/* unused pure expression or super */ null && (NDKEvent)) {
+// src/events/kinds/dvm/result.ts
+var NDKDVMJobResult = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
   constructor(ndk, event) {
     super(ndk, event);
   }
   static from(event) {
-    return new _NDKDVMJobResult(event.ndk, event.rawEvent());
+    return new NDKDVMJobResult(event.ndk, event.rawEvent());
   }
   setAmount(msat, invoice) {
     this.removeTag("amount");
@@ -31080,223 +31787,46 @@ var NDKDVMJobResult = class _NDKDVMJobResult extends (/* unused pure expression 
   }
 };
 
-// src/events/kinds/dvm/NDKDVMRequest.ts
-var NDKDVMRequest = class _NDKDVMRequest extends (/* unused pure expression or super */ null && (NDKEvent)) {
+// src/events/kinds/dvm/feedback.ts
+var NDKDvmJobFeedbackStatus = /* @__PURE__ */ ((NDKDvmJobFeedbackStatus2) => {
+  NDKDvmJobFeedbackStatus2["Processing"] = "processing";
+  NDKDvmJobFeedbackStatus2["Success"] = "success";
+  NDKDvmJobFeedbackStatus2["Scheduled"] = "scheduled";
+  NDKDvmJobFeedbackStatus2["PayReq"] = "payment_required";
+  return NDKDvmJobFeedbackStatus2;
+})(NDKDvmJobFeedbackStatus || {});
+var NDKDVMJobFeedback = class extends (/* unused pure expression or super */ null && (NDKEvent)) {
   constructor(ndk, event) {
     super(ndk, event);
-    if (ndk) {
-      this.tags.push(["relays", ...ndk.pool.urls()]);
+    this.kind ??= 7e3 /* DVMJobFeedback */;
+  }
+  static async from(event) {
+    const e = new NDKDVMJobFeedback(event.ndk, event.rawEvent());
+    if (e.encrypted)
+      await e.dvmDecrypt();
+    return e;
+  }
+  get status() {
+    return this.tagValue("status");
+  }
+  set status(status) {
+    this.removeTag("status");
+    if (status !== void 0) {
+      this.tags.push(["status", status]);
     }
   }
-  static from(event) {
-    return new _NDKDVMRequest(event.ndk, event.rawEvent());
+  get encrypted() {
+    return !!this.getMatchingTags("encrypted")[0];
   }
-  /**
-   * Create a new job feedback for this request
-   */
-  createFeedback(status) {
-    const feedback = new NDKDVMJobFeedback(this.ndk);
-    feedback.status = status;
-    feedback.tag(this, "job");
-    return feedback;
-  }
-  /**
-   * Create a new result event for this request
-   */
-  createResult(data) {
-    const event = new NDKDVMJobResult(this.ndk, data);
-    event.jobRequest = this;
-    return event;
-  }
-  set bid(msatAmount) {
-    if (msatAmount === void 0) {
-      this.removeTag("bid");
-    } else {
-      this.tags.push(["bid", msatAmount.toString()]);
-    }
-  }
-  get bid() {
-    const v = this.tagValue("bid");
-    if (v === void 0)
-      return void 0;
-    return parseInt(v);
-  }
-  /**
-   * Adds a new input to the job
-   * @param args The arguments to the input
-   */
-  addInput(...args) {
-    this.tags.push(["i", ...args]);
-  }
-  /**
-   * Adds a new parameter to the job
-   */
-  addParam(...args) {
-    this.tags.push(["param", ...args]);
-  }
-  set output(output) {
-    if (output === void 0) {
-      this.removeTag("output");
-    } else {
-      if (typeof output === "string")
-        output = [output];
-      this.tags.push(["output", ...output]);
-    }
-  }
-  get output() {
-    const outputTag = this.getMatchingTags("output")[0];
-    return outputTag ? outputTag.slice(1) : void 0;
-  }
-  get params() {
-    const paramTags = this.getMatchingTags("param");
-    return paramTags.map((t) => t.slice(1));
-  }
-  getParam(name) {
-    const paramTag = this.getMatchingTags("param").find((t) => t[1] === name);
-    return paramTag ? paramTag[2] : void 0;
-  }
-};
-
-// src/events/kinds/dvm/NDKTranscriptionDVM.ts
-var NDKTranscriptionDVM = class _NDKTranscriptionDVM extends (/* unused pure expression or super */ null && (NDKDVMRequest)) {
-  constructor(ndk, event) {
-    super(ndk, event);
-    this.kind = 5e3 /* DVMReqTextExtraction */;
-  }
-  static from(event) {
-    return new _NDKTranscriptionDVM(event.ndk, event.rawEvent());
-  }
-  /**
-   * Returns the original source of the transcription
-   */
-  get url() {
-    const inputTags = this.getMatchingTags("i");
-    if (inputTags.length !== 1) {
-      return void 0;
-    }
-    return inputTags[0][1];
-  }
-  /**
-   * Getter for the title tag
-   */
-  get title() {
-    return this.tagValue("title");
-  }
-  /**
-   * Setter for the title tag
-   */
-  set title(value) {
-    this.removeTag("title");
-    if (value) {
-      this.tags.push(["title", value]);
-    }
-  }
-  /**
-   * Getter for the image tag
-   */
-  get image() {
-    return this.tagValue("image");
-  }
-  /**
-   * Setter for the image tag
-   */
-  set image(value) {
-    this.removeTag("image");
-    if (value) {
-      this.tags.push(["image", value]);
-    }
-  }
-};
-
-// src/events/kinds/repost.ts
-var NDKRepost = class _NDKRepost extends (/* unused pure expression or super */ null && (NDKEvent)) {
-  _repostedEvents;
-  constructor(ndk, rawEvent) {
-    super(ndk, rawEvent);
-  }
-  static from(event) {
-    return new _NDKRepost(event.ndk, event.rawEvent());
-  }
-  /**
-   * Returns all reposted events by the current event.
-   *
-   * @param klass Optional class to convert the events to.
-   * @returns
-   */
-  async repostedEvents(klass, opts) {
-    const items = [];
-    if (!this.ndk)
-      throw new Error("NDK instance not set");
-    if (this._repostedEvents !== void 0)
-      return this._repostedEvents;
-    for (const eventId of this.repostedEventIds()) {
-      const filter = filterForId(eventId);
-      const event = await this.ndk.fetchEvent(filter, opts);
-      if (event) {
-        items.push(klass ? klass.from(event) : event);
-      }
-    }
-    return items;
-  }
-  /**
-   * Returns the reposted event IDs.
-   */
-  repostedEventIds() {
-    return this.tags.filter((t) => t[0] === "e" || t[0] === "a").map((t) => t[1]);
-  }
-};
-function filterForId(id) {
-  if (id.match(/:/)) {
-    const [kind, pubkey, identifier] = id.split(":");
-    return {
-      kinds: [parseInt(kind)],
-      authors: [pubkey],
-      "#d": [identifier]
-    };
-  } else {
-    return { ids: [id] };
-  }
-}
-
-// src/events/kinds/nip89/NDKAppHandler.ts
-var NDKAppHandlerEvent = class _NDKAppHandlerEvent extends (/* unused pure expression or super */ null && (NDKEvent)) {
-  profile;
-  constructor(ndk, rawEvent) {
-    super(ndk, rawEvent);
-    this.kind ??= 31990 /* AppHandler */;
-  }
-  static from(ndkEvent) {
-    return new _NDKAppHandlerEvent(ndkEvent.ndk, ndkEvent.rawEvent());
-  }
-  /**
-   * Fetches app handler information
-   * If no app information is available on the kind:31990,
-   * we fetch the event's author's profile and return that instead.
-   */
-  async fetchProfile() {
-    if (this.profile === void 0 && this.content.length > 0) {
-      try {
-        const profile = JSON.parse(this.content);
-        if (profile && profile.name) {
-          return profile;
-        } else {
-          this.profile = null;
-        }
-      } catch (e) {
-        this.profile = null;
-      }
-    }
-    return new Promise((resolve, reject) => {
-      const author = this.author;
-      author.fetchProfile().then(() => {
-        resolve(author.profile);
-      }).catch(reject);
-    });
+  async dvmDecrypt() {
+    await this.decrypt();
+    const decryptedContent = JSON.parse(this.content);
+    this.tags.push(...decryptedContent);
   }
 };
 
 // src/events/kinds/simple-group/index.ts
-var NDKSimpleGroup = class _NDKSimpleGroup {
+var NDKSimpleGroup = class {
   ndk;
   groupId;
   relaySet;
@@ -31306,44 +31836,47 @@ var NDKSimpleGroup = class _NDKSimpleGroup {
     this.relaySet = relaySet;
   }
   /**
-   * Adds a user to the group.
+   * Adds a user to the group using a kind:9000 event
    * @param user user to add
    * @param opts options
    */
-  async addUser(user, opts = {
-    publish: true,
-    skipUserListEvent: false
-  }) {
-    const addUserEvent = _NDKSimpleGroup.generateAddUserEvent(user.pubkey, this.groupId);
+  async addUser(user) {
+    const addUserEvent = NDKSimpleGroup.generateAddUserEvent(user.pubkey, this.groupId);
     addUserEvent.ndk = this.ndk;
-    let currentUserListEvent = opts.currentUserListEvent;
-    if (!opts.skipUserListEvent) {
-      currentUserListEvent ??= await this.getMemberListEvent() || _NDKSimpleGroup.generateUserListEvent(this.groupId);
-      currentUserListEvent.tags = currentUserListEvent.tags.filter(untagUser(user.pubkey));
-      currentUserListEvent.tag(user, opts.marker);
-    }
-    if (opts?.publish ?? true) {
-      const promises = [addUserEvent.publish(this.relaySet)];
-      if (!opts.skipUserListEvent && currentUserListEvent) {
-        promises.push(currentUserListEvent.publish(this.relaySet));
-      }
-      await Promise.all(promises);
-    }
-    return {
-      addUserEvent,
-      currentUserListEvent
-    };
+    const relays = await addUserEvent.publish(this.relaySet);
+    return addUserEvent;
   }
   async getMemberListEvent() {
     const memberList = await this.ndk.fetchEvent(
       {
         kinds: [39002 /* GroupMembers */],
-        "#h": [this.groupId]
+        "#d": [this.groupId]
       },
       void 0,
       this.relaySet
     );
     return memberList;
+  }
+  /**
+   * Gets a list of users that belong to this group
+   */
+  async getMembers() {
+    const members = [];
+    const memberPubkeys = /* @__PURE__ */ new Set();
+    const memberListEvent = await this.getMemberListEvent();
+    if (!memberListEvent)
+      return [];
+    for (const pTag of memberListEvent.getMatchingTags("p")) {
+      const pubkey = pTag[1];
+      if (memberPubkeys.has(pubkey))
+        continue;
+      memberPubkeys.add(pubkey);
+      try {
+        members.push(this.ndk.getUser({ pubkey }));
+      } catch {
+      }
+    }
+    return members;
   }
   /**
    * Generates an event that lists the members of a group.
@@ -31364,44 +31897,41 @@ var NDKSimpleGroup = class _NDKSimpleGroup {
    * Generates an event that adds a user to a group.
    * @param userPubkey pubkey of the user to add
    * @param groupId group to add the user to
-   * @param alt optional description of the event
    * @returns
    */
-  static generateAddUserEvent(userPubkey, groupId, alt) {
+  static generateAddUserEvent(userPubkey, groupId) {
     const event = new NDKEvent(void 0, {
       kind: 9e3 /* GroupAdminAddUser */,
       tags: [["h", groupId]]
     });
-    if (alt)
-      event.alt = alt;
+    event.tags.push(["p", userPubkey]);
     return event;
   }
 };
-var untagUser = (pubkey) => (tag) => !(tag[0] === "p" && tag[1] === pubkey);
 
 // src/relay/auth-policies.ts
 
-function disconnect(pool, debug4) {
-  debug4 ??= browser("ndk:relay:auth-policies:disconnect");
+function disconnect(pool, debug7) {
+  debug7 ??= browser("ndk:relay:auth-policies:disconnect");
   return async (relay) => {
-    debug4(`Relay ${relay.url} requested authentication, disconnecting`);
+    debug7(`Relay ${relay.url} requested authentication, disconnecting`);
     pool.removeRelay(relay.url);
   };
 }
-async function signAndAuth(event, relay, signer, debug4, resolve, reject) {
+async function signAndAuth(event, relay, signer, debug7, resolve, reject) {
   try {
     await event.sign(signer);
     await relay.auth(event);
     resolve(event);
   } catch (e) {
-    debug4(`Failed to publish auth event to relay ${relay.url}`, e);
+    debug7(`Failed to publish auth event to relay ${relay.url}`, e);
     reject(event);
   }
 }
-function signIn({ ndk, signer, debug: debug4 } = {}) {
-  debug4 ??= browser("ndk:auth-policies:signIn");
+function signIn({ ndk, signer, debug: debug7 } = {}) {
+  debug7 ??= browser("ndk:auth-policies:signIn");
   return async (relay, challenge) => {
-    debug4(`Relay ${relay.url} requested authentication, signing in`);
+    debug7(`Relay ${relay.url} requested authentication, signing in`);
     const event = new NDKEvent(ndk);
     event.kind = 22242 /* ClientAuth */;
     event.tags = [
@@ -31411,10 +31941,10 @@ function signIn({ ndk, signer, debug: debug4 } = {}) {
     signer ??= ndk?.signer;
     return new Promise(async (resolve, reject) => {
       if (signer) {
-        await signAndAuth(event, relay, signer, debug4, resolve, reject);
+        await signAndAuth(event, relay, signer, debug7, resolve, reject);
       } else {
         ndk?.once("signer:ready", async (signer2) => {
-          await signAndAuth(event, relay, signer2, debug4, resolve, reject);
+          await signAndAuth(event, relay, signer2, debug7, resolve, reject);
         });
       }
     });
@@ -31570,7 +32100,7 @@ var NDKNip07Signer = class {
 
 // src/signers/private-key/index.ts
 
-var NDKPrivateKeySigner = class _NDKPrivateKeySigner {
+var NDKPrivateKeySigner = class {
   _user;
   privateKey;
   constructor(privateKey) {
@@ -31583,7 +32113,7 @@ var NDKPrivateKeySigner = class _NDKPrivateKeySigner {
   }
   static generate() {
     const privateKey = generatePrivateKey();
-    return new _NDKPrivateKeySigner(privateKey);
+    return new NDKPrivateKeySigner(privateKey);
   }
   async blockUntilReady() {
     if (!this._user) {
@@ -31623,11 +32153,11 @@ var NDKNostrRpc = class extends (/* unused pure expression or super */ null && (
   ndk;
   signer;
   debug;
-  constructor(ndk, signer, debug4) {
+  constructor(ndk, signer, debug7) {
     super();
     this.ndk = ndk;
     this.signer = signer;
-    this.debug = debug4.extend("rpc");
+    this.debug = debug7.extend("rpc");
   }
   /**
    * Subscribe to a filter. This function will resolve once the subscription is ready.
@@ -31723,13 +32253,13 @@ var NDKNostrRpc = class extends (/* unused pure expression or super */ null && (
 // src/signers/nip46/backend/ping.ts
 var PingEventHandlingStrategy = class {
   async handle(backend, id, remotePubkey, params) {
-    const debug4 = backend.debug.extend("ping");
-    debug4(`ping request from ${remotePubkey}`);
+    const debug7 = backend.debug.extend("ping");
+    debug7(`ping request from ${remotePubkey}`);
     if (await backend.pubkeyAllowed({ id, pubkey: remotePubkey, method: "ping" })) {
-      debug4(`connection request from ${remotePubkey} allowed`);
+      debug7(`connection request from ${remotePubkey} allowed`);
       return "pong";
     } else {
-      debug4(`connection request from ${remotePubkey} rejected`);
+      debug7(`connection request from ${remotePubkey} rejected`);
     }
     return void 0;
   }
@@ -31739,17 +32269,17 @@ var PingEventHandlingStrategy = class {
 var ConnectEventHandlingStrategy = class {
   async handle(backend, id, remotePubkey, params) {
     const [pubkey, token] = params;
-    const debug4 = backend.debug.extend("connect");
-    debug4(`connection request from ${pubkey}`);
+    const debug7 = backend.debug.extend("connect");
+    debug7(`connection request from ${pubkey}`);
     if (token && backend.applyToken) {
-      debug4(`applying token`);
+      debug7(`applying token`);
       await backend.applyToken(pubkey, token);
     }
     if (await backend.pubkeyAllowed({ id, pubkey, method: "connect", params: token })) {
-      debug4(`connection request from ${pubkey} allowed`);
+      debug7(`connection request from ${pubkey} allowed`);
       return "ack";
     } else {
-      debug4(`connection request from ${pubkey} rejected`);
+      debug7(`connection request from ${pubkey} rejected`);
     }
     return void 0;
   }
@@ -31981,7 +32511,7 @@ var NDKNip46Signer = class extends (/* unused pure expression or super */ null &
     });
     this.localSigner.user().then((localUser) => {
       this.rpc.subscribe({
-        kinds: [24133 /* NostrConnect */, 24134 /* NostrConnectAdmin */],
+        kinds: [24133 /* NostrConnect */, 24133 /* NostrConnect */ + 1],
         "#p": [localUser.pubkey]
       });
     });
@@ -32110,7 +32640,7 @@ var NDKNip46Signer = class extends (/* unused pure expression or super */ null &
         this.remotePubkey,
         "create_account",
         req,
-        24134 /* NostrConnectAdmin */,
+        24133 /* NostrConnect */,
         (response) => {
           this.debug("got a response", response);
           if (!response.error) {
@@ -32124,6 +32654,89 @@ var NDKNip46Signer = class extends (/* unused pure expression or super */ null &
     });
   }
 };
+
+// src/dvm/schedule.ts
+function addRelays(event, relays) {
+  const tags = [];
+  if (!relays || relays.length === 0) {
+    const poolRelays = event.ndk?.pool.relays;
+    relays = poolRelays ? Object.keys(poolRelays) : void 0;
+  }
+  if (relays && relays.length > 0)
+    tags.push(["relays", ...relays]);
+  return tags;
+}
+async function dvmSchedule(event, dvm, relays, encrypted = true, waitForConfirmationForMs) {
+  if (!event.ndk)
+    throw new Error("NDK not set");
+  if (!event.sig)
+    throw new Error("Event not signed");
+  if (!event.created_at)
+    throw new Error("Event has no date");
+  if (!dvm)
+    throw new Error("No DVM specified");
+  if (event.created_at <= Date.now() / 1e3)
+    throw new Error("Event needs to be in the future");
+  const scheduleEvent = new NDKDVMRequest(event.ndk, {
+    kind: 5905 /* DVMEventSchedule */
+  });
+  scheduleEvent.addInput(JSON.stringify(event.rawEvent()), "text");
+  scheduleEvent.tags.push(...addRelays(event, relays));
+  if (encrypted) {
+    await scheduleEvent.encryption(dvm);
+  } else {
+    scheduleEvent.dvm = dvm;
+  }
+  await scheduleEvent.sign();
+  let res;
+  if (waitForConfirmationForMs) {
+    res = event.ndk.subscribe(
+      {
+        kinds: [5905 /* DVMEventSchedule */ + 1e3, 7e3 /* DVMJobFeedback */],
+        ...scheduleEvent.filter()
+      },
+      { groupable: false, closeOnEose: false }
+    );
+  }
+  const timeoutPromise = new Promise((reject) => {
+    setTimeout(() => {
+      res?.stop();
+      reject("Timeout waiting for an answer from the DVM");
+    }, waitForConfirmationForMs);
+  });
+  const schedulePromise = new Promise(
+    (resolve, reject) => {
+      if (waitForConfirmationForMs) {
+        res?.on("event", async (e) => {
+          res?.stop();
+          if (e.kind === 7e3 /* DVMJobFeedback */) {
+            const feedback = await NDKDVMJobFeedback.from(e);
+            if (feedback.status === "error") {
+              const statusTag = feedback.getMatchingTags("status");
+              reject(statusTag?.[2] ?? feedback);
+            } else {
+              resolve(feedback);
+            }
+          }
+          resolve(e);
+        });
+      }
+      scheduleEvent.publish().then(() => {
+        if (!waitForConfirmationForMs)
+          resolve();
+      });
+    }
+  );
+  return new Promise((resolve, reject) => {
+    if (waitForConfirmationForMs) {
+      Promise.race([timeoutPromise, schedulePromise]).then((e) => {
+        resolve(e);
+      }).catch(reject);
+    } else {
+      schedulePromise.then(resolve);
+    }
+  });
+}
 
 // src/ndk/index.ts
 
@@ -32179,7 +32792,7 @@ var OutboxTracker = class extends lib.EventEmitter {
       const outboxItem = this.track(item, "user");
       const user = item instanceof NDKUser ? item : new NDKUser({ hexpubkey: item });
       user.ndk = this.ndk;
-      user.relayList().then((relayList) => {
+      NDKRelayList.forUser(user, this.ndk).then((relayList) => {
         if (relayList) {
           outboxItem.readRelays = new Set(relayList.readRelayUrls);
           outboxItem.writeRelays = new Set(relayList.writeRelayUrls);
@@ -32244,9 +32857,9 @@ var NDKPool = class extends lib.EventEmitter {
   flappingRelays = /* @__PURE__ */ new Set();
   // A map to store timeouts for each flapping relay.
   backoffTimes = /* @__PURE__ */ new Map();
-  constructor(relayUrls = [], blacklistedRelayUrls = [], ndk, debug4) {
+  constructor(relayUrls = [], blacklistedRelayUrls = [], ndk, debug7) {
     super();
-    this.debug = debug4 ?? ndk.debug.extend("pool");
+    this.debug = debug7 ?? ndk.debug.extend("pool");
     for (const relayUrl of relayUrls) {
       const relay = new NDKRelay(relayUrl);
       this.addRelay(relay, false);
@@ -32736,7 +33349,7 @@ var NDK = class extends lib.EventEmitter {
     this._activeUser = user;
     if (user && differentUser) {
       const connectToUserRelays = async (user2) => {
-        const relayList = await user2.relayList();
+        const relayList = await NDKRelayList.forUser(user2, this);
         if (!relayList) {
           this.debug("No relay list found for user", { npub: user2.npub });
           return;
