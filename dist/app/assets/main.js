@@ -18518,7 +18518,7 @@ async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
 
-    const subscription = await window.ndk.subscribe(filter);
+    const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
     subscription.on("event", (e) => {
         saveNoteToDatabase(e);
         searchNotes(); // trigger a search to update the UI
@@ -18629,7 +18629,8 @@ function searchNotes() {
             const color = colorForRelay(relay.url);
             noteRelays += `<div class="relay-indicator" style="background-color:#${color}" data-bs-toggle="tooltip" data-bs-title="${relay.url}">&nbsp;</div>`;
         }
-        $("#notes-list").append("<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + note.title + "</div><div>" + noteRelays + "</div></button>");
+        const privateIndicator = note.private ? "<i class='fa fa-solid fa-eye-slash'></i>" : "<i class='fa fa-cookie' style='width:16px'></i>";
+        $("#notes-list").append("<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + privateIndicator + "&nbsp;" + note.title + "</div><div>" + noteRelays + "</div></button>");
         notesDisplayed++;
     });
 
