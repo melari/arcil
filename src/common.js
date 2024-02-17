@@ -30,20 +30,28 @@ export function shortHash(input, length = 64) {
 }
 
 // Swaps between connected / disconnected
-export function toggleConnect() {
+export async function toggleConnect() {
   if (window.nip07signer) {
-    window.nip07signer = null;
-    window.ndk = null;
-    window.nostrUser = null;
-    delete(window.sessionStorage.privateKey);
-    delete(window.sessionStorage.lastKeyProvider);
     $(".connect-wallet").text("Connect");
+    await disconnectNostr();
     return ensureReadonlyConnected().then(() => {
       window.dispatchEvent(new Event(Wallet.WALLET_DISCONNECTED_EVENT));
     });
   } else {
     return ensureConnected();
   }
+}
+
+async function disconnectNostr() {
+  for (const r of window.ndk.pool.relays.values()) { r.disconnect(); }
+  await delay(100); // Give the relays a chance to disconnect
+  window.ndk = null;
+
+  window.nip07signer = null;
+  window.nostrUser = null;
+  delete (window.sessionStorage.privateKey);
+  delete (window.sessionStorage.lastKeyProvider);
+  location.reload();
 }
 
 // Will try to get a connection without user interaction if possible
