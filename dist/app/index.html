@@ -159,9 +159,21 @@ h3 {
                     </button>
                 </div>
                 <div class="d-none d-md-flex">
-                    <button class="btn" onclick="saveNote()">Publish</button>
-                    <button class="btn" onclick="savePrivateNote()">Save as Private/Draft</button>
+                    <div class="btn-group dropup">
+                        <button type="button" class="btn" onclick="saveNote()" style="margin-right:0;">
+                          Publish
+                        </button>
+                        <button type="button" class="btn dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                          <span class="visually-hidden">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><button class="dropdown-item danger" onclick="deleteNote()" style="margin:0">🗑️ Delete</button></li>
+                            <li><button class="dropdown-item" onclick="savePrivateNote()" style="margin:0">🔒 Save as Draft</button></li>
+                        </ul>
+                    </div>
+
                     <button class="btn" onclick="viewPublishedNote()">Open Published <i class="fa fa-external-link" aria-hidden="true"></i></button>
+                    
                 </div>
             </div>
         </nav>
@@ -242,6 +254,7 @@ h3 {
                 <button class="list-group-item list-group-item-action active" aria-current="true" onclick="saveNote()">Publish</button>
                 <button class="list-group-item list-group-item-action" onclick="savePrivateNote()">Save as private draft</button>
                 <button class="list-group-item list-group-item-action" onclick="viewPublishedNote()">Open published <i class="fa fa-external-link" aria-hidden="true"></i></button>
+                <button class="list-group-item list-group-item-action" onclick="deleteNote()">Delete Note</button>
               </div>
         </div>
       </div>

@@ -153,9 +153,11 @@ function searchNotes() {
         }
     });
 
-    const sorted = Array.from(uniqueNotes).sort((a, b) =>
-        (notes[b]?.nostrEvent.created_at ?? 0) - (notes[a]?.nostrEvent.created_at ?? 0)
-    );
+    const sorted = Array.from(uniqueNotes)
+        .filter((note) => notes[note]?.content != "")
+        .sort((a, b) =>
+            (notes[b]?.nostrEvent.created_at ?? 0) - (notes[a]?.nostrEvent.created_at ?? 0)
+        );
 
     window.tooltipList.forEach(tooltip => tooltip.dispose());
 
@@ -193,41 +195,55 @@ function newNote(content = "") {
 }
 window.newNote = newNote;
 
+function deleteNote() {
+    if (!!window.publishModal) { window.publishModal.hide(); }
+    confirmAction("Are you sure you want to delete this note?").then(() => {
+        showPending("Deleting...");
+        window.MDEditor.value('');
+        publishNote('Your note has been deleted');
+    });
+}
+window.deleteNote = deleteNote;
+
 function saveNote() {
     if (!!window.publishModal) { window.publishModal.hide(); }
-    confirmPublish().then(() => {
+    if (!PageContext.instance.note.private) {
         showPending("Publishing...");
-        ensureConnected().then(() => {
-            const title = $("#note-title").val();
-            if (dtagFor(title) == "tagayasu-") {
-                showError("Title cannot be empty");
-                return;
-            }
-
-            const saveEvent = new NDKEvent(window.ndk);
-            saveEvent.kind = 30023;
-            saveEvent.content = window.MDEditor.value();
-            saveEvent.tags = [
-                ["d", dtagFor(title)],
-                ["title", title],
-                ["published_at", Math.floor(Date.now() / 1000).toString()]
-            ]
-            MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-                saveEvent.tags.push(["a", backref]);
-            });
-            console.log(saveEvent);
-            saveEvent.publish().then(function (x) {
-                showNotice("Your note has been published!");
-                PageContext.instance.setNoteByNostrEvent(saveEvent);
-            })
+        publishNote("Your note has been published!");
+    } else {
+        confirmAction("This note is private. Are you sure you want to publish it?").then(() => {
+            showPending("Publishing...");
+            publishNote("Your draft has been converted to a public note!");
         });
-    });
+    }
 }
 window.saveNote = saveNote;
 
-function confirmPublish() {
-    if (!PageContext.instance.note.private) { return Promise.resolve('confirmation not required'); }
-    return confirmAction("This note is private. Are you sure you want to publish it?");
+function publishNote(message) {
+    ensureConnected().then(() => {
+        const title = $("#note-title").val();
+        if (dtagFor(title) == "tagayasu-") {
+            showError("Title cannot be empty");
+            return;
+        }
+
+        const saveEvent = new NDKEvent(window.ndk);
+        saveEvent.kind = 30023;
+        saveEvent.content = window.MDEditor.value();
+        saveEvent.tags = [
+            ["d", dtagFor(title)],
+            ["title", title],
+            ["published_at", Math.floor(Date.now() / 1000).toString()]
+        ]
+        MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
+            saveEvent.tags.push(["a", backref]);
+        });
+        console.log(saveEvent);
+        saveEvent.publish().then(function (x) {
+            showNotice(message);
+            PageContext.instance.setNoteByNostrEvent(saveEvent);
+        })
+    });
 }
 
 function savePrivateNote() {
