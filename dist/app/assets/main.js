@@ -18617,10 +18617,14 @@ function searchNotes() {
         }
     });
 
+    const sorted = Array.from(uniqueNotes).sort((a, b) =>
+        (notes[b]?.nostrEvent.created_at ?? 0) - (notes[a]?.nostrEvent.created_at ?? 0)
+    );
+
     window.tooltipList.forEach(tooltip => tooltip.dispose());
 
     let notesDisplayed = 0;
-    uniqueNotes.forEach(function (noteId) {
+    sorted.forEach(function (noteId) {
         const note = window.notes[noteId];
         if (!note) { return; }
         if (notesDisplayed > 20) { return; }
