@@ -18658,34 +18658,41 @@ function newNote(content = "") {
 window.newNote = newNote;
 
 function saveNote() {
-    (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Publishing...");
     if (!!window.publishModal) { window.publishModal.hide(); }
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
-        const title = $("#note-title").val();
-        if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
-            return;
-        }
+    confirmPublish().then(() => {
+        (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Publishing...");
+        (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+            const title = $("#note-title").val();
+            if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
+                (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
+                return;
+            }
 
-        const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
-        saveEvent.kind = 30023;
-        saveEvent.content = window.MDEditor.value();
-        saveEvent.tags = [
-            ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
-            ["title", title],
-            ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ]
-        MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-            saveEvent.tags.push(["a", backref]);
+            const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+            saveEvent.kind = 30023;
+            saveEvent.content = window.MDEditor.value();
+            saveEvent.tags = [
+                ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
+                ["title", title],
+                ["published_at", Math.floor(Date.now() / 1000).toString()]
+            ]
+            MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
+                saveEvent.tags.push(["a", backref]);
+            });
+            console.log(saveEvent);
+            saveEvent.publish().then(function (x) {
+                (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your note has been published!");
+                PageContext.instance.setNoteByNostrEvent(saveEvent);
+            })
         });
-        console.log(saveEvent);
-        saveEvent.publish().then(function (x) {
-            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your note has been published!");
-            PageContext.instance.setNoteByNostrEvent(saveEvent);
-        })
     });
 }
 window.saveNote = saveNote;
+
+function confirmPublish() {
+    if (!PageContext.instance.note.private) { return Promise.resolve('confirmation not required'); }
+    return confirmAction("This note is private. Are you sure you want to publish it?");
+}
 
 function savePrivateNote() {
     (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Encrypting and saving...");
@@ -18865,6 +18872,27 @@ $("#toast").on("click", function () {
 window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
     createMDE();
 });
+
+function confirmAction(question) {
+    return new Promise((resolve, reject) => {
+        const modal = new bootstrap.Modal("#confirmActionModal", {});
+        $("#confirmActionTitle").text(question);
+        modal.show();
+
+        const confirmActionYes = document.getElementById('confirmActionYes');
+        confirmActionYes.addEventListener('click', function onYesClick() {
+            confirmActionYes.removeEventListener('click', onYesClick);
+            modal.hide();
+            resolve("user confirmed the action");
+        });
+
+        modal._element.addEventListener('hidden.bs.modal', function onModalHidden() {
+            modal._element.removeEventListener('hidden.bs.modal', onModalHidden);
+            reject("user cancelled the action");
+        });
+    });
+}
+window.confirmAction = confirmAction;
 
 /***/ }),
 

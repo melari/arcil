@@ -194,34 +194,41 @@ function newNote(content = "") {
 window.newNote = newNote;
 
 function saveNote() {
-    showPending("Publishing...");
     if (!!window.publishModal) { window.publishModal.hide(); }
-    ensureConnected().then(() => {
-        const title = $("#note-title").val();
-        if (dtagFor(title) == "tagayasu-") {
-            showError("Title cannot be empty");
-            return;
-        }
+    confirmPublish().then(() => {
+        showPending("Publishing...");
+        ensureConnected().then(() => {
+            const title = $("#note-title").val();
+            if (dtagFor(title) == "tagayasu-") {
+                showError("Title cannot be empty");
+                return;
+            }
 
-        const saveEvent = new NDKEvent(window.ndk);
-        saveEvent.kind = 30023;
-        saveEvent.content = window.MDEditor.value();
-        saveEvent.tags = [
-            ["d", dtagFor(title)],
-            ["title", title],
-            ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ]
-        MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-            saveEvent.tags.push(["a", backref]);
+            const saveEvent = new NDKEvent(window.ndk);
+            saveEvent.kind = 30023;
+            saveEvent.content = window.MDEditor.value();
+            saveEvent.tags = [
+                ["d", dtagFor(title)],
+                ["title", title],
+                ["published_at", Math.floor(Date.now() / 1000).toString()]
+            ]
+            MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
+                saveEvent.tags.push(["a", backref]);
+            });
+            console.log(saveEvent);
+            saveEvent.publish().then(function (x) {
+                showNotice("Your note has been published!");
+                PageContext.instance.setNoteByNostrEvent(saveEvent);
+            })
         });
-        console.log(saveEvent);
-        saveEvent.publish().then(function (x) {
-            showNotice("Your note has been published!");
-            PageContext.instance.setNoteByNostrEvent(saveEvent);
-        })
     });
 }
 window.saveNote = saveNote;
+
+function confirmPublish() {
+    if (!PageContext.instance.note.private) { return Promise.resolve('confirmation not required'); }
+    return confirmAction("This note is private. Are you sure you want to publish it?");
+}
 
 function savePrivateNote() {
     showPending("Encrypting and saving...");
@@ -401,3 +408,24 @@ $("#toast").on("click", function () {
 window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
     createMDE();
 });
+
+function confirmAction(question) {
+    return new Promise((resolve, reject) => {
+        const modal = new bootstrap.Modal("#confirmActionModal", {});
+        $("#confirmActionTitle").text(question);
+        modal.show();
+
+        const confirmActionYes = document.getElementById('confirmActionYes');
+        confirmActionYes.addEventListener('click', function onYesClick() {
+            confirmActionYes.removeEventListener('click', onYesClick);
+            modal.hide();
+            resolve("user confirmed the action");
+        });
+
+        modal._element.addEventListener('hidden.bs.modal', function onModalHidden() {
+            modal._element.removeEventListener('hidden.bs.modal', onModalHidden);
+            reject("user cancelled the action");
+        });
+    });
+}
+window.confirmAction = confirmAction;
