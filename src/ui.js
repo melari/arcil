@@ -196,12 +196,28 @@ function newNote(content = "") {
 window.newNote = newNote;
 
 function deleteNote() {
+    if (!PageContext.instance.note.id) {
+        showNotice("Nothing to do! Note was never published.");
+        return;
+    }
+
     if (!!window.publishModal) { window.publishModal.hide(); }
     confirmAction("Are you sure you want to delete this note?").then(() => {
         showPending("Deleting...");
-        window.MDEditor.value('');
-        publishNote('Your note has been deleted').then(() => {
-            $("#note-title").val("");
+
+        // Delete the most recent version of the note
+        const deleteEvent = new NDKEvent(window.ndk);
+        deleteEvent.kind = 5;
+        deleteEvent.content = "This note has been deleted";
+        deleteEvent.tags = [
+            ["e", PageContext.instance.note.id]
+        ];
+        deleteEvent.publish().then(() => {
+        // Save a new version with removed content to encourage clients not to show old versions of the note
+            window.MDEditor.value('');
+            publishNote('Your note has been deleted').then(() => {
+                $("#note-title").val("");
+            });
         });
     });
 }
