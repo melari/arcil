@@ -1,4 +1,4 @@
-import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptSelf, decryptSelf } from "./common.js"
+import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptNote, decryptSelf } from "./common.js"
 import { NDKEvent } from "@nostr-dev-kit/ndk";
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
@@ -55,8 +55,8 @@ async function fetchNotes() {
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
 
     const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
-    subscription.on("event", (e) => {
-        saveNoteToDatabase(e);
+    subscription.on("event", async (e) => {
+        await saveNoteToDatabase(e);
         searchNotes(); // trigger a search to update the UI
     });
 
@@ -90,14 +90,14 @@ function loadNote() {
 
     ensureConnected().then(() => {
         const filter = PageContext.instance.noteFilterFromUrl();
-        window.ndk.fetchEvent(filter).then(function (event) {
+        window.ndk.fetchEvent(filter).then(async function (event) {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
-                    saveNoteToDatabase(event);
+                    await saveNoteToDatabase(event);
                     editNote(event.id);
                 }
-            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on nattr d-tag if present
-                const title = filter["#d"][0].slice(9).split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
+                const title = PageContext.instance.noteTitleFromUrl();
                 window.MDEditor.value(`# ${title}`);
                 $("#note-title").val(title);
             }
@@ -106,8 +106,8 @@ function loadNote() {
 }
 window.loadNote = loadNote;
 
-function saveNoteToDatabase(event) {
-    const note = Note.fromNostrEvent(event);
+async function saveNoteToDatabase(event) {
+    const note = await Note.fromNostrEvent(event);
     if (notes[event.id]) { return; }
 
     notes[event.id] = note;
@@ -257,9 +257,9 @@ async function publishNote(message) {
             saveEvent.tags.push(["a", backref]);
         });
         console.log(saveEvent);
-        return saveEvent.publish().then(function (x) {
+        return saveEvent.publish().then(async function (x) {
             showNotice(message);
-            PageContext.instance.setNoteByNostrEvent(saveEvent);
+            await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
@@ -276,16 +276,16 @@ function savePrivateNote() {
 
         const saveEvent = new NDKEvent(window.ndk);
         saveEvent.kind = 30023;
-        saveEvent.content = await encryptSelf(window.MDEditor.value());
+        saveEvent.content = await encryptNote(title, window.MDEditor.value());
         saveEvent.tags = [
             ["d", dtagFor(title)],
-            ["title", title],
+            ["title", "DRAFT"],
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
-        saveEvent.publish().then(function (x) {
+        saveEvent.publish().then(async function (x) {
             showNotice("Your note has been saved privately.");
-            PageContext.instance.setNoteByNostrEvent(saveEvent);
+            await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
@@ -316,18 +316,16 @@ window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     updateOwnerOnly();
 
+    const stubTitle = PageContext.instance.noteTitleFromUrl();
     const note = PageContext.instance.note;
     if (note.nostrEvent) {
-        if (note.private) { // if the private tag is present, it means the content is encrypted
-            $("#note-content").html(MarkdownRenderer.instance.renderHtml(await decryptSelf(note.content)))
-            window.MDEditor.value(await decryptSelf(note.content));
-          } else {
-            $("#note-content").html(MarkdownRenderer.instance.renderHtml(note.content));
-            window.MDEditor.value(note.content);
-          }
-          loadBackrefs();
+        $("#note-content").html(MarkdownRenderer.instance.renderHtml(note.content));
+        window.MDEditor.value(note.content);
+        loadBackrefs();
+    } else if (!!stubTitle) {
+        $("#note-content").html(`<h1>${stubTitle}</h1><p>⚠️ This note is a stub and does not exist yet. Click "open in editor" to start writing!</p>`);
     } else {
-        $("#note-content").html("<center><h3>note not found!</h3>Either this version of the note no longer exists or it's on a different nostr relay.");
+        $("#note-content").html("<center><h3>note not found!</h3>Either this version of the note no longer exists or it's on a different nostr relay.</center>");
     }
 
     if (!!window.notesModal) { window.notesModal.hide(); }

@@ -12793,13 +12793,13 @@ async function browseNote() {
   const filters = PageContext.instance.noteFilterFromUrl();
   if (!!filters.authors) { PageContext.instance.setNoteByAuthorPubkey(filters.authors[0]); } // save the author from the params (if possible) rather than event in case the event does not exist.
   window.ndk.fetchEvent(filters).then(async function(event) {
-    if (!!event) { PageContext.instance.setNoteByNostrEvent(event); }
+    if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
 }
 window.browseNote = browseNote;
 
 function openNoteInEditor() {
-  window.location.href = window.router.urlFor(Router.EDITOR, PageContext.instance.noteIdentifierFromUrl());
+  window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}?title=${PageContext.instance.noteTitleFromUrl()}`);
 }
 window.openNoteInEditor = openNoteInEditor;
 
@@ -12834,9 +12834,11 @@ window.lookupNpubFromDns = lookupNpubFromDns;
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
   Mf: () => (/* binding */ atagFor),
+  fD: () => (/* binding */ decryptNote),
   Gk: () => (/* binding */ decryptSelf),
   gw: () => (/* binding */ delay),
   oF: () => (/* binding */ dtagFor),
+  r0: () => (/* binding */ encryptNote),
   DE: () => (/* binding */ encryptSelf),
   zs: () => (/* binding */ ensureConnected),
   lD: () => (/* binding */ ensureReadonlyConnected),
@@ -17932,7 +17934,7 @@ function connectNostrViaPassphrase() {
 }
 
 function dtagFor(title) {
-  return `tagayasu-${title.toLowerCase()}`;
+  return `tagayasu-${common_crypto.SHA256(title.toLowerCase())}`;
 }
 
 function naddrFor(title, hexpubkey) {
@@ -17965,6 +17967,26 @@ async function decryptSelf(text) {
   } else {
     return Promise.reject("Did not find any encryption compatible wallet");
   }
+}
+
+async function encryptNote(title, content) {
+  const titleLength = title.length;
+  const body = `${titleLength}:${title}${content}`;
+  console.log(body);
+  return await encryptSelf(body);
+}
+
+async function decryptNote(cyphertext) {
+  const body = await decryptSelf(cyphertext);
+  const titleLength = parseInt(body.slice(0, body.indexOf(":")));
+
+  const titleOffset = body.indexOf(":") + 1;
+  const contentOffset = titleOffset + titleLength;
+
+  const title = body.slice(titleOffset, contentOffset);
+  const content = body.slice(contentOffset);
+  console.log({ body, titleLength, title, content });
+  return { title, content };
 }
 
 /**
@@ -18123,7 +18145,7 @@ class MarkdownRenderer {
                 const token = {
                 type: 'link',
                 raw: match[0],
-                href: window.router.urlFor(Router.BROWSER, handle),
+                    href: window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
                 title: match[1],
                 text: match[1],
                 tokens: this.lexer.inlineTokens(match[1])
@@ -18190,7 +18212,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 class Note {
-    static fromNostrEvent(event) {
+    static async fromNostrEvent(event) {
         const note = new Note();
         note.id = event.id;
         note.nostrEvent = event;
@@ -18199,6 +18221,13 @@ class Note {
         note.content = event.content;
         note.authorPubkey = event.pubkey;
         note.onRelays = [];
+
+        if (note.private) {
+            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .decryptNote */ .fD)(note.content);
+            note.title = title;
+            note.content = content;
+        }
+
         return note;
     }
 
@@ -18248,8 +18277,8 @@ class PageContext {
         this._note = note;
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
-    setNoteByNostrEvent(event) {
-        this._note = Note.fromNostrEvent(event);
+    async setNoteByNostrEvent(event) {
+        this._note = await Note.fromNostrEvent(event);
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
     setNoteByAuthorPubkey(authorPubkey) {
@@ -18279,6 +18308,10 @@ class PageContext {
 
     noteIdentifierFromUrl() {
         return this._urlParam(PageContext.NADDR_PARAM_NAME);
+    }
+
+    noteTitleFromUrl() {
+        return this._urlParam("title");
     }
 
     _urlParam(name) {
@@ -18519,8 +18552,8 @@ async function fetchNotes() {
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
 
     const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
-    subscription.on("event", (e) => {
-        saveNoteToDatabase(e);
+    subscription.on("event", async (e) => {
+        await saveNoteToDatabase(e);
         searchNotes(); // trigger a search to update the UI
     });
 
@@ -18554,14 +18587,14 @@ function loadNote() {
 
     (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
         const filter = PageContext.instance.noteFilterFromUrl();
-        window.ndk.fetchEvent(filter).then(function (event) {
+        window.ndk.fetchEvent(filter).then(async function (event) {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
-                    saveNoteToDatabase(event);
+                    await saveNoteToDatabase(event);
                     editNote(event.id);
                 }
-            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on nattr d-tag if present
-                const title = filter["#d"][0].slice(9).split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
+                const title = PageContext.instance.noteTitleFromUrl();
                 window.MDEditor.value(`# ${title}`);
                 $("#note-title").val(title);
             }
@@ -18570,8 +18603,8 @@ function loadNote() {
 }
 window.loadNote = loadNote;
 
-function saveNoteToDatabase(event) {
-    const note = Note.fromNostrEvent(event);
+async function saveNoteToDatabase(event) {
+    const note = await Note.fromNostrEvent(event);
     if (notes[event.id]) { return; }
 
     notes[event.id] = note;
@@ -18721,9 +18754,9 @@ async function publishNote(message) {
             saveEvent.tags.push(["a", backref]);
         });
         console.log(saveEvent);
-        return saveEvent.publish().then(function (x) {
+        return saveEvent.publish().then(async function (x) {
             (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)(message);
-            PageContext.instance.setNoteByNostrEvent(saveEvent);
+            await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
@@ -18740,16 +18773,16 @@ function savePrivateNote() {
 
         const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
         saveEvent.kind = 30023;
-        saveEvent.content = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(window.MDEditor.value());
+        saveEvent.content = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .encryptNote */ .r0)(title, window.MDEditor.value());
         saveEvent.tags = [
             ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
-            ["title", title],
+            ["title", "DRAFT"],
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
-        saveEvent.publish().then(function (x) {
+        saveEvent.publish().then(async function (x) {
             ;(0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your note has been saved privately.");
-            PageContext.instance.setNoteByNostrEvent(saveEvent);
+            await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
@@ -18780,18 +18813,16 @@ window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     updateOwnerOnly();
 
+    const stubTitle = PageContext.instance.noteTitleFromUrl();
     const note = PageContext.instance.note;
     if (note.nostrEvent) {
-        if (note.private) { // if the private tag is present, it means the content is encrypted
-            $("#note-content").html(MarkdownRenderer.instance.renderHtml(await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(note.content)))
-            window.MDEditor.value(await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(note.content));
-          } else {
-            $("#note-content").html(MarkdownRenderer.instance.renderHtml(note.content));
-            window.MDEditor.value(note.content);
-          }
-          loadBackrefs();
+        $("#note-content").html(MarkdownRenderer.instance.renderHtml(note.content));
+        window.MDEditor.value(note.content);
+        loadBackrefs();
+    } else if (!!stubTitle) {
+        $("#note-content").html(`<h1>${stubTitle}</h1><p>⚠️ This note is a stub and does not exist yet. Click "open in editor" to start writing!</p>`);
     } else {
-        $("#note-content").html("<center><h3>note not found!</h3>Either this version of the note no longer exists or it's on a different nostr relay.");
+        $("#note-content").html("<center><h3>note not found!</h3>Either this version of the note no longer exists or it's on a different nostr relay.</center>");
     }
 
     if (!!window.notesModal) { window.notesModal.hide(); }

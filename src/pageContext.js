@@ -15,8 +15,8 @@ class PageContext {
         this._note = note;
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
-    setNoteByNostrEvent(event) {
-        this._note = Note.fromNostrEvent(event);
+    async setNoteByNostrEvent(event) {
+        this._note = await Note.fromNostrEvent(event);
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
     setNoteByAuthorPubkey(authorPubkey) {
@@ -46,6 +46,10 @@ class PageContext {
 
     noteIdentifierFromUrl() {
         return this._urlParam(PageContext.NADDR_PARAM_NAME);
+    }
+
+    noteTitleFromUrl() {
+        return this._urlParam("title");
     }
 
     _urlParam(name) {

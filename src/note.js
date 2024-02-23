@@ -1,8 +1,8 @@
 import { NDKEvent } from "@nostr-dev-kit/ndk";
-import { dtagFor } from "./common.js";
+import { dtagFor, decryptNote } from "./common.js";
 
 class Note {
-    static fromNostrEvent(event) {
+    static async fromNostrEvent(event) {
         const note = new Note();
         note.id = event.id;
         note.nostrEvent = event;
@@ -11,6 +11,13 @@ class Note {
         note.content = event.content;
         note.authorPubkey = event.pubkey;
         note.onRelays = [];
+
+        if (note.private) {
+            const { title, content } = await decryptNote(note.content);
+            note.title = title;
+            note.content = content;
+        }
+
         return note;
     }
 

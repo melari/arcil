@@ -14,13 +14,13 @@ async function browseNote() {
   const filters = PageContext.instance.noteFilterFromUrl();
   if (!!filters.authors) { PageContext.instance.setNoteByAuthorPubkey(filters.authors[0]); } // save the author from the params (if possible) rather than event in case the event does not exist.
   window.ndk.fetchEvent(filters).then(async function(event) {
-    if (!!event) { PageContext.instance.setNoteByNostrEvent(event); }
+    if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
 }
 window.browseNote = browseNote;
 
 function openNoteInEditor() {
-  window.location.href = window.router.urlFor(Router.EDITOR, PageContext.instance.noteIdentifierFromUrl());
+  window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}?title=${PageContext.instance.noteTitleFromUrl()}`);
 }
 window.openNoteInEditor = openNoteInEditor;
 

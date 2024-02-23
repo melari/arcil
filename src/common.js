@@ -177,7 +177,7 @@ function connectNostrViaPassphrase() {
 }
 
 export function dtagFor(title) {
-  return `tagayasu-${title.toLowerCase()}`;
+  return `tagayasu-${crypto.SHA256(title.toLowerCase())}`;
 }
 
 export function naddrFor(title, hexpubkey) {
@@ -210,6 +210,26 @@ export async function decryptSelf(text) {
   } else {
     return Promise.reject("Did not find any encryption compatible wallet");
   }
+}
+
+export async function encryptNote(title, content) {
+  const titleLength = title.length;
+  const body = `${titleLength}:${title}${content}`;
+  console.log(body);
+  return await encryptSelf(body);
+}
+
+export async function decryptNote(cyphertext) {
+  const body = await decryptSelf(cyphertext);
+  const titleLength = parseInt(body.slice(0, body.indexOf(":")));
+
+  const titleOffset = body.indexOf(":") + 1;
+  const contentOffset = titleOffset + titleLength;
+
+  const title = body.slice(titleOffset, contentOffset);
+  const content = body.slice(contentOffset);
+  console.log({ body, titleLength, title, content });
+  return { title, content };
 }
 
 /**
