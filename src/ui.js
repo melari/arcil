@@ -200,7 +200,9 @@ function deleteNote() {
     confirmAction("Are you sure you want to delete this note?").then(() => {
         showPending("Deleting...");
         window.MDEditor.value('');
-        publishNote('Your note has been deleted');
+        publishNote('Your note has been deleted').then(() => {
+            $("#note-title").val("");
+        });
     });
 }
 window.deleteNote = deleteNote;
@@ -219,8 +221,8 @@ function saveNote() {
 }
 window.saveNote = saveNote;
 
-function publishNote(message) {
-    ensureConnected().then(() => {
+async function publishNote(message) {
+    return ensureConnected().then(() => {
         const title = $("#note-title").val();
         if (dtagFor(title) == "tagayasu-") {
             showError("Title cannot be empty");
@@ -239,7 +241,7 @@ function publishNote(message) {
             saveEvent.tags.push(["a", backref]);
         });
         console.log(saveEvent);
-        saveEvent.publish().then(function (x) {
+        return saveEvent.publish().then(function (x) {
             showNotice(message);
             PageContext.instance.setNoteByNostrEvent(saveEvent);
         })

@@ -18664,7 +18664,9 @@ function deleteNote() {
     confirmAction("Are you sure you want to delete this note?").then(() => {
         (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Deleting...");
         window.MDEditor.value('');
-        publishNote('Your note has been deleted');
+        publishNote('Your note has been deleted').then(() => {
+            $("#note-title").val("");
+        });
     });
 }
 window.deleteNote = deleteNote;
@@ -18683,8 +18685,8 @@ function saveNote() {
 }
 window.saveNote = saveNote;
 
-function publishNote(message) {
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+async function publishNote(message) {
+    return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
         const title = $("#note-title").val();
         if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
             (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
@@ -18703,7 +18705,7 @@ function publishNote(message) {
             saveEvent.tags.push(["a", backref]);
         });
         console.log(saveEvent);
-        saveEvent.publish().then(function (x) {
+        return saveEvent.publish().then(function (x) {
             (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)(message);
             PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
