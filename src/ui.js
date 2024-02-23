@@ -356,7 +356,8 @@ function createMDE() {
             codeSyntaxHighlighting: true
         },
         tabSize: 2,
-        previewRender: MarkdownRenderer.instance.renderHtml
+        previewRender: MarkdownRenderer.instance.renderHtml,
+        styleSelectedText: false // This works around a bug in SimpleMDE where text cannot be selected on mobile
     });
 }
 

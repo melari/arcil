@@ -18820,7 +18820,8 @@ function createMDE() {
             codeSyntaxHighlighting: true
         },
         tabSize: 2,
-        previewRender: MarkdownRenderer.instance.renderHtml
+        previewRender: MarkdownRenderer.instance.renderHtml,
+        styleSelectedText: false
     });
 }
 
