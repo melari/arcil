@@ -1,4 +1,5 @@
 import { filterFromId } from "./common.js";
+import { Note } from "./note.js";
 
 class PageContext {
     static NOTE_IN_FOCUS_CHANGED = "note-in-focus-changed";

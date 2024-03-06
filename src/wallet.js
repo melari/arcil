@@ -1,4 +1,4 @@
-class Wallet {
+export class Wallet {
     static WALLET_CONNECTED_EVENT = "wallet-connected-event";
     static WALLET_DISCONNECTED_EVENT = "wallet-disconnected-event";
     static WALLET_CONNECTION_CHANGED = "wallet-connection-changed";

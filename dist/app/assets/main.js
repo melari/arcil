@@ -17888,7 +17888,6 @@ async function connectNostrViaEthereum() {
       }
     });
   const account = accounts[0];
-  console.log(account);
 
   const message = "Sign this message to approve the current website *unlimited* access to your Tagayasu account.\n\nPlease be very careful to make sure you are on the correct website (tagayasu.xyz) to prevent phising attacks!";
 
@@ -17972,7 +17971,6 @@ async function decryptSelf(text) {
 async function encryptNote(title, content) {
   const titleLength = title.length;
   const body = `${titleLength}:${title}${content}`;
-  console.log(body);
   return await encryptSelf(body);
 }
 
@@ -17985,7 +17983,6 @@ async function decryptNote(cyphertext) {
 
   const title = body.slice(titleOffset, contentOffset);
   const content = body.slice(contentOffset);
-  console.log({ body, titleLength, title, content });
   return { title, content };
 }
 
@@ -18206,6 +18203,9 @@ function updateStats() {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Note: () => (/* binding */ Note)
+/* harmony export */ });
 /* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(2445);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6213);
 
@@ -18219,8 +18219,11 @@ class Note {
         note.title = event.tags.find(t => t[0] == "title")[1];
         note.private = !!event.tags.find(t => t[0] == "private");
         note.content = event.content;
+        note.originalContent = event.content;
         note.authorPubkey = event.pubkey;
+        note.createdAt = event.created_at;
         note.onRelays = [];
+        note.isStub = false;
 
         if (note.private) {
             const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .decryptNote */ .fD)(note.content);
@@ -18235,6 +18238,7 @@ class Note {
         const note = new Note();
         note.authorPubkey = pubkey;
         note.onRelays = [];
+        note.isStub = true;
         return note;
     }
 
@@ -18249,8 +18253,39 @@ class Note {
     get dtag() {
         return (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .dtagFor */ .oF)(this.title);
     }
+
+    toPlain() {
+        return {
+            id: this.id,
+            private: this.private,
+            title: this.private ? 'private' : this.title,
+            content: this.originalContent,
+            pubkey: this.authorPubkey,
+            createdAt: this.createdAt,
+        };
+    }
+
+    static async fromPlain(plain) {
+        const note = new Note();
+        note.id = plain.id;
+        note.private = plain.private;
+        note.authorPubkey = plain.pubkey;
+        note.originalContent = plain.content;
+        note.content = plain.content;
+        note.title = plain.title;
+        note.createdAt = plain.createdAt;
+        note.onRelays = [];
+        note.isStub = false;
+
+        if (note.private) {
+            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .decryptNote */ .fD)(note.content);
+            note.title = title;
+            note.content = content;
+        }
+
+        return note;
+    }
 }
-window.Note = Note;
 
 /***/ }),
 
@@ -18260,6 +18295,8 @@ window.Note = Note;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _note_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3797);
+
 
 
 class PageContext {
@@ -18271,21 +18308,21 @@ class PageContext {
         if (!!PageContext.instance) { throw new Error('Use singleton instance'); }
     }
 
-    _note = new Note();
+    _note = new _note_js__WEBPACK_IMPORTED_MODULE_1__.Note();
     get note() { return this._note; }
     setNote(note) { // note should be an instance of `Note`
         this._note = note;
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
     async setNoteByNostrEvent(event) {
-        this._note = await Note.fromNostrEvent(event);
+        this._note = await _note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromNostrEvent(event);
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
     setNoteByAuthorPubkey(authorPubkey) {
         if (authorPubkey && authorPubkey.startsWith("npub")) {
             throw new Error('Expected hexpubkey, got npub');
         }
-        this._note = Note.fromHexPubkey(authorPubkey);
+        this._note = _note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromHexPubkey(authorPubkey);
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
     
@@ -18486,29 +18523,122 @@ window.Router = Router;
 
 /***/ }),
 
-/***/ 8281:
+/***/ 8423:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
+// ESM COMPAT FLAG
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
-/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2445);
-/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(2171);
-/* harmony import */ var _nostr_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(7295);
 
-
-
-
+// EXTERNAL MODULE: ./src/common.js + 13 modules
+var common = __webpack_require__(6213);
+// EXTERNAL MODULE: ./node_modules/@nostr-dev-kit/ndk/dist/index.mjs + 15 modules
+var dist = __webpack_require__(2445);
+// EXTERNAL MODULE: ./src/error.js
+var error = __webpack_require__(2171);
+// EXTERNAL MODULE: ./src/nostr.js
+var nostr = __webpack_require__(7295);
+// EXTERNAL MODULE: ./src/note.js
+var src_note = __webpack_require__(3797);
+// EXTERNAL MODULE: ./src/wallet.js
+var wallet = __webpack_require__(5123);
+;// CONCATENATED MODULE: ./src/database.js
 const Trie = __webpack_require__(9372);
+
+
+
+class Database {
+    notes = {};
+    noteTitleTrie = new Trie();
+
+    static instance = new Database();
+    constructor() {
+        if (!!Database.instance) { throw new Error('Use singleton instance'); }
+    }
+
+    clear() {
+        this.notes = {};
+        this.noteTitleTrie = new Trie();
+    }
+
+    hasSearchableEntries() {
+        return Object.keys(this.noteTitleTrie._childPaths).length !== 0;
+    }
+
+    search(wordList) {
+        const uniqueNotes = new Set();
+        wordList.forEach(word => {
+            const searchResults = this.noteTitleTrie.getData(word);
+            if (!!searchResults) {
+                searchResults.forEach(noteId => uniqueNotes.add(noteId));
+            }
+        });
+
+        return Array.from(uniqueNotes)
+            .filter((note) => this.notes[note]?.content != "")
+            .sort((a, b) =>
+                (this.notes[b]?.createdAt ?? 0) - (this.notes[a]?.createdAt ?? 0)
+            );
+    }
+
+    async addFromNostrEvent(event) {
+        this.addNote(await src_note.Note.fromNostrEvent(event));
+        this.pushStateToLocalStorage(window.nostrUser.npub);
+    }
+
+    addNote(note) {
+        if (this.notes[note.id]) { return; }
+
+        this.notes[note.id] = note;
+        note.title.split(" ").forEach(word =>
+            this.noteTitleTrie.add(word.toLowerCase(), note.id)
+        );
+
+        Object.values(this.notes)
+            .filter(n => n.dtag === note.dtag)
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, -1)
+            .forEach(n => delete this.notes[n.id]);
+    }
+
+    pushStateToLocalStorage(userId) {
+        const state = {
+            notes: Object.values(this.notes).map(note => note.toPlain()),
+        };
+
+        localStorage.setItem(`database-${userId}`, JSON.stringify(state));
+    }
+
+    async pullStateFromLocalStorage(userId) {
+        const state = JSON.parse(localStorage.getItem(`database-${userId}`));
+        if (!state) { return; }
+
+        return Promise.all(state.notes.map(async note =>
+            this.addNote(await src_note.Note.fromPlain(note))
+        ));
+    }
+}
+window.Database = Database;
+
+window.addEventListener(wallet.Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
+    Database.instance.clear();
+});
+
+window.addEventListener(wallet.Wallet.WALLET_CONNECTED_EVENT, function (e) {
+    Database.instance.pullStateFromLocalStorage(window.nostrUser.npub);
+});
+;// CONCATENATED MODULE: ./src/ui.js
+
+
+
+
+
 
 const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
 
-window.noteTitleTrie = new Trie();
-window.notes = {};
-
 $(window).on('DOMContentLoaded', async function () {
     createMDE();
-    (0,_nostr_js__WEBPACK_IMPORTED_MODULE_2__.startNostrMonitoring)();
+    (0,nostr.startNostrMonitoring)();
 
     window.router = await new Router().route();
     $("#page-" + window.router.pageName).show();
@@ -18524,7 +18654,7 @@ $(window).on('DOMContentLoaded', async function () {
 
 // Connect UI button
 function connectWalletApp() {
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .toggleConnect */ .Ti)().then(() => {
+    (0,common/* toggleConnect */.Ti)().then(() => {
         if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
     })
 }
@@ -18532,7 +18662,7 @@ window.connectWalletApp = connectWalletApp;
 
 function showMyNotes() {
     $("#notes-list").empty();
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+    (0,common/* ensureConnected */.zs)().then(() => {
         window.notesModal = new bootstrap.Modal('#myNotesModal', {});
         window.notesModal.show();
         $("#note-search-box").focus();
@@ -18553,7 +18683,7 @@ async function fetchNotes() {
 
     const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
     subscription.on("event", async (e) => {
-        await saveNoteToDatabase(e);
+        await Database.instance.addFromNostrEvent(e);
         searchNotes(); // trigger a search to update the UI
     });
 
@@ -18567,14 +18697,15 @@ async function fetchNotes() {
         let foundNew = false;
         subscription.eventsPerRelay.forEach((eventIds, relay) => {
             for (const eventId of eventIds) {
-                if (notes[eventId] && !notes[eventId].onRelays.includes(relay)) {
-                    notes[eventId].onRelays.push(relay);
+                const note = Database.instance.notes[eventId];
+                if (note && !note.onRelays.includes(relay)) {
+                    note.onRelays.push(relay);
                     foundNew = true;
                 }
             }
         });
         if (foundNew) { searchNotes(); }
-        await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .delay */ .gw)(100);
+        await (0,common/* delay */.gw)(100);
     }
 }
 
@@ -18585,12 +18716,12 @@ function loadNote() {
         else { return newNote(INTRO_TEXT); }
     }
 
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+    (0,common/* ensureConnected */.zs)().then(() => {
         const filter = PageContext.instance.noteFilterFromUrl();
         window.ndk.fetchEvent(filter).then(async function (event) {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
-                    await saveNoteToDatabase(event);
+                    await Database.instance.addFromNostrEvent(event);
                     editNote(event.id);
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
@@ -18602,22 +18733,6 @@ function loadNote() {
     });
 }
 window.loadNote = loadNote;
-
-async function saveNoteToDatabase(event) {
-    const note = await Note.fromNostrEvent(event);
-    if (notes[event.id]) { return; }
-
-    notes[event.id] = note;
-    note.title.split(" ").forEach(function (word) {
-        noteTitleTrie.add(word.toLowerCase(), event.id);
-    });
-
-    Object.values(notes)
-        .filter(n => n.dtag === note.dtag)
-        .sort((a, b) => a.nostrEvent.created_at - b.nostrEvent.created_at)
-        .slice(0, -1)
-        .forEach(n => delete notes[n.id]);
-}
 
 function colorForRelay(str) {
     let hash = 0;
@@ -18633,34 +18748,19 @@ function colorForRelay(str) {
 }
 
 function searchNotes() {
-    // If the trie is empty
-    if (Object.keys(window.noteTitleTrie._childPaths).length === 0) {
+    if (!Database.instance.hasSearchableEntries()) {
         $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
         return;
     }
 
     $("#notes-list").empty();
-    const uniqueNotes = new Set();
-    $("#note-search-box").val().toLowerCase().split(" ").forEach(function (searchWord) {
-        const searchResults = noteTitleTrie.getData(searchWord);
-        if (!!searchResults) {
-            searchResults.forEach(function (noteId) {
-                uniqueNotes.add(noteId);
-            });
-        }
-    });
-
-    const sorted = Array.from(uniqueNotes)
-        .filter((note) => notes[note]?.content != "")
-        .sort((a, b) =>
-            (notes[b]?.nostrEvent.created_at ?? 0) - (notes[a]?.nostrEvent.created_at ?? 0)
-        );
-
     window.tooltipList.forEach(tooltip => tooltip.dispose());
+
+    const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" "));
 
     let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
-        const note = window.notes[noteId];
+        const note = Database.instance.notes[noteId];
         if (!note) { return; }
         if (notesDisplayed > 20) { return; }
         let noteRelays = "";
@@ -18680,7 +18780,7 @@ window.searchNotes = searchNotes;
 window.tooltipList = [];
 
 async function editNote(noteId) {
-    PageContext.instance.setNote(window.notes[noteId]);
+    PageContext.instance.setNote(Database.instance.notes[noteId]);
 }
 window.editNote = editNote
 
@@ -18694,16 +18794,16 @@ window.newNote = newNote;
 
 function deleteNote() {
     if (!PageContext.instance.note.id) {
-        (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Nothing to do! Note was never published.");
+        (0,error/* showNotice */.s6)("Nothing to do! Note was never published.");
         return;
     }
 
     if (!!window.publishModal) { window.publishModal.hide(); }
     confirmAction("Are you sure you want to delete this note?").then(() => {
-        (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Deleting...");
+        (0,error/* showPending */.Si)("Deleting...");
 
         // Delete the most recent version of the note
-        const deleteEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+        const deleteEvent = new dist/* NDKEvent */._C(window.ndk);
         deleteEvent.kind = 5;
         deleteEvent.content = "This note has been deleted";
         deleteEvent.tags = [
@@ -18723,11 +18823,11 @@ window.deleteNote = deleteNote;
 function saveNote() {
     if (!!window.publishModal) { window.publishModal.hide(); }
     if (!PageContext.instance.note.private) {
-        (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Publishing...");
+        (0,error/* showPending */.Si)("Publishing...");
         publishNote("Your note has been published!");
     } else {
         confirmAction("This note is private. Are you sure you want to publish it?").then(() => {
-            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Publishing...");
+            (0,error/* showPending */.Si)("Publishing...");
             publishNote("Your draft has been converted to a public note!");
         });
     }
@@ -18735,53 +18835,52 @@ function saveNote() {
 window.saveNote = saveNote;
 
 async function publishNote(message) {
-    return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(() => {
+    return (0,common/* ensureConnected */.zs)().then(() => {
         const title = $("#note-title").val();
-        if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
+        if ((0,common/* dtagFor */.oF)(title) == "tagayasu-") {
+            (0,error/* showError */.x2)("Title cannot be empty");
             return;
         }
 
-        const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+        const saveEvent = new dist/* NDKEvent */._C(window.ndk);
         saveEvent.kind = 30023;
         saveEvent.content = window.MDEditor.value();
         saveEvent.tags = [
-            ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
+            ["d", (0,common/* dtagFor */.oF)(title)],
             ["title", title],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
         MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
             saveEvent.tags.push(["a", backref]);
         });
-        console.log(saveEvent);
         return saveEvent.publish().then(async function (x) {
-            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)(message);
+            (0,error/* showNotice */.s6)(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
 
 function savePrivateNote() {
-    (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showPending */ .Si)("Encrypting and saving...");
+    (0,error/* showPending */.Si)("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
-    (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
+    (0,common/* ensureConnected */.zs)().then(async () => {
         const title = $("#note-title").val();
-        if ((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title) == "tagayasu-") {
-            (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showError */ .x2)("Title cannot be empty");
+        if ((0,common/* dtagFor */.oF)(title) == "tagayasu-") {
+            (0,error/* showError */.x2)("Title cannot be empty");
             return;
         }
 
-        const saveEvent = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+        const saveEvent = new dist/* NDKEvent */._C(window.ndk);
         saveEvent.kind = 30023;
-        saveEvent.content = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .encryptNote */ .r0)(title, window.MDEditor.value());
+        saveEvent.content = await (0,common/* encryptNote */.r0)(title, window.MDEditor.value());
         saveEvent.tags = [
-            ["d", (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(title)],
+            ["d", (0,common/* dtagFor */.oF)(title)],
             ["title", "DRAFT"],
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
         saveEvent.publish().then(async function (x) {
-            ;(0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your note has been saved privately.");
+            ;(0,error/* showNotice */.s6)("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
@@ -18805,17 +18904,12 @@ window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
     updateOwnerOnly();
 });
 
-window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
-    window.noteTitleTrie = new Trie();
-    window.notes = {};
-});
-
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     updateOwnerOnly();
 
     const stubTitle = PageContext.instance.noteTitleFromUrl();
     const note = PageContext.instance.note;
-    if (note.nostrEvent) {
+    if (!note.isStub) {
         const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
         const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
         $("#note-content").html(html);
@@ -18894,14 +18988,14 @@ function updateOwnerOnly() {
 async function loadBackrefs() {
     if (window.router.pageName !== Router.BROWSER) { return; }
 
-    await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
+    await (0,common/* ensureReadonlyConnected */.lD)();
 
     $("#backref-content").empty();
 
     const filters = {
         authors: [PageContext.instance.note.nostrEvent.pubkey],
         kinds: [30023],
-        "#a": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .atagFor */ .Mf)(PageContext.instance.note.nostrEvent.tags.find(t => t[0] == "title")[1], PageContext.instance.note.nostrEvent.pubkey)]
+        "#a": [(0,common/* atagFor */.Mf)(PageContext.instance.note.nostrEvent.tags.find(t => t[0] == "title")[1], PageContext.instance.note.nostrEvent.pubkey)]
     };
     window.ndk.fetchEvents(filters).then(function(events) {
         events.forEach(function(event) {
@@ -18912,21 +19006,21 @@ async function loadBackrefs() {
     });
 }
 
-window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .ERROR_EVENT */ .qi, function (e) {
+window.addEventListener(error/* ERROR_EVENT */.qi, function (e) {
     $("#toast").removeClass("text-bg-success");
     $("#toast").removeClass("text-bg-secondary");
     $("#toast").addClass("text-bg-danger");
     showToast(e.detail.message);
 })
 
-window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .NOTICE_EVENT */ .FZ, function (e) {
+window.addEventListener(error/* NOTICE_EVENT */.FZ, function (e) {
     $("#toast").removeClass("text-bg-danger");
     $("#toast").removeClass("text-bg-secondary");
     $("#toast").addClass("text-bg-success");
     showToast(e.detail.message);
 })
 
-window.addEventListener(_error_js__WEBPACK_IMPORTED_MODULE_3__/* .PENDING_EVENT */ .k7, function (e) {
+window.addEventListener(error/* PENDING_EVENT */.k7, function (e) {
     $("#toast").removeClass("text-bg-danger");
     $("#toast").removeClass("text-bg-success");
     $("#toast").addClass("text-bg-secondary");
@@ -18971,8 +19065,13 @@ window.confirmAction = confirmAction;
 /***/ }),
 
 /***/ 5123:
-/***/ (() => {
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Wallet: () => (/* binding */ Wallet)
+/* harmony export */ });
 class Wallet {
     static WALLET_CONNECTED_EVENT = "wallet-connected-event";
     static WALLET_DISCONNECTED_EVENT = "wallet-disconnected-event";
@@ -34262,7 +34361,7 @@ __webpack_require__(8751);
 __webpack_require__(5123);
 __webpack_require__(7909);
 __webpack_require__(6044);
-__webpack_require__(8281); // last
+__webpack_require__(8423); // last
 })();
 
 /******/ })()

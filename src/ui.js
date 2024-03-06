@@ -2,12 +2,9 @@ import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor
 import { NDKEvent } from "@nostr-dev-kit/ndk";
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
-const Trie = require("triever");
+import { Database } from "./database.js";
 
 const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
-
-window.noteTitleTrie = new Trie();
-window.notes = {};
 
 $(window).on('DOMContentLoaded', async function () {
     createMDE();
@@ -56,7 +53,7 @@ async function fetchNotes() {
 
     const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
     subscription.on("event", async (e) => {
-        await saveNoteToDatabase(e);
+        await Database.instance.addFromNostrEvent(e);
         searchNotes(); // trigger a search to update the UI
     });
 
@@ -70,8 +67,9 @@ async function fetchNotes() {
         let foundNew = false;
         subscription.eventsPerRelay.forEach((eventIds, relay) => {
             for (const eventId of eventIds) {
-                if (notes[eventId] && !notes[eventId].onRelays.includes(relay)) {
-                    notes[eventId].onRelays.push(relay);
+                const note = Database.instance.notes[eventId];
+                if (note && !note.onRelays.includes(relay)) {
+                    note.onRelays.push(relay);
                     foundNew = true;
                 }
             }
@@ -93,7 +91,7 @@ function loadNote() {
         window.ndk.fetchEvent(filter).then(async function (event) {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
-                    await saveNoteToDatabase(event);
+                    await Database.instance.addFromNostrEvent(event);
                     editNote(event.id);
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
@@ -105,22 +103,6 @@ function loadNote() {
     });
 }
 window.loadNote = loadNote;
-
-async function saveNoteToDatabase(event) {
-    const note = await Note.fromNostrEvent(event);
-    if (notes[event.id]) { return; }
-
-    notes[event.id] = note;
-    note.title.split(" ").forEach(function (word) {
-        noteTitleTrie.add(word.toLowerCase(), event.id);
-    });
-
-    Object.values(notes)
-        .filter(n => n.dtag === note.dtag)
-        .sort((a, b) => a.nostrEvent.created_at - b.nostrEvent.created_at)
-        .slice(0, -1)
-        .forEach(n => delete notes[n.id]);
-}
 
 function colorForRelay(str) {
     let hash = 0;
@@ -136,34 +118,19 @@ function colorForRelay(str) {
 }
 
 function searchNotes() {
-    // If the trie is empty
-    if (Object.keys(window.noteTitleTrie._childPaths).length === 0) {
+    if (!Database.instance.hasSearchableEntries()) {
         $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
         return;
     }
 
     $("#notes-list").empty();
-    const uniqueNotes = new Set();
-    $("#note-search-box").val().toLowerCase().split(" ").forEach(function (searchWord) {
-        const searchResults = noteTitleTrie.getData(searchWord);
-        if (!!searchResults) {
-            searchResults.forEach(function (noteId) {
-                uniqueNotes.add(noteId);
-            });
-        }
-    });
-
-    const sorted = Array.from(uniqueNotes)
-        .filter((note) => notes[note]?.content != "")
-        .sort((a, b) =>
-            (notes[b]?.nostrEvent.created_at ?? 0) - (notes[a]?.nostrEvent.created_at ?? 0)
-        );
-
     window.tooltipList.forEach(tooltip => tooltip.dispose());
+
+    const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" "));
 
     let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
-        const note = window.notes[noteId];
+        const note = Database.instance.notes[noteId];
         if (!note) { return; }
         if (notesDisplayed > 20) { return; }
         let noteRelays = "";
@@ -183,7 +150,7 @@ window.searchNotes = searchNotes;
 window.tooltipList = [];
 
 async function editNote(noteId) {
-    PageContext.instance.setNote(window.notes[noteId]);
+    PageContext.instance.setNote(Database.instance.notes[noteId]);
 }
 window.editNote = editNote
 
@@ -256,7 +223,6 @@ async function publishNote(message) {
         MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
             saveEvent.tags.push(["a", backref]);
         });
-        console.log(saveEvent);
         return saveEvent.publish().then(async function (x) {
             showNotice(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
@@ -308,17 +274,12 @@ window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
     updateOwnerOnly();
 });
 
-window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
-    window.noteTitleTrie = new Trie();
-    window.notes = {};
-});
-
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     updateOwnerOnly();
 
     const stubTitle = PageContext.instance.noteTitleFromUrl();
     const note = PageContext.instance.note;
-    if (note.nostrEvent) {
+    if (!note.isStub) {
         const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
         const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
         $("#note-content").html(html);

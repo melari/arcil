@@ -131,7 +131,6 @@ async function connectNostrViaEthereum() {
       }
     });
   const account = accounts[0];
-  console.log(account);
 
   const message = "Sign this message to approve the current website *unlimited* access to your Tagayasu account.\n\nPlease be very careful to make sure you are on the correct website (tagayasu.xyz) to prevent phising attacks!";
 
@@ -215,7 +214,6 @@ export async function decryptSelf(text) {
 export async function encryptNote(title, content) {
   const titleLength = title.length;
   const body = `${titleLength}:${title}${content}`;
-  console.log(body);
   return await encryptSelf(body);
 }
 
@@ -228,7 +226,6 @@ export async function decryptNote(cyphertext) {
 
   const title = body.slice(titleOffset, contentOffset);
   const content = body.slice(contentOffset);
-  console.log({ body, titleLength, title, content });
   return { title, content };
 }
 
