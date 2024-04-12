@@ -6,6 +6,7 @@ const crypto = require('crypto-js');
 
 window.relays = {
   default: [
+    "wss://relay.tagayasu.xyz",
     "wss://relay.damus.io",
     "wss://nos.lol",
     "wss://nostr.mom",
