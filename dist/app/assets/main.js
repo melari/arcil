@@ -17763,6 +17763,7 @@ const common_crypto = __webpack_require__(1354);
 
 window.relays = {
   default: [
+    "wss://relay.tagayasu.xyz",
     "wss://relay.damus.io",
     "wss://nos.lol",
     "wss://nostr.mom",
