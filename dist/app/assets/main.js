@@ -12791,7 +12791,6 @@ async function browseNote() {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
    
   const filters = PageContext.instance.noteFilterFromUrl();
-  if (!!filters.authors) { PageContext.instance.setNoteByAuthorPubkey(filters.authors[0]); } // save the author from the params (if possible) rather than event in case the event does not exist.
   window.ndk.fetchEvent(filters).then(async function(event) {
     if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
@@ -17809,6 +17808,8 @@ async function disconnectNostr() {
   window.nostrUser = null;
   delete (window.sessionStorage.privateKey);
   delete (window.sessionStorage.lastKeyProvider);
+  window.MDEditor.value('');
+  localStorage.removeItem('autosave');
   location.reload();
 }
 
@@ -18319,14 +18320,6 @@ class PageContext {
         this._note = await _note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromNostrEvent(event);
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
-    setNoteByAuthorPubkey(authorPubkey) {
-        if (authorPubkey && authorPubkey.startsWith("npub")) {
-            throw new Error('Expected hexpubkey, got npub');
-        }
-        this._note = _note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromHexPubkey(authorPubkey);
-        window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
-    }
-    
 
     _dnslinkNpub = null;
     async dnslinkNpub() {
@@ -18651,7 +18644,26 @@ $(window).on('DOMContentLoaded', async function () {
     } else if (window.router.pageName == "browser") {
         window.browseNote();
     }
+
+    startAutoSave();
 });
+
+function startAutoSave() {
+    setInterval(() => {
+        localStorage.setItem('autosave', JSON.stringify({
+            title: $("#note-title").val(),
+            content: window.MDEditor.value()
+        }));
+    }, 1000 * 1);
+}
+
+function restoreAutoSave() {
+    const autosave = localStorage.getItem('autosave');
+    if (!autosave) { return; }
+
+    const parsed = JSON.parse(autosave);
+    newNote(parsed.title, parsed.content);
+}
 
 // Connect UI button
 function connectWalletApp() {
@@ -18713,8 +18725,9 @@ async function fetchNotes() {
 // Load the note into the editor given by params
 function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
-        if (!!window.nip07signer) { return showMyNotes(); }
-        else { return newNote(INTRO_TEXT); }
+        if (!!localStorage.getItem('autosave')) { restoreAutoSave(); }
+        else if (!!window.nip07signer) { return showMyNotes(); }
+        else { return newNote('', INTRO_TEXT); }
     }
 
     (0,common/* ensureConnected */.zs)().then(() => {
@@ -18785,11 +18798,10 @@ async function editNote(noteId) {
 }
 window.editNote = editNote
 
-function newNote(content = "") {
+function newNote(title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
     window.MDEditor.value(content);
-    $("#note-title").val("");
-    PageContext.instance.setNoteByAuthorPubkey(PageContext.instance.note.authorPubkey);
+    $("#note-title").val(title);
 }
 window.newNote = newNote;
 
@@ -18857,7 +18869,7 @@ async function publishNote(message) {
         return saveEvent.publish().then(async function (x) {
             (0,error/* showNotice */.s6)(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
-        })
+        });
     });
 }
 
@@ -18895,9 +18907,6 @@ window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
     $("#help-npub").html(window.nostrUser.npub);
-    if (window.router.pageName == Router.EDITOR) {
-        PageContext.instance.setNoteByAuthorPubkey(window.nostrUser.hexpubkey);
-    }
 });
 
 window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {

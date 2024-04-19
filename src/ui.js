@@ -20,7 +20,26 @@ $(window).on('DOMContentLoaded', async function () {
     } else if (window.router.pageName == "browser") {
         window.browseNote();
     }
+
+    startAutoSave();
 });
+
+function startAutoSave() {
+    setInterval(() => {
+        localStorage.setItem('autosave', JSON.stringify({
+            title: $("#note-title").val(),
+            content: window.MDEditor.value()
+        }));
+    }, 1000 * 1);
+}
+
+function restoreAutoSave() {
+    const autosave = localStorage.getItem('autosave');
+    if (!autosave) { return; }
+
+    const parsed = JSON.parse(autosave);
+    newNote(parsed.title, parsed.content);
+}
 
 // Connect UI button
 function connectWalletApp() {
@@ -82,8 +101,9 @@ async function fetchNotes() {
 // Load the note into the editor given by params
 function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
-        if (!!window.nip07signer) { return showMyNotes(); }
-        else { return newNote(INTRO_TEXT); }
+        if (!!localStorage.getItem('autosave')) { restoreAutoSave(); }
+        else if (!!window.nip07signer) { return showMyNotes(); }
+        else { return newNote('', INTRO_TEXT); }
     }
 
     ensureConnected().then(() => {
@@ -154,11 +174,10 @@ async function editNote(noteId) {
 }
 window.editNote = editNote
 
-function newNote(content = "") {
+function newNote(title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
     window.MDEditor.value(content);
-    $("#note-title").val("");
-    PageContext.instance.setNoteByAuthorPubkey(PageContext.instance.note.authorPubkey);
+    $("#note-title").val(title);
 }
 window.newNote = newNote;
 
@@ -226,7 +245,7 @@ async function publishNote(message) {
         return saveEvent.publish().then(async function (x) {
             showNotice(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
-        })
+        });
     });
 }
 
@@ -264,9 +283,6 @@ window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
     $("#help-npub").html(window.nostrUser.npub);
-    if (window.router.pageName == Router.EDITOR) {
-        PageContext.instance.setNoteByAuthorPubkey(window.nostrUser.hexpubkey);
-    }
 });
 
 window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {

@@ -52,6 +52,8 @@ async function disconnectNostr() {
   window.nostrUser = null;
   delete (window.sessionStorage.privateKey);
   delete (window.sessionStorage.lastKeyProvider);
+  window.MDEditor.value('');
+  localStorage.removeItem('autosave');
   location.reload();
 }
 

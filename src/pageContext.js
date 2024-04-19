@@ -20,14 +20,6 @@ class PageContext {
         this._note = await Note.fromNostrEvent(event);
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
-    setNoteByAuthorPubkey(authorPubkey) {
-        if (authorPubkey && authorPubkey.startsWith("npub")) {
-            throw new Error('Expected hexpubkey, got npub');
-        }
-        this._note = Note.fromHexPubkey(authorPubkey);
-        window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
-    }
-    
 
     _dnslinkNpub = null;
     async dnslinkNpub() {

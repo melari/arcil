@@ -12,7 +12,6 @@ async function browseNote() {
   await ensureReadonlyConnected();
    
   const filters = PageContext.instance.noteFilterFromUrl();
-  if (!!filters.authors) { PageContext.instance.setNoteByAuthorPubkey(filters.authors[0]); } // save the author from the params (if possible) rather than event in case the event does not exist.
   window.ndk.fetchEvent(filters).then(async function(event) {
     if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
