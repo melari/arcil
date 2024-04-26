@@ -1,5 +1,4 @@
-import { NDKEvent } from "@nostr-dev-kit/ndk";
-import { dtagFor, decryptNote } from "./common.js";
+import { dtagFor, handleFor, decryptNote } from "./common.js";
 
 export class Note {
     static async fromNostrEvent(event) {
@@ -37,11 +36,7 @@ export class Note {
     }
 
     get handle() {
-        const event = new NDKEvent(window.ndk);
-        event.kind = 30023;
-        event.pubkey = this.authorPubkey;
-        event.tags = [["d", this.dtag]];
-        return event.encode();
+        return handleFor(this.title, this.authorPubkey);
     }
 
     get dtag() {

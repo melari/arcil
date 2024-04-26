@@ -10,7 +10,7 @@ $(window).on('DOMContentLoaded', async function () {
     createMDE();
     startNostrMonitoring();
 
-    window.router = await new Router().route();
+    window.router = await (new Router().route());
     $("#page-" + window.router.pageName).show();
 
     await window.trySeamlessConnection().catch(() => { });
@@ -101,13 +101,13 @@ async function fetchNotes() {
 // Load the note into the editor given by params
 function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
-        if (!!localStorage.getItem('autosave')) { restoreAutoSave(); }
+        if (!!localStorage.getItem('autosave')) { return restoreAutoSave(); }
         else if (!!window.nip07signer) { return showMyNotes(); }
         else { return newNote('', INTRO_TEXT); }
     }
 
-    ensureConnected().then(() => {
-        const filter = PageContext.instance.noteFilterFromUrl();
+    ensureConnected().then(async () => {
+        const filter = await PageContext.instance.noteFilterFromUrl();
         window.ndk.fetchEvent(filter).then(async function (event) {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
@@ -276,7 +276,7 @@ function savePrivateNote() {
 }
 window.savePrivateNote = savePrivateNote;
 
-function viewPublishedNote() {
+async function viewPublishedNote() {
     window.location.href = window.router.urlFor(Router.BROWSER, PageContext.instance.note.handle);
 }
 window.viewPublishedNote = viewPublishedNote

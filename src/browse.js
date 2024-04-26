@@ -12,17 +12,8 @@ window.connectWalletBrowse = connectWalletBrowse;
 async function browseNote() {
   await ensureReadonlyConnected();
 
-  const npub = await PageContext.instance.dnslinkNpub();
-  console.log("npub from dnslink:", npub);
-
-  const hexpubkey = npubToHexpubkey(npub);
-  console.log("hexpubkey:", hexpubkey);
-
-  const homepageFilter = { authors: [hexpubkey], kinds: [30023], "#d": [dtagFor("homepage")] };
-  const explicitFilter = PageContext.instance.noteFilterFromUrl();
-  const filters = explicitFilter ?? homepageFilter;
-  console.log("filters:", filters);
-
+  const filters = await PageContext.instance.noteFilterFromUrl();
+  console.log(filters);
   window.ndk.fetchEvent(filters).then(async function (event) {
     if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
@@ -31,14 +22,14 @@ async function browseNote() {
     if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, do nothing.
 
     const stubTitle = PageContext.instance.noteTitleFromUrl();
-    if (explicitFilter) {
+    if (!!PageContext.instance.noteIdentifierFromUrl()) {
       if (stubTitle) {
-        PageContext.instance.setNote(Note.fromContent(hexpubkey, stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
+        PageContext.instance.setNote(Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
       } else {
-        PageContext.instance.setNote(Note.fromContent(hexpubkey, '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+        PageContext.instance.setNote(Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
       }
     } else {
-      PageContext.instance.setNote(Note.fromContent(hexpubkey, 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+      PageContext.instance.setNote(Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
     }
   }, 2000);
 }

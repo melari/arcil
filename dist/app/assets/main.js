@@ -12792,17 +12792,8 @@ window.connectWalletBrowse = connectWalletBrowse;
 async function browseNote() {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
 
-  const npub = await PageContext.instance.dnslinkNpub();
-  console.log("npub from dnslink:", npub);
-
-  const hexpubkey = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .npubToHexpubkey */ .e0)(npub);
-  console.log("hexpubkey:", hexpubkey);
-
-  const homepageFilter = { authors: [hexpubkey], kinds: [30023], "#d": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)("homepage")] };
-  const explicitFilter = PageContext.instance.noteFilterFromUrl();
-  const filters = explicitFilter ?? homepageFilter;
-  console.log("filters:", filters);
-
+  const filters = await PageContext.instance.noteFilterFromUrl();
+  console.log(filters);
   window.ndk.fetchEvent(filters).then(async function (event) {
     if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
@@ -12811,14 +12802,14 @@ async function browseNote() {
     if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, do nothing.
 
     const stubTitle = PageContext.instance.noteTitleFromUrl();
-    if (explicitFilter) {
+    if (!!PageContext.instance.noteIdentifierFromUrl()) {
       if (stubTitle) {
-        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(hexpubkey, stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
+        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
       } else {
-        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(hexpubkey, '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
       }
     } else {
-      PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(hexpubkey, 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+      PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
     }
   }, 2000);
 }
@@ -12874,12 +12865,12 @@ __webpack_require__.d(__webpack_exports__, {
   zs: () => (/* binding */ ensureConnected),
   lD: () => (/* binding */ ensureReadonlyConnected),
   e: () => (/* binding */ filterFromId),
-  vK: () => (/* binding */ naddrFor),
+  t4: () => (/* binding */ handleFor),
   e0: () => (/* binding */ npubToHexpubkey),
   Ti: () => (/* binding */ toggleConnect)
 });
 
-// UNUSED EXPORTS: NIP33_A_REGEX, shortHash
+// UNUSED EXPORTS: NIP33_A_REGEX, naddrFor, shortHash
 
 // NAMESPACE OBJECT: ./node_modules/nostr-tools/node_modules/@noble/curves/esm/abstract/utils.js
 var abstract_utils_namespaceObject = {};
@@ -17971,6 +17962,15 @@ function dtagFor(title) {
   return `tagayasu-${common_crypto.SHA256(title.toLowerCase())}`;
 }
 
+function handleFor(title, hexpubkey) {
+  const dnslinkHexpubkey = PageContext.instance.dnslinkHexpubkey();
+  if (dnslinkHexpubkey === hexpubkey) {
+    return title.replace(/ /g, "-");
+  } else {
+    return naddrFor(title, hexpubkey);
+  }
+}
+
 function naddrFor(title, hexpubkey) {
   const event = new dist/* NDKEvent */._C(window.ndk);
   event.kind = 30023;
@@ -18181,7 +18181,7 @@ class MarkdownRenderer {
             const match = src.match(/^\[\[([^\]\n]+)\]\]/);
             if (match) {
                 this.lexer.state.inLink = true;
-                const handle = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .naddrFor */ .vK)(match[1], PageContext.instance.note.authorPubkey);
+                const handle = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .handleFor */ .t4)(match[1], PageContext.instance.note.authorPubkey);
                 const token = {
                 type: 'link',
                 raw: match[0],
@@ -18249,9 +18249,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Note: () => (/* binding */ Note)
 /* harmony export */ });
-/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(2445);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6213);
-
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
 
 
 class Note {
@@ -18269,7 +18267,7 @@ class Note {
         note.isStub = false;
 
         if (note.private) {
-            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .decryptNote */ .fD)(note.content);
+            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptNote */ .fD)(note.content);
             note.title = title;
             note.content = content;
         }
@@ -18290,15 +18288,11 @@ class Note {
     }
 
     get handle() {
-        const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKEvent */ ._C(window.ndk);
-        event.kind = 30023;
-        event.pubkey = this.authorPubkey;
-        event.tags = [["d", this.dtag]];
-        return event.encode();
+        return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .handleFor */ .t4)(this.title, this.authorPubkey);
     }
 
     get dtag() {
-        return (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .dtagFor */ .oF)(this.title);
+        return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(this.title);
     }
 
     toPlain() {
@@ -18325,7 +18319,7 @@ class Note {
         note.isStub = false;
 
         if (note.private) {
-            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .decryptNote */ .fD)(note.content);
+            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptNote */ .fD)(note.content);
             note.title = title;
             note.content = content;
         }
@@ -18367,22 +18361,50 @@ class PageContext {
     }
 
     _dnslinkNpub = null;
-    async dnslinkNpub() {
+    dnslinkNpub() {
         if (this._dnslinkNpub !== null) { return this._dnslinkNpub; }
 
-        const npubFromDomain = await DnsClient.instance.npub("tagayasu.htlc.io");
+        const npubFromDomain = window.router.dnslinkNpub;
         if (npubFromDomain === null || !npubFromDomain.startsWith('npub')) { this._dnslinkNpub = ''; }
         else { this._dnslinkNpub = npubFromDomain; }
         return this._dnslinkNpub;
     }
 
-    noteFilterFromUrl() {
-        const explicitIdentifier = this.noteIdentifierFromUrl();
-        if (!explicitIdentifier) { return null; }
+    dnslinkHexpubkey() {
+        const npub = this.dnslinkNpub();
+        return npub && (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .npubToHexpubkey */ .e0)(npub);
+    }
 
-        const filter = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .filterFromId */ .e)(explicitIdentifier);
-        if (!filter.kinds) { filter.kinds = [30023]; }
-        return filter;
+    /**
+     * Handles several scenarios:
+     * - If the URL has a naddr, filter to that note by ID
+     * - If the URL has a plaintext title, filter to that note based on domain
+     * - If the URL has a plaintext title and there is no domain, return null
+     * - If the URL is empty, try to filter to the homepage based on domain
+     * - If the URL is empty and there is no domain, return null
+     */
+    async noteFilterFromUrl() {
+        const hexpubkey = await this.dnslinkHexpubkey();
+        const explicitIdentifier = this.noteIdentifierFromUrl();
+        if (!explicitIdentifier && !hexpubkey) { return null; }
+        if (!explicitIdentifier) {
+            return {
+                authors: [hexpubkey],
+                kinds: [30023],
+                "#d": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)("homepage")]
+            };
+        }
+
+        const potentialFilter = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .filterFromId */ .e)(explicitIdentifier);
+        if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
+        if (!!potentialFilter["#d"]) { return potentialFilter; }
+        if (!hexpubkey) { return null; }
+
+        return {
+            authors: [hexpubkey],
+            kinds: [30023],
+            "#d": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(potentialFilter.ids[0].replace(/-/g, ' '))]
+        };
     }
 
     noteIdentifierFromUrl() {
@@ -18506,26 +18528,34 @@ class Router {
 
     _pageName = null;
     get pageName() {
-        if (!!this._pageName) { return this._pageName; }
+        if (this._pageName !== null) { return this._pageName; }
         throw new Error('Call route() first');
     }
 
     _defaultPageName = null;
     get defaultPageName() {
-        if (!!this._defaultPageName) { return this._defaultPageName; }
+        if (this._defaultPageName !== null) { return this._defaultPageName; }
         throw new Error('call route() first');
     }
 
     _inlineParams = null;
     get inlineParams() {
-        if (!!this._inlineParams) { return this._inlineParams; }
+        if (this._inlineParams !== null) { return this._inlineParams; }
+        throw new Error('call route() first');
+    }
+
+    _dnslinkNpub = null;
+    get dnslinkNpub() {
+        if (this._dnslinkNpub !== null) { return this._dnslinkNpub; }
         throw new Error('call route() first');
     }
 
     async route() {
+        this._dnslinkNpub = await DnsClient.instance.npub(window.location.hostname);
+
         if (this.editorDomains.includes(window.location.hostname)) {
             this._defaultPageName = Router.EDITOR;
-        } else if (!!(await PageContext.instance.dnslinkNpub())) {
+        } else if (!!this._dnslinkNpub) {
             this._defaultPageName = Router.BROWSER;
         } else {
             this._defaultPageName = Router.DNSLINK_HELP;
@@ -18682,7 +18712,7 @@ $(window).on('DOMContentLoaded', async function () {
     createMDE();
     (0,nostr.startNostrMonitoring)();
 
-    window.router = await new Router().route();
+    window.router = await (new Router().route());
     $("#page-" + window.router.pageName).show();
 
     await window.trySeamlessConnection().catch(() => { });
@@ -18773,13 +18803,13 @@ async function fetchNotes() {
 // Load the note into the editor given by params
 function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
-        if (!!localStorage.getItem('autosave')) { restoreAutoSave(); }
+        if (!!localStorage.getItem('autosave')) { return restoreAutoSave(); }
         else if (!!window.nip07signer) { return showMyNotes(); }
         else { return newNote('', INTRO_TEXT); }
     }
 
-    (0,common/* ensureConnected */.zs)().then(() => {
-        const filter = PageContext.instance.noteFilterFromUrl();
+    (0,common/* ensureConnected */.zs)().then(async () => {
+        const filter = await PageContext.instance.noteFilterFromUrl();
         window.ndk.fetchEvent(filter).then(async function (event) {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
@@ -18948,7 +18978,7 @@ function savePrivateNote() {
 }
 window.savePrivateNote = savePrivateNote;
 
-function viewPublishedNote() {
+async function viewPublishedNote() {
     window.location.href = window.router.urlFor(Router.BROWSER, PageContext.instance.note.handle);
 }
 window.viewPublishedNote = viewPublishedNote

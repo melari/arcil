@@ -19,26 +19,34 @@ class Router {
 
     _pageName = null;
     get pageName() {
-        if (!!this._pageName) { return this._pageName; }
+        if (this._pageName !== null) { return this._pageName; }
         throw new Error('Call route() first');
     }
 
     _defaultPageName = null;
     get defaultPageName() {
-        if (!!this._defaultPageName) { return this._defaultPageName; }
+        if (this._defaultPageName !== null) { return this._defaultPageName; }
         throw new Error('call route() first');
     }
 
     _inlineParams = null;
     get inlineParams() {
-        if (!!this._inlineParams) { return this._inlineParams; }
+        if (this._inlineParams !== null) { return this._inlineParams; }
+        throw new Error('call route() first');
+    }
+
+    _dnslinkNpub = null;
+    get dnslinkNpub() {
+        if (this._dnslinkNpub !== null) { return this._dnslinkNpub; }
         throw new Error('call route() first');
     }
 
     async route() {
+        this._dnslinkNpub = await DnsClient.instance.npub(window.location.hostname);
+
         if (this.editorDomains.includes(window.location.hostname)) {
             this._defaultPageName = Router.EDITOR;
-        } else if (!!(await PageContext.instance.dnslinkNpub())) {
+        } else if (!!this._dnslinkNpub) {
             this._defaultPageName = Router.BROWSER;
         } else {
             this._defaultPageName = Router.DNSLINK_HELP;

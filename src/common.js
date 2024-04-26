@@ -182,6 +182,15 @@ export function dtagFor(title) {
   return `tagayasu-${crypto.SHA256(title.toLowerCase())}`;
 }
 
+export function handleFor(title, hexpubkey) {
+  const dnslinkHexpubkey = PageContext.instance.dnslinkHexpubkey();
+  if (dnslinkHexpubkey === hexpubkey) {
+    return title.replace(/ /g, "-");
+  } else {
+    return naddrFor(title, hexpubkey);
+  }
+}
+
 export function naddrFor(title, hexpubkey) {
   const event = new NDKEvent(window.ndk);
   event.kind = 30023;

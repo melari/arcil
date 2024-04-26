@@ -1,4 +1,4 @@
-import { naddrFor, atagFor } from "./common.js"
+import { handleFor, atagFor } from "./common.js"
 
 class MarkdownRenderer {
     static instance = new MarkdownRenderer();
@@ -19,7 +19,7 @@ class MarkdownRenderer {
             const match = src.match(/^\[\[([^\]\n]+)\]\]/);
             if (match) {
                 this.lexer.state.inLink = true;
-                const handle = naddrFor(match[1], PageContext.instance.note.authorPubkey);
+                const handle = handleFor(match[1], PageContext.instance.note.authorPubkey);
                 const token = {
                 type: 'link',
                 raw: match[0],
