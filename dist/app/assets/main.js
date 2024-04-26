@@ -12777,6 +12777,8 @@ __exportStar(__webpack_require__(3088), exports);
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _note_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3797);
+
 
 
 // Connect UI button
@@ -12789,16 +12791,46 @@ window.connectWalletBrowse = connectWalletBrowse;
 // Run on page ready; loads the note content from nostr
 async function browseNote() {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
-   
-  const filters = PageContext.instance.noteFilterFromUrl();
-  window.ndk.fetchEvent(filters).then(async function(event) {
+
+  const npub = await PageContext.instance.dnslinkNpub();
+  console.log("npub from dnslink:", npub);
+
+  const hexpubkey = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .npubToHexpubkey */ .e0)(npub);
+  console.log("hexpubkey:", hexpubkey);
+
+  const homepageFilter = { authors: [hexpubkey], kinds: [30023], "#d": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)("homepage")] };
+  const explicitFilter = PageContext.instance.noteFilterFromUrl();
+  const filters = explicitFilter ?? homepageFilter;
+  console.log("filters:", filters);
+
+  window.ndk.fetchEvent(filters).then(async function (event) {
     if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
+
+  setTimeout(() => {
+    if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, do nothing.
+
+    const stubTitle = PageContext.instance.noteTitleFromUrl();
+    if (explicitFilter) {
+      if (stubTitle) {
+        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(hexpubkey, stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
+      } else {
+        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(hexpubkey, '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+      }
+    } else {
+      PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(hexpubkey, 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+    }
+  }, 2000);
 }
 window.browseNote = browseNote;
 
 function openNoteInEditor() {
-  window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}?title=${PageContext.instance.noteTitleFromUrl()}`);
+  const stubTitle = PageContext.instance.note.title;
+  if (PageContext.instance.noteIdentifierFromUrl()) {
+    window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}?title=${stubTitle}`);
+  } else {
+    window.location.href = window.router.urlFor(Router.EDITOR, `?title=${stubTitle}`);
+  }
 }
 window.openNoteInEditor = openNoteInEditor;
 
@@ -12843,6 +12875,7 @@ __webpack_require__.d(__webpack_exports__, {
   lD: () => (/* binding */ ensureReadonlyConnected),
   e: () => (/* binding */ filterFromId),
   vK: () => (/* binding */ naddrFor),
+  e0: () => (/* binding */ npubToHexpubkey),
   Ti: () => (/* binding */ toggleConnect)
 });
 
@@ -17988,6 +18021,14 @@ async function decryptNote(cyphertext) {
   return { title, content };
 }
 
+function npubToHexpubkey(npub) {
+  const decoded = nip19_exports.decode(npub);
+  if (decoded.type !== "npub") {
+    throw new Error('Invalid npub');
+  }
+  return decoded.data;
+}
+
 /**
  * Creates a valid nostr filter from an event id or a NIP-19 bech32.
  * Original: https://github.com/nostr-dev-kit/ndk/blob/master/ndk/src/subscription/utils.ts#L132
@@ -18236,11 +18277,15 @@ class Note {
         return note;
     }
 
-    static fromHexPubkey(pubkey) {
+    static fromContent(pubkey, title, content) {
         const note = new Note();
         note.authorPubkey = pubkey;
+        note.title = title;
+        note.content = content;
+        note.originalContent = content;
+        note.private = false;
         note.onRelays = [];
-        note.isStub = true;
+        note.isStub = false;
         return note;
     }
 
@@ -18325,14 +18370,17 @@ class PageContext {
     async dnslinkNpub() {
         if (this._dnslinkNpub !== null) { return this._dnslinkNpub; }
 
-        const npubFromDomain = await DnsClient.instance.npub(window.location.hostname);
+        const npubFromDomain = await DnsClient.instance.npub("tagayasu.htlc.io");
         if (npubFromDomain === null || !npubFromDomain.startsWith('npub')) { this._dnslinkNpub = ''; }
         else { this._dnslinkNpub = npubFromDomain; }
         return this._dnslinkNpub;
     }
 
     noteFilterFromUrl() {
-        const filter = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .filterFromId */ .e)(this.noteIdentifierFromUrl());
+        const explicitIdentifier = this.noteIdentifierFromUrl();
+        if (!explicitIdentifier) { return null; }
+
+        const filter = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .filterFromId */ .e)(explicitIdentifier);
         if (!filter.kinds) { filter.kinds = [30023]; }
         return filter;
     }
@@ -18917,26 +18965,15 @@ window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     updateOwnerOnly();
 
-    const stubTitle = PageContext.instance.noteTitleFromUrl();
+    // browser
     const note = PageContext.instance.note;
-    if (!note.isStub) {
-        const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
-        const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
-        $("#note-content").html(html);
-        window.MDEditor.value(note.content);
-        loadBackrefs();
-    } else {
-        const content = stubTitle
-            ? `<h1>${stubTitle}</h1><p>⚠️ This note is a stub and does not exist yet. Click "open in editor" to start writing!</p>`
-            : "<center><h3>note not found!</h3>Either this version of the note no longer exists or it's on a different nostr relay.</center>"
-            ;
+    const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
+    const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
+    $("#note-content").html(html);
+    loadBackrefs();
 
-        setTimeout(() => {
-            if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, don't overwrite it.
-            $("#note-content").html(content);
-        }, 2000);
-    }
-
+    // editor
+    window.MDEditor.value(note.content);
     if (!!window.notesModal) { window.notesModal.hide(); }
     $("#note-title").val(note.title);
 });

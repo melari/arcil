@@ -232,6 +232,14 @@ export async function decryptNote(cyphertext) {
   return { title, content };
 }
 
+export function npubToHexpubkey(npub) {
+  const decoded = nip19.decode(npub);
+  if (decoded.type !== "npub") {
+    throw new Error('Invalid npub');
+  }
+  return decoded.data;
+}
+
 /**
  * Creates a valid nostr filter from an event id or a NIP-19 bech32.
  * Original: https://github.com/nostr-dev-kit/ndk/blob/master/ndk/src/subscription/utils.ts#L132

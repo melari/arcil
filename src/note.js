@@ -24,11 +24,15 @@ export class Note {
         return note;
     }
 
-    static fromHexPubkey(pubkey) {
+    static fromContent(pubkey, title, content) {
         const note = new Note();
         note.authorPubkey = pubkey;
+        note.title = title;
+        note.content = content;
+        note.originalContent = content;
+        note.private = false;
         note.onRelays = [];
-        note.isStub = true;
+        note.isStub = false;
         return note;
     }
 

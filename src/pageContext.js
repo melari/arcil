@@ -32,7 +32,10 @@ class PageContext {
     }
 
     noteFilterFromUrl() {
-        const filter = filterFromId(this.noteIdentifierFromUrl());
+        const explicitIdentifier = this.noteIdentifierFromUrl();
+        if (!explicitIdentifier) { return null; }
+
+        const filter = filterFromId(explicitIdentifier);
         if (!filter.kinds) { filter.kinds = [30023]; }
         return filter;
     }

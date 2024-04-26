@@ -293,26 +293,15 @@ window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
 window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     updateOwnerOnly();
 
-    const stubTitle = PageContext.instance.noteTitleFromUrl();
+    // browser
     const note = PageContext.instance.note;
-    if (!note.isStub) {
-        const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
-        const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
-        $("#note-content").html(html);
-        window.MDEditor.value(note.content);
-        loadBackrefs();
-    } else {
-        const content = stubTitle
-            ? `<h1>${stubTitle}</h1><p>⚠️ This note is a stub and does not exist yet. Click "open in editor" to start writing!</p>`
-            : "<center><h3>note not found!</h3>Either this version of the note no longer exists or it's on a different nostr relay.</center>"
-            ;
+    const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
+    const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
+    $("#note-content").html(html);
+    loadBackrefs();
 
-        setTimeout(() => {
-            if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, don't overwrite it.
-            $("#note-content").html(content);
-        }, 2000);
-    }
-
+    // editor
+    window.MDEditor.value(note.content);
     if (!!window.notesModal) { window.notesModal.hide(); }
     $("#note-title").val(note.title);
 });
