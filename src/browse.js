@@ -31,7 +31,7 @@ async function browseNote() {
     } else {
       PageContext.instance.setNote(Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
     }
-  }, 2000);
+  }, 5000);
 }
 window.browseNote = browseNote;
 
