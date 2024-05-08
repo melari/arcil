@@ -18788,7 +18788,6 @@ async function fetchNotes() {
     const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
     subscription.on("event", async (e) => {
         await Database.instance.addFromNostrEvent(e);
-        searchNotes(); // trigger a search to update the UI
     });
 
     // Well keep the subscription around for 5 seconds after the last event is received,
@@ -18858,7 +18857,7 @@ function searchNotes() {
         return;
     }
 
-    $("#notes-list").empty();
+    let notesListContent = "";
     window.tooltipList.forEach(tooltip => tooltip.dispose());
 
     const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" "));
@@ -18874,10 +18873,11 @@ function searchNotes() {
             noteRelays += `<div class="relay-indicator" style="background-color:#${color}" data-bs-toggle="tooltip" data-bs-title="${relay.url}">&nbsp;</div>`;
         }
         const privateIndicator = note.private ? "<i class='fa fa-solid fa-eye-slash'></i>" : "<i class='fa fa-cookie' style='width:16px'></i>";
-        $("#notes-list").append("<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + privateIndicator + "&nbsp;" + note.title + "</div><div>" + noteRelays + "</div></button>");
+        notesListContent += "<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + privateIndicator + "&nbsp;" + note.title + "</div><div>" + noteRelays + "</div></button>";
         notesDisplayed++;
     });
 
+    $("#notes-list").html(notesListContent);
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     window.tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
