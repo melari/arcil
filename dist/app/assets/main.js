@@ -18196,12 +18196,13 @@ class MarkdownRenderer {
                 this.lexer.state.inLink = true;
                 const handle = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .handleFor */ .t4)(match[1], PageContext.instance.note.authorPubkey);
                 const token = {
-                type: 'link',
-                raw: match[0],
+                    type: 'link',
+                    raw: match[0],
                     href: window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
-                title: match[1],
-                text: match[1],
-                tokens: this.lexer.inlineTokens(match[1])
+                    onclick: "foobar()",
+                    title: match[1],
+                    text: match[1],
+                    tokens: this.lexer.inlineTokens(match[1])
                 }
                 this.lexer.state.inLink = false;
                 window.foo.push((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .atagFor */ .Mf)(match[1], PageContext.instance.note.authorPubkey));

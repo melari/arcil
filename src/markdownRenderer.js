@@ -21,27 +21,27 @@ class MarkdownRenderer {
                 this.lexer.state.inLink = true;
                 const handle = handleFor(match[1], PageContext.instance.note.authorPubkey);
                 const token = {
-                type: 'link',
-                raw: match[0],
+                    type: 'link',
+                    raw: match[0],
                     href: window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
-                title: match[1],
-                text: match[1],
-                tokens: this.lexer.inlineTokens(match[1])
+                    title: match[1],
+                    text: match[1],
+                    tokens: this.lexer.inlineTokens(match[1])
                 }
                 this.lexer.state.inLink = false;
-                window.foo.push(atagFor(match[1], PageContext.instance.note.authorPubkey));
+                window._backrefs.push(atagFor(match[1], PageContext.instance.note.authorPubkey));
                 return token;
             }
             return false;
             }
         };
 
-        window.foo = [];
+        window._backrefs = [];
         marked.use({ tokenizer });
         marked.use(markedKatex({ throwOnError: true }));
         return {
             html: DOMPurify.sanitize(marked.parse(markdown)),
-            backrefs: window.foo,
+            backrefs: window._backrefs,
         }
     }
 }
