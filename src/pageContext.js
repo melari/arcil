@@ -45,7 +45,7 @@ class PageContext {
      * - If the URL is empty and there is no domain, return null
      */
     async noteFilterFromUrl() {
-        const hexpubkey = await this.dnslinkHexpubkey();
+        const hexpubkey = this.dnslinkHexpubkey();
         const explicitIdentifier = this.noteIdentifierFromUrl();
         if (!explicitIdentifier && !hexpubkey) { return null; }
         if (!explicitIdentifier) {

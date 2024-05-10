@@ -1,6 +1,7 @@
 import { ensureConnected, encryptSelf, decryptSelf } from "./common";
 import { NDKEvent } from "@nostr-dev-kit/ndk";
 import { showNotice } from "./error.js";
+import { Relay } from "./relay.js";
 
 class Preferences {
     static PREFERENCES_CHANGED_EVENT = "preferences-changed";
@@ -33,7 +34,7 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        window.ndk.fetchEvent(filter).then(async (event) => {
+        Relay.instance.fetchEvent(filter, async (event) => {
             if (!!event) {
                 const parsed = JSON.parse(await decryptSelf(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);

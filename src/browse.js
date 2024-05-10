@@ -1,5 +1,6 @@
 import { toggleConnect, ensureReadonlyConnected, npubToHexpubkey, dtagFor } from "./common.js"
 import { Note } from "./note.js"
+import { Relay } from "./relay.js"
 
 // Connect UI button
 function connectWalletBrowse() {
@@ -14,8 +15,8 @@ async function browseNote() {
 
   const filters = await PageContext.instance.noteFilterFromUrl();
   console.log(filters);
-  window.ndk.fetchEvent(filters).then(async function (event) {
-    if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
+  Relay.instance.fetchEvent(filters, async (event) => {
+      if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
 
   setTimeout(() => {

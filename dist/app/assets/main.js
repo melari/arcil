@@ -12791,6 +12791,8 @@ __exportStar(__webpack_require__(3088), exports);
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
 /* harmony import */ var _note_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3797);
+/* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3894);
+
 
 
 
@@ -12807,8 +12809,8 @@ async function browseNote() {
 
   const filters = await PageContext.instance.noteFilterFromUrl();
   console.log(filters);
-  window.ndk.fetchEvent(filters).then(async function (event) {
-    if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
+  _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters, async (event) => {
+      if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
   });
 
   setTimeout(() => {
@@ -18199,25 +18201,24 @@ class MarkdownRenderer {
                     type: 'link',
                     raw: match[0],
                     href: window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
-                    onclick: "foobar()",
                     title: match[1],
                     text: match[1],
                     tokens: this.lexer.inlineTokens(match[1])
                 }
                 this.lexer.state.inLink = false;
-                window.foo.push((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .atagFor */ .Mf)(match[1], PageContext.instance.note.authorPubkey));
+                window._backrefs.push((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .atagFor */ .Mf)(match[1], PageContext.instance.note.authorPubkey));
                 return token;
             }
             return false;
             }
         };
 
-        window.foo = [];
+        window._backrefs = [];
         marked.use({ tokenizer });
         marked.use(markedKatex({ throwOnError: true }));
         return {
             html: DOMPurify.sanitize(marked.parse(markdown)),
-            backrefs: window.foo,
+            backrefs: window._backrefs,
         }
     }
 }
@@ -18398,7 +18399,7 @@ class PageContext {
      * - If the URL is empty and there is no domain, return null
      */
     async noteFilterFromUrl() {
-        const hexpubkey = await this.dnslinkHexpubkey();
+        const hexpubkey = this.dnslinkHexpubkey();
         const explicitIdentifier = this.noteIdentifierFromUrl();
         if (!explicitIdentifier && !hexpubkey) { return null; }
         if (!explicitIdentifier) {
@@ -18450,7 +18451,9 @@ window.PageContext = PageContext;
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
 /* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2483);
-/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2171);
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(2171);
+/* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3894);
+
 
 
 
@@ -18486,7 +18489,7 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        window.ndk.fetchEvent(filter).then(async (event) => {
+        _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filter, async (event) => {
             if (!!event) {
                 const parsed = JSON.parse(await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
@@ -18505,7 +18508,7 @@ class Preferences {
             ];
             event.content = await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(this.current));
             event.publish().then(() => {
-                (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your preferences have been saved.");
+                (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your preferences have been saved.");
             });
         });
     }
@@ -18515,6 +18518,154 @@ window.Preferences = Preferences;
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, async function (e) {
     Preferences.instance.setFromNostr();
 });
+
+
+/***/ }),
+
+/***/ 3894:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Z: () => (/* binding */ Relay)
+/* harmony export */ });
+/**
+ *  A low level cache of raw nostr events. These can belong to any user and will not be decrypted.
+ *  Unlike Database, this cache is not persisted between page loads.
+ */
+class Relay {
+    // which tags are indexed in tagIndex
+    // #d is not included since it is the primary index
+    static INDEXED_TAGS = ['a'];
+
+    // "kind:hexpubkey:dTag" => Note (singular)
+    primaryIndex = {};
+
+    // "kind:hexpubkey:tagKind:TagValue" => Set{"primaryKey1", ... }
+    tagIndex = {};
+
+    static instance = new Relay();
+    constructor() {
+        if (!!Relay.instance) { throw new Error('Use singletone instance'); }
+    }
+
+    async fetchEvents(filters, callback) {
+        const cached = this.readByFilter(filters);
+        if (cached.size > 0) {
+            callback(cached);
+        } else {
+            window.ndk.fetchEvents(filters).then((events) => {
+                events.forEach(e => this.write(e));
+                callback(events);
+            });
+        }
+    }
+
+    async fetchEvent(filters, callback) {
+        const cached = this.readByFilter(filters);
+        if (cached.size > 0) {
+            callback([...cached][0]);
+        } else {
+            window.ndk.fetchEvent(filters).then((event) => {
+                this.write(event);
+                callback(event);
+            });
+        }
+    }
+
+    // subscribe does a combination of checking cache and external relays
+    // cached results trigger the callback immediately but don't block pulling events from external relays.
+    async subscribe(filters, callback) {
+        const subscription = await window.ndk.subscribe(filters, { closeOnEose: true });
+        subscription.on("event", async (event) => {
+            this.write(event)
+            callback(event);
+        });
+
+        const cached = this.readByFilter(filters);
+        [...cached].forEach(event => callback(event));
+
+        return subscription;
+    }
+
+    write(note) {
+        const primaryKey = this.primaryIndexKey(note.kind, note.pubkey, note.dTag);
+        if (note.dTag) {
+            const existing = this.primaryIndex[primaryKey];
+            if (!existing || existing.created_at < note.created_at) {
+                this.primaryIndex[primaryKey] = note;
+            }
+        }
+
+        note.tags.filter(t => Relay.INDEXED_TAGS.includes(t[0])).forEach(([tagKind, tagValue]) => {
+            const tagKey = this.tagIndexKey(note.kind, note.pubkey, tagKind, tagValue);
+            if (!this.tagIndex[tagKey]) { this.tagIndex[tagKey] = new Set(); }
+            if (this.tagIndex[tagKey].has(primaryKey)) { return; }
+            this.tagIndex[tagKey].add(primaryKey);
+        });
+    }
+
+    // Tries to load events from the cache using the filter. Not all possible
+    // filters are supported. The expectation is to have:
+    // - hexpubkey
+    // - kind
+    // - ONE of "#d" or other tag in INDEXED_TAGS
+    //
+    // Each of these filter should in turn have only ONE value
+    // 
+    // Example structure of nostr filter:
+    // {
+    //   #d: ['value'],
+    //   authors: ['hexpubkey'],
+    //   kinds: [30023]
+    // }
+    readByFilter(filter) {
+        const supportedTags = ['#d', ...Relay.INDEXED_TAGS.map(t => `#${t}`)];
+        const tagsGiven = supportedTags.filter(t => !!filter[t]);
+        if (!filter.authors || !filter.kinds || tagsGiven.length !== 1) {
+            return new Set();
+        }
+
+        const tagToUse = tagsGiven[0];
+
+        if (filter.authors.length > 1 || filter.kinds.length > 1 || filter[tagToUse].length > 1) {
+            return new Set();
+        }
+
+        const kind = filter.kinds[0];
+        const hexpubkey = filter.authors[0];
+        const tagKind = tagToUse.slice(1);
+        const tagValue = filter[tagToUse][0];
+
+        if (tagToUse === '#d') {
+            return this.readPrimaryIndex(kind, hexpubkey, tagValue);
+        }
+
+        return this.readTagIndex(kind, hexpubkey, tagKind, tagValue);
+    }
+
+    readPrimaryIndex(kind, hexpubkey, dTag) {
+        const note = this.primaryIndex[this.primaryIndexKey(kind, hexpubkey, dTag)];
+        if (!note) { return new Set(); }
+        return new Set([note]);
+    }
+
+    readTagIndex(kind, hexpubkey, tagKind, tagValue) {
+        const primaryKeys = this.tagIndex[this.tagIndexKey(kind, hexpubkey, tagKind, tagValue)];
+        if (!primaryKeys) { return new Set(); }
+        return new Set([...primaryKeys].map(k => this.primaryIndex[k]));
+    }
+
+    primaryIndexKey(kind, hexpubkey, dTag) {
+        return `${kind}:${hexpubkey}:${dTag}`;
+    }
+
+    tagIndexKey(kind, hexpubkey, tagKind, tagValue) {
+        return `${kind}:${hexpubkey}:${tagKind}/${tagValue}`;
+    }
+}
+window.Relay = Relay;
+
 
 /***/ }),
 
@@ -18633,6 +18784,11 @@ const Trie = __webpack_require__(9372);
 
 
 
+/**
+ *  A local store of notes owned by the wallet-connected user.
+ *  LocalStorage is used to store the events between page loads as a simple backup
+ *  if the notes are dropped by all relays.
+ */
 class Database {
     notes = {};
     noteTitleTrie = new Trie();
@@ -18713,7 +18869,11 @@ window.addEventListener(wallet.Wallet.WALLET_DISCONNECTED_EVENT, function (e) {
 window.addEventListener(wallet.Wallet.WALLET_CONNECTED_EVENT, function (e) {
     Database.instance.pullStateFromLocalStorage(window.nostrUser.npub);
 });
+
+// EXTERNAL MODULE: ./src/relay.js
+var relay = __webpack_require__(3894);
 ;// CONCATENATED MODULE: ./src/ui.js
+
 
 
 
@@ -18786,8 +18946,7 @@ async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
 
-    const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
-    subscription.on("event", async (e) => {
+    const subscription = await relay/* Relay */.Z.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
     });
 
@@ -18823,7 +18982,7 @@ function loadNote() {
 
     (0,common/* ensureConnected */.zs)().then(async () => {
         const filter = await PageContext.instance.noteFilterFromUrl();
-        window.ndk.fetchEvent(filter).then(async function (event) {
+        relay/* Relay */.Z.instance.fetchEvent(filter, async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
                     await Database.instance.addFromNostrEvent(event);
@@ -19088,7 +19247,7 @@ async function loadBackrefs() {
         kinds: [30023],
         "#a": [(0,common/* atagFor */.Mf)(PageContext.instance.note.nostrEvent.tags.find(t => t[0] == "title")[1], PageContext.instance.note.nostrEvent.pubkey)]
     };
-    window.ndk.fetchEvents(filters).then(function(events) {
+    relay/* Relay */.Z.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
         const href = window.router.urlFor(Router.BROWSER, event.encode());
         const title = event.tags.find(t => t[0] == "title")[1];
@@ -19152,6 +19311,7 @@ function confirmAction(question) {
     });
 }
 window.confirmAction = confirmAction;
+
 
 /***/ }),
 
@@ -40915,6 +41075,7 @@ __webpack_require__(5123);
 __webpack_require__(7909);
 __webpack_require__(6044);
 __webpack_require__(8423); // last
+
 })();
 
 /******/ })()

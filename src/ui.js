@@ -3,6 +3,7 @@ import { NDKEvent } from "@nostr-dev-kit/ndk";
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
+import { Relay } from "./relay.js";
 
 const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
 
@@ -70,8 +71,7 @@ async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
 
-    const subscription = await window.ndk.subscribe(filter, { closeOnEose: true });
-    subscription.on("event", async (e) => {
+    const subscription = await Relay.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
     });
 
@@ -107,7 +107,7 @@ function loadNote() {
 
     ensureConnected().then(async () => {
         const filter = await PageContext.instance.noteFilterFromUrl();
-        window.ndk.fetchEvent(filter).then(async function (event) {
+        Relay.instance.fetchEvent(filter, async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
                     await Database.instance.addFromNostrEvent(event);
@@ -372,7 +372,7 @@ async function loadBackrefs() {
         kinds: [30023],
         "#a": [atagFor(PageContext.instance.note.nostrEvent.tags.find(t => t[0] == "title")[1], PageContext.instance.note.nostrEvent.pubkey)]
     };
-    window.ndk.fetchEvents(filters).then(function(events) {
+    Relay.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
         const href = window.router.urlFor(Router.BROWSER, event.encode());
         const title = event.tags.find(t => t[0] == "title")[1];

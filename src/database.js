@@ -2,6 +2,11 @@ const Trie = require("triever");
 import { Note } from "./note.js";
 import { Wallet } from "./wallet.js";
 
+/**
+ *  A local store of notes owned by the wallet-connected user.
+ *  LocalStorage is used to store the events between page loads as a simple backup
+ *  if the notes are dropped by all relays.
+ */
 export class Database {
     notes = {};
     noteTitleTrie = new Trie();
