@@ -1,4 +1,4 @@
-import { noteFilterFromIdentifier, npubToHexpubkey, dtagFor } from "./common.js";
+import { noteFilterFromIdentifier, npubToHexpubkey } from "./common.js";
 import { Note } from "./note.js";
 
 class PageContext {

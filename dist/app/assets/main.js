@@ -12819,9 +12819,17 @@ async function browseNote(identifier) {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
 
   const filters = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .noteFilterFromIdentifier */ .YX)(identifier);
-  console.log(filters);
   _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters, async (event) => {
-      if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
+      if (!!event) {
+          await PageContext.instance.setNoteByNostrEvent(event);
+          const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
+          const filters = {
+              authors: [event.pubkey],
+              kinds: [30023],
+              "#d": aTags.map(t => t.split(':')[2])
+          }
+          _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters, (events) => {});
+      }
   });
 
   setTimeout(() => {
@@ -12862,7 +12870,6 @@ window.bindPrefetchLinks = bindPrefetchLinks;
 
 // When the browser back button is pressed
 window.addEventListener('popstate', (event) => {
-    console.log("popstate");
     browseNote(event.state?.identifier);
 });
 
@@ -17905,7 +17912,6 @@ async function connectNostr(nip07signer) {
   return await nip07signer.user().then(async (user) => {
       if (!!user.npub) {
         window.nostrUser = user;
-        console.log("Permission granted to read their public key:", user.npub);
         window.ndk.connect();
         window.dispatchEvent(new Event(Wallet.WALLET_CONNECTED_EVENT));
       }

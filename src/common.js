@@ -104,7 +104,6 @@ async function connectNostr(nip07signer) {
   return await nip07signer.user().then(async (user) => {
       if (!!user.npub) {
         window.nostrUser = user;
-        console.log("Permission granted to read their public key:", user.npub);
         window.ndk.connect();
         window.dispatchEvent(new Event(Wallet.WALLET_CONNECTED_EVENT));
       }

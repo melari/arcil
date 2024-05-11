@@ -25,9 +25,17 @@ async function browseNote(identifier) {
   await ensureReadonlyConnected();
 
   const filters = noteFilterFromIdentifier(identifier);
-  console.log(filters);
   Relay.instance.fetchEvent(filters, async (event) => {
-      if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
+      if (!!event) {
+          await PageContext.instance.setNoteByNostrEvent(event);
+          const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
+          const filters = {
+              authors: [event.pubkey],
+              kinds: [30023],
+              "#d": aTags.map(t => t.split(':')[2])
+          }
+          Relay.instance.fetchEvents(filters, (events) => {});
+      }
   });
 
   setTimeout(() => {
