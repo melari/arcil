@@ -12819,8 +12819,14 @@ async function browseNote(identifier) {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
 
   const filters = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .noteFilterFromIdentifier */ .YX)(identifier);
+
+  $("#note-content").html("<h2>🔍 searching for note...</h2>");
+
+  let foundNote = false;
+  let searchCompleted = false;
   _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters, async (event) => {
       if (!!event) {
+          foundNote = true;
           await PageContext.instance.setNoteByNostrEvent(event);
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
@@ -12829,23 +12835,19 @@ async function browseNote(identifier) {
               "#d": aTags.map(t => t.split(':')[2])
           }
           _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters, (events) => {});
+      } else {
+        const stubTitle = PageContext.instance.noteTitleFromUrl();
+        if (!!PageContext.instance.noteIdentifierFromUrl()) {
+          if (stubTitle) {
+            PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
+          } else {
+            PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+          }
+        } else {
+          PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+        }
       }
   });
-
-  setTimeout(() => {
-    if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, do nothing.
-
-    const stubTitle = PageContext.instance.noteTitleFromUrl();
-    if (!!PageContext.instance.noteIdentifierFromUrl()) {
-      if (stubTitle) {
-        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
-      } else {
-        PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
-      }
-    } else {
-      PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
-    }
-  }, 5000);
 }
 window.browseNote = browseNote;
 
@@ -18639,6 +18641,8 @@ class Relay {
     }
 
     write(note) {
+        if (!note) { return; }
+
         const primaryKey = this.primaryIndexKey(note.kind, note.pubkey, note.dTag);
         if (note.dTag) {
             const existing = this.primaryIndex[primaryKey];
@@ -19281,10 +19285,14 @@ async function loadBackrefs() {
 
     $("#backref-content").empty();
 
+    const hexpubkey = PageContext.instance.note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
+    const title = PageContext.instance.note.nostrEvent?.tags.find(t => t[0] === 'title')[1] ?? PageContext.instance.note.title;
+    if (!hexpubkey || !title) { return; }
+
     const filters = {
-        authors: [PageContext.instance.note.nostrEvent.pubkey],
+        authors: [hexpubkey],
         kinds: [30023],
-        "#a": [(0,common/* atagFor */.Mf)(PageContext.instance.note.nostrEvent.tags.find(t => t[0] == "title")[1], PageContext.instance.note.nostrEvent.pubkey)]
+        "#a": [(0,common/* atagFor */.Mf)(title, hexpubkey)]
     };
     relay/* Relay */.Z.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {

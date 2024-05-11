@@ -94,6 +94,8 @@ export class Relay {
     }
 
     write(note) {
+        if (!note) { return; }
+
         const primaryKey = this.primaryIndexKey(note.kind, note.pubkey, note.dTag);
         if (note.dTag) {
             const existing = this.primaryIndex[primaryKey];

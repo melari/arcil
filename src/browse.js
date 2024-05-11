@@ -25,8 +25,14 @@ async function browseNote(identifier) {
   await ensureReadonlyConnected();
 
   const filters = noteFilterFromIdentifier(identifier);
+
+  $("#note-content").html("<h2>🔍 searching for note...</h2>");
+
+  let foundNote = false;
+  let searchCompleted = false;
   Relay.instance.fetchEvent(filters, async (event) => {
       if (!!event) {
+          foundNote = true;
           await PageContext.instance.setNoteByNostrEvent(event);
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
@@ -35,23 +41,19 @@ async function browseNote(identifier) {
               "#d": aTags.map(t => t.split(':')[2])
           }
           Relay.instance.fetchEvents(filters, (events) => {});
+      } else {
+        const stubTitle = PageContext.instance.noteTitleFromUrl();
+        if (!!PageContext.instance.noteIdentifierFromUrl()) {
+          if (stubTitle) {
+            PageContext.instance.setNote(Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
+          } else {
+            PageContext.instance.setNote(Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+          }
+        } else {
+          PageContext.instance.setNote(Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+        }
       }
   });
-
-  setTimeout(() => {
-    if (PageContext.instance.note.nostrEvent) { return; } // If the note has been loaded by now, do nothing.
-
-    const stubTitle = PageContext.instance.noteTitleFromUrl();
-    if (!!PageContext.instance.noteIdentifierFromUrl()) {
-      if (stubTitle) {
-        PageContext.instance.setNote(Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
-      } else {
-        PageContext.instance.setNote(Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
-      }
-    } else {
-      PageContext.instance.setNote(Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
-    }
-  }, 5000);
 }
 window.browseNote = browseNote;
 

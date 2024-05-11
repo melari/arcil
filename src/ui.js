@@ -358,10 +358,14 @@ async function loadBackrefs() {
 
     $("#backref-content").empty();
 
+    const hexpubkey = PageContext.instance.note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
+    const title = PageContext.instance.note.nostrEvent?.tags.find(t => t[0] === 'title')[1] ?? PageContext.instance.note.title;
+    if (!hexpubkey || !title) { return; }
+
     const filters = {
-        authors: [PageContext.instance.note.nostrEvent.pubkey],
+        authors: [hexpubkey],
         kinds: [30023],
-        "#a": [atagFor(PageContext.instance.note.nostrEvent.tags.find(t => t[0] == "title")[1], PageContext.instance.note.nostrEvent.pubkey)]
+        "#a": [atagFor(title, hexpubkey)]
     };
     Relay.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
