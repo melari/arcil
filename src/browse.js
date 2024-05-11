@@ -14,6 +14,13 @@ async function browseNoteFromUrl() {
 }
 window.browseNoteFromUrl = browseNoteFromUrl;
 
+async function navigateToNote(identifier, title) {
+    const url = window.router.urlFor(Router.BROWSER, `${identifier}?title=${title}`);
+    const state = { identifier }
+    history.pushState(state, '', url);
+    browseNote(identifier);
+}
+
 async function browseNote(identifier) {
   await ensureReadonlyConnected();
 
@@ -52,6 +59,14 @@ window.openNoteInEditor = openNoteInEditor;
 
 function bindPrefetchLinks() {
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
-    $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => browseNote(e.target.title));
+    $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
+        navigateToNote(e.target.title, e.target.innerText);
+        return false; // block navigation
+    });
 }
 window.bindPrefetchLinks = bindPrefetchLinks;
+
+// When the browser back button is pressed
+window.addEventListener('popstate', (event) => {
+    browseNote(event.state?.identifier);
+});

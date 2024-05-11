@@ -24,7 +24,7 @@ class MarkdownRenderer {
                     type: 'link',
                     raw: match[0],
                     href: '#tagayasu-prefetch', // `javascript:browseNote('${handle}')`, //window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
-                    title: match[1],
+                    title: handle,
                     text: match[1],
                     tokens: this.lexer.inlineTokens(match[1])
                 }

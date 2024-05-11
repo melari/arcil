@@ -1,4 +1,4 @@
-import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptNote } from "./common.js"
+import { handleFor, delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptNote } from "./common.js"
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
@@ -365,9 +365,9 @@ async function loadBackrefs() {
     };
     Relay.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
-            const href = window.router.urlFor(Router.BROWSER, event.encode());
             const title = event.tags.find(t => t[0] == "title")[1];
-            $("#backref-content").append(`<li><a title='${title}' href='#tagayasu-prefetch'>${title}</a></li>`)
+            const handle = handleFor(title, event.pubkey);
+            $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
         });
         bindPrefetchLinks();
     });

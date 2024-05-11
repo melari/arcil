@@ -12808,6 +12808,13 @@ async function browseNoteFromUrl() {
 }
 window.browseNoteFromUrl = browseNoteFromUrl;
 
+async function navigateToNote(identifier, title) {
+    const url = window.router.urlFor(Router.BROWSER, `${identifier}?title=${title}`);
+    const state = { identifier }
+    history.pushState(state, '', url);
+    browseNote(identifier);
+}
+
 async function browseNote(identifier) {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
 
@@ -12846,9 +12853,18 @@ window.openNoteInEditor = openNoteInEditor;
 
 function bindPrefetchLinks() {
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
-    $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => browseNote(e.target.title));
+    $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
+        navigateToNote(e.target.title, e.target.innerText);
+        return false; // block navigation
+    });
 }
 window.bindPrefetchLinks = bindPrefetchLinks;
+
+// When the browser back button is pressed
+window.addEventListener('popstate', (event) => {
+    console.log("popstate");
+    browseNote(event.state?.identifier);
+});
 
 
 /***/ }),
@@ -18222,7 +18238,7 @@ class MarkdownRenderer {
                     type: 'link',
                     raw: match[0],
                     href: '#tagayasu-prefetch', // `javascript:browseNote('${handle}')`, //window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
-                    title: match[1],
+                    title: handle,
                     text: match[1],
                     tokens: this.lexer.inlineTokens(match[1])
                 }
@@ -19266,9 +19282,9 @@ async function loadBackrefs() {
     };
     relay/* Relay */.Z.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
-            const href = window.router.urlFor(Router.BROWSER, event.encode());
             const title = event.tags.find(t => t[0] == "title")[1];
-            $("#backref-content").append(`<li><a title='${title}' href='#tagayasu-prefetch'>${title}</a></li>`)
+            const handle = (0,common/* handleFor */.t4)(title, event.pubkey);
+            $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
         });
         bindPrefetchLinks();
     });
