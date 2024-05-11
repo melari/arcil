@@ -18500,14 +18500,12 @@ class Preferences {
 
     async saveToNostr() {
         await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .ensureConnected */ .zs)().then(async () => {
-            const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
-            event.kind = Preferences.KIND;
-            event.tags = [
+            const tags = [
                 ["d", Preferences.D_TAG],
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
-            event.content = await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(this.current));
-            event.publish().then(() => {
+            const content = await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(this.current));
+            _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.publish(Preferences.KIND, content, tags, (saveEvent) => {
                 (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your preferences have been saved.");
             });
         });
@@ -18529,6 +18527,9 @@ window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, async function (e) {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Z: () => (/* binding */ Relay)
 /* harmony export */ });
+/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(2483);
+
+
 /**
  *  A low level cache of raw nostr events. These can belong to any user and will not be decrypted.
  *  Unlike Database, this cache is not persisted between page loads.
@@ -18537,6 +18538,7 @@ class Relay {
     // which tags are indexed in tagIndex
     // #d is not included since it is the primary index
     static INDEXED_TAGS = ['a'];
+    static DELETE_EVENT_KIND = 5;
 
     // "kind:hexpubkey:dTag" => Note (singular)
     primaryIndex = {};
@@ -18586,6 +18588,39 @@ class Relay {
         [...cached].forEach(event => callback(event));
 
         return subscription;
+    }
+
+    // Publishes a note to all relays, and adds it to the local cache as well
+    // Once the event has been published to external relays, the callback is called with the saved nostr event
+    async publish(kind, content, tags, callback) {
+        const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKEvent */ ._C(window.ndk);
+        event.kind = kind;
+        event.content = content;
+        event.tags = tags;
+
+        if (kind !== Relay.DELETE_EVENT_KIND) {
+            this.write(event);
+        }
+
+        await event.publish().then((relaySet) => {
+            callback(event);
+        });
+    }
+
+    // Publishes a kind 5 (delete request) event to relays,
+    // and removes the event from the cache as well.
+    // Returns a Promise that is fulfilled once the deletion event has been pushed to external relays
+    async del(noteId) {
+        Object.keys(this.primaryIndex).forEach((dTag) => {
+            if (this.primaryIndex[dTag].id === noteId) {
+                delete this.primaryIndex[dTag];
+                Object.keys(this.tagIndex).forEach((tagIndexKey) => {
+                    this.tagIndex[tagIndexKey].delete(dTag);
+                });
+            }
+        });
+
+        return this.publish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
     }
 
     write(note) {
@@ -19066,19 +19101,14 @@ function deleteNote() {
     confirmAction("Are you sure you want to delete this note?").then(() => {
         (0,error/* showPending */.Si)("Deleting...");
 
-        // Delete the most recent version of the note
-        const deleteEvent = new dist/* NDKEvent */._C(window.ndk);
-        deleteEvent.kind = 5;
-        deleteEvent.content = "This note has been deleted";
-        deleteEvent.tags = [
-            ["e", PageContext.instance.note.id]
-        ];
-        deleteEvent.publish().then(() => {
+        const noteId = PageContext.instance.note.id;
+
         // Save a new version with removed content to encourage clients not to show old versions of the note
-            window.MDEditor.value('');
-            publishNote('Your note has been deleted').then(() => {
-                $("#note-title").val("");
-            });
+        // Then, publish a kind-5 delete request to purge the event entirely
+        window.MDEditor.value('');
+        publishNote('Your note has been deleted').then(() => {
+            $("#note-title").val("");
+            relay/* Relay */.Z.instance.del(noteId);
         });
     });
 }
@@ -19106,18 +19136,16 @@ async function publishNote(message) {
             return;
         }
 
-        const saveEvent = new dist/* NDKEvent */._C(window.ndk);
-        saveEvent.kind = 30023;
-        saveEvent.content = window.MDEditor.value();
-        saveEvent.tags = [
+        const tags = [
             ["d", (0,common/* dtagFor */.oF)(title)],
             ["title", title],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ]
+        ];
         MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-            saveEvent.tags.push(["a", backref]);
+            tags.push(["a", backref]);
         });
-        return saveEvent.publish().then(async function (x) {
+
+        return relay/* Relay */.Z.instance.publish(30023, window.MDEditor.value(), tags, async (saveEvent) => {
             (0,error/* showNotice */.s6)(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         });
@@ -19134,16 +19162,14 @@ function savePrivateNote() {
             return;
         }
 
-        const saveEvent = new dist/* NDKEvent */._C(window.ndk);
-        saveEvent.kind = 30023;
-        saveEvent.content = await (0,common/* encryptNote */.r0)(title, window.MDEditor.value());
-        saveEvent.tags = [
+        const content = await (0,common/* encryptNote */.r0)(title, window.MDEditor.value());
+        const tags = [
             ["d", (0,common/* dtagFor */.oF)(title)],
             ["title", "DRAFT"],
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
-        saveEvent.publish().then(async function (x) {
+        relay/* Relay */.Z.instance.publish(30023, content, tags,async (saveEvent) => {
             ;(0,error/* showNotice */.s6)("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })

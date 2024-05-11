@@ -1,3 +1,5 @@
+import { NDKEvent } from "@nostr-dev-kit/ndk";
+
 /**
  *  A low level cache of raw nostr events. These can belong to any user and will not be decrypted.
  *  Unlike Database, this cache is not persisted between page loads.
@@ -6,6 +8,7 @@ export class Relay {
     // which tags are indexed in tagIndex
     // #d is not included since it is the primary index
     static INDEXED_TAGS = ['a'];
+    static DELETE_EVENT_KIND = 5;
 
     // "kind:hexpubkey:dTag" => Note (singular)
     primaryIndex = {};
@@ -18,18 +21,6 @@ export class Relay {
         if (!!Relay.instance) { throw new Error('Use singletone instance'); }
     }
 
-    async fetchEvents(filters, callback) {
-        const cached = this.readByFilter(filters);
-        if (cached.size > 0) {
-            callback(cached);
-        } else {
-            window.ndk.fetchEvents(filters).then((events) => {
-                events.forEach(e => this.write(e));
-                callback(events);
-            });
-        }
-    }
-
     async fetchEvent(filters, callback) {
         const cached = this.readByFilter(filters);
         if (cached.size > 0) {
@@ -38,6 +29,18 @@ export class Relay {
             window.ndk.fetchEvent(filters).then((event) => {
                 this.write(event);
                 callback(event);
+            });
+        }
+    }
+
+    async fetchEvents(filters, callback) {
+        const cached = this.readByFilter(filters);
+        if (cached.size > 0) {
+            callback(cached);
+        } else {
+            window.ndk.fetchEvents(filters).then((events) => {
+                events.forEach(e => this.write(e));
+                callback(events);
             });
         }
     }
@@ -55,6 +58,39 @@ export class Relay {
         [...cached].forEach(event => callback(event));
 
         return subscription;
+    }
+
+    // Publishes a note to all relays, and adds it to the local cache as well
+    // Once the event has been published to external relays, the callback is called with the saved nostr event
+    async publish(kind, content, tags, callback) {
+        const event = new NDKEvent(window.ndk);
+        event.kind = kind;
+        event.content = content;
+        event.tags = tags;
+
+        if (kind !== Relay.DELETE_EVENT_KIND) {
+            this.write(event);
+        }
+
+        await event.publish().then((relaySet) => {
+            callback(event);
+        });
+    }
+
+    // Publishes a kind 5 (delete request) event to relays,
+    // and removes the event from the cache as well.
+    // Returns a Promise that is fulfilled once the deletion event has been pushed to external relays
+    async del(noteId) {
+        Object.keys(this.primaryIndex).forEach((dTag) => {
+            if (this.primaryIndex[dTag].id === noteId) {
+                delete this.primaryIndex[dTag];
+                Object.keys(this.tagIndex).forEach((tagIndexKey) => {
+                    this.tagIndex[tagIndexKey].delete(dTag);
+                });
+            }
+        });
+
+        return this.publish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
     }
 
     write(note) {

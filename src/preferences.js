@@ -45,14 +45,12 @@ class Preferences {
 
     async saveToNostr() {
         await ensureConnected().then(async () => {
-            const event = new NDKEvent(window.ndk);
-            event.kind = Preferences.KIND;
-            event.tags = [
+            const tags = [
                 ["d", Preferences.D_TAG],
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
-            event.content = await encryptSelf(JSON.stringify(this.current));
-            event.publish().then(() => {
+            const content = await encryptSelf(JSON.stringify(this.current));
+            Relay.instance.publish(Preferences.KIND, content, tags, (saveEvent) => {
                 showNotice("Your preferences have been saved.");
             });
         });

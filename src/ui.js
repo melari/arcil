@@ -191,19 +191,14 @@ function deleteNote() {
     confirmAction("Are you sure you want to delete this note?").then(() => {
         showPending("Deleting...");
 
-        // Delete the most recent version of the note
-        const deleteEvent = new NDKEvent(window.ndk);
-        deleteEvent.kind = 5;
-        deleteEvent.content = "This note has been deleted";
-        deleteEvent.tags = [
-            ["e", PageContext.instance.note.id]
-        ];
-        deleteEvent.publish().then(() => {
+        const noteId = PageContext.instance.note.id;
+
         // Save a new version with removed content to encourage clients not to show old versions of the note
-            window.MDEditor.value('');
-            publishNote('Your note has been deleted').then(() => {
-                $("#note-title").val("");
-            });
+        // Then, publish a kind-5 delete request to purge the event entirely
+        window.MDEditor.value('');
+        publishNote('Your note has been deleted').then(() => {
+            $("#note-title").val("");
+            Relay.instance.del(noteId);
         });
     });
 }
@@ -231,18 +226,16 @@ async function publishNote(message) {
             return;
         }
 
-        const saveEvent = new NDKEvent(window.ndk);
-        saveEvent.kind = 30023;
-        saveEvent.content = window.MDEditor.value();
-        saveEvent.tags = [
+        const tags = [
             ["d", dtagFor(title)],
             ["title", title],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ]
+        ];
         MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-            saveEvent.tags.push(["a", backref]);
+            tags.push(["a", backref]);
         });
-        return saveEvent.publish().then(async function (x) {
+
+        return Relay.instance.publish(30023, window.MDEditor.value(), tags, async (saveEvent) => {
             showNotice(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         });
@@ -259,16 +252,14 @@ function savePrivateNote() {
             return;
         }
 
-        const saveEvent = new NDKEvent(window.ndk);
-        saveEvent.kind = 30023;
-        saveEvent.content = await encryptNote(title, window.MDEditor.value());
-        saveEvent.tags = [
+        const content = await encryptNote(title, window.MDEditor.value());
+        const tags = [
             ["d", dtagFor(title)],
             ["title", "DRAFT"],
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
-        saveEvent.publish().then(async function (x) {
+        Relay.instance.publish(30023, content, tags,async (saveEvent) => {
             showNotice("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
