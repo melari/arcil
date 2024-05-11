@@ -1,5 +1,4 @@
-import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptNote, decryptSelf } from "./common.js"
-import { NDKEvent } from "@nostr-dev-kit/ndk";
+import { delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptNote } from "./common.js"
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
@@ -19,7 +18,7 @@ $(window).on('DOMContentLoaded', async function () {
     if (window.router.pageName == "editor") {
         window.loadNote();
     } else if (window.router.pageName == "browser") {
-        window.browseNote();
+        window.browseNoteFromUrl();
     }
 
     startAutoSave();
@@ -106,7 +105,7 @@ function loadNote() {
     }
 
     ensureConnected().then(async () => {
-        const filter = await PageContext.instance.noteFilterFromUrl();
+        const filter = PageContext.instance.noteFilterFromUrl();
         Relay.instance.fetchEvent(filter, async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
@@ -289,6 +288,7 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
     const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
     $("#note-content").html(html);
+    bindPrefetchLinks();
     loadBackrefs();
 
     // editor
@@ -365,10 +365,11 @@ async function loadBackrefs() {
     };
     Relay.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
-        const href = window.router.urlFor(Router.BROWSER, event.encode());
-        const title = event.tags.find(t => t[0] == "title")[1];
-        $("#backref-content").append(`<li><a href='${href}'>${title}</a></li>`)
+            const href = window.router.urlFor(Router.BROWSER, event.encode());
+            const title = event.tags.find(t => t[0] == "title")[1];
+            $("#backref-content").append(`<li><a title='${title}' href='#tagayasu-prefetch'>${title}</a></li>`)
         });
+        bindPrefetchLinks();
     });
 }
 

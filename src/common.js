@@ -250,6 +250,37 @@ export function npubToHexpubkey(npub) {
 }
 
 /**
+ * Handles several scenarios:
+ * - If the identifier is a naddr, filter to that note by ID
+ * - If the identifier is a plaintext title, filter to that note based on domain
+ * - If the identifier is a plaintext title and there is no domain, return null
+ * - If the identifier is empty, try to filter to the homepage based on domain
+ * - If the identifier is empty and there is no domain, return null
+ */
+export function noteFilterFromIdentifier(explicitIdentifier) {
+    const hexpubkey = PageContext.instance.dnslinkHexpubkey();
+    if (!explicitIdentifier && !hexpubkey) { return null; }
+    if (!explicitIdentifier) {
+        return {
+            authors: [hexpubkey],
+            kinds: [30023],
+            "#d": [dtagFor("homepage")]
+        };
+    }
+
+    const potentialFilter = filterFromId(explicitIdentifier);
+    if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
+    if (!!potentialFilter["#d"]) { return potentialFilter; }
+    if (!hexpubkey) { return null; }
+
+    return {
+        authors: [hexpubkey],
+        kinds: [30023],
+        "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
+    };
+}
+
+/**
  * Creates a valid nostr filter from an event id or a NIP-19 bech32.
  * Original: https://github.com/nostr-dev-kit/ndk/blob/master/ndk/src/subscription/utils.ts#L132
  */

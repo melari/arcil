@@ -12802,12 +12802,16 @@ function connectWalletBrowse() {
 }
 window.connectWalletBrowse = connectWalletBrowse;
 
-
 // Run on page ready; loads the note content from nostr
-async function browseNote() {
+async function browseNoteFromUrl() {
+    browseNote(PageContext.instance.noteIdentifierFromUrl());
+}
+window.browseNoteFromUrl = browseNoteFromUrl;
+
+async function browseNote(identifier) {
   await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .ensureReadonlyConnected */ .lD)();
 
-  const filters = await PageContext.instance.noteFilterFromUrl();
+  const filters = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .noteFilterFromIdentifier */ .YX)(identifier);
   console.log(filters);
   _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters, async (event) => {
       if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
@@ -12840,25 +12844,11 @@ function openNoteInEditor() {
 }
 window.openNoteInEditor = openNoteInEditor;
 
-async function lookupNpubFromDns() {
-  const hostname = window.location.hostname;
-  const url = `https://1.1.1.1/dns-query?name=npub.${hostname}&type=TXT`;
-  const headers = {
-    'accept': 'application/dns-json'
-  };
-
-  // Make the fetch request
-  const npub = await fetch(url, {
-    headers: headers
-  })
-    .then(response => response.json()) // Parse the response as JSON
-    .then(data => data["Answer"][0]["data"].replace(/[^a-zA-Z0-9]/g, ''))
-    .catch(error => {
-      console.error('Error:', error);
-    });
-  return npub;
+function bindPrefetchLinks() {
+    $("a[href='#tagayasu-prefetch']").off('click.navigate');
+    $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => browseNote(e.target.title));
 }
-window.lookupNpubFromDns = lookupNpubFromDns;
+window.bindPrefetchLinks = bindPrefetchLinks;
 
 
 /***/ }),
@@ -12879,13 +12869,13 @@ __webpack_require__.d(__webpack_exports__, {
   DE: () => (/* binding */ encryptSelf),
   zs: () => (/* binding */ ensureConnected),
   lD: () => (/* binding */ ensureReadonlyConnected),
-  e: () => (/* binding */ filterFromId),
   t4: () => (/* binding */ handleFor),
+  YX: () => (/* binding */ noteFilterFromIdentifier),
   e0: () => (/* binding */ npubToHexpubkey),
   Ti: () => (/* binding */ toggleConnect)
 });
 
-// UNUSED EXPORTS: NIP33_A_REGEX, naddrFor, shortHash
+// UNUSED EXPORTS: NIP33_A_REGEX, filterFromId, naddrFor, shortHash
 
 // NAMESPACE OBJECT: ./node_modules/nostr-tools/node_modules/@noble/curves/esm/abstract/utils.js
 var abstract_utils_namespaceObject = {};
@@ -18045,6 +18035,37 @@ function npubToHexpubkey(npub) {
 }
 
 /**
+ * Handles several scenarios:
+ * - If the identifier is a naddr, filter to that note by ID
+ * - If the identifier is a plaintext title, filter to that note based on domain
+ * - If the identifier is a plaintext title and there is no domain, return null
+ * - If the identifier is empty, try to filter to the homepage based on domain
+ * - If the identifier is empty and there is no domain, return null
+ */
+function noteFilterFromIdentifier(explicitIdentifier) {
+    const hexpubkey = PageContext.instance.dnslinkHexpubkey();
+    if (!explicitIdentifier && !hexpubkey) { return null; }
+    if (!explicitIdentifier) {
+        return {
+            authors: [hexpubkey],
+            kinds: [30023],
+            "#d": [dtagFor("homepage")]
+        };
+    }
+
+    const potentialFilter = filterFromId(explicitIdentifier);
+    if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
+    if (!!potentialFilter["#d"]) { return potentialFilter; }
+    if (!hexpubkey) { return null; }
+
+    return {
+        authors: [hexpubkey],
+        kinds: [30023],
+        "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
+    };
+}
+
+/**
  * Creates a valid nostr filter from an event id or a NIP-19 bech32.
  * Original: https://github.com/nostr-dev-kit/ndk/blob/master/ndk/src/subscription/utils.ts#L132
  */
@@ -18200,7 +18221,7 @@ class MarkdownRenderer {
                 const token = {
                     type: 'link',
                     raw: match[0],
-                    href: window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
+                    href: '#tagayasu-prefetch', // `javascript:browseNote('${handle}')`, //window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
                     title: match[1],
                     text: match[1],
                     tokens: this.lexer.inlineTokens(match[1])
@@ -18390,36 +18411,8 @@ class PageContext {
         return npub && (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .npubToHexpubkey */ .e0)(npub);
     }
 
-    /**
-     * Handles several scenarios:
-     * - If the URL has a naddr, filter to that note by ID
-     * - If the URL has a plaintext title, filter to that note based on domain
-     * - If the URL has a plaintext title and there is no domain, return null
-     * - If the URL is empty, try to filter to the homepage based on domain
-     * - If the URL is empty and there is no domain, return null
-     */
-    async noteFilterFromUrl() {
-        const hexpubkey = this.dnslinkHexpubkey();
-        const explicitIdentifier = this.noteIdentifierFromUrl();
-        if (!explicitIdentifier && !hexpubkey) { return null; }
-        if (!explicitIdentifier) {
-            return {
-                authors: [hexpubkey],
-                kinds: [30023],
-                "#d": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)("homepage")]
-            };
-        }
-
-        const potentialFilter = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .filterFromId */ .e)(explicitIdentifier);
-        if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
-        if (!!potentialFilter["#d"]) { return potentialFilter; }
-        if (!hexpubkey) { return null; }
-
-        return {
-            authors: [hexpubkey],
-            kinds: [30023],
-            "#d": [(0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(potentialFilter.ids[0].replace(/-/g, ' '))]
-        };
+    noteFilterFromUrl() {
+        return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .noteFilterFromIdentifier */ .YX)(this.noteIdentifierFromUrl());
     }
 
     noteIdentifierFromUrl() {
@@ -18551,18 +18544,6 @@ class Relay {
         if (!!Relay.instance) { throw new Error('Use singletone instance'); }
     }
 
-    async fetchEvents(filters, callback) {
-        const cached = this.readByFilter(filters);
-        if (cached.size > 0) {
-            callback(cached);
-        } else {
-            window.ndk.fetchEvents(filters).then((events) => {
-                events.forEach(e => this.write(e));
-                callback(events);
-            });
-        }
-    }
-
     async fetchEvent(filters, callback) {
         const cached = this.readByFilter(filters);
         if (cached.size > 0) {
@@ -18571,6 +18552,18 @@ class Relay {
             window.ndk.fetchEvent(filters).then((event) => {
                 this.write(event);
                 callback(event);
+            });
+        }
+    }
+
+    async fetchEvents(filters, callback) {
+        const cached = this.readByFilter(filters);
+        if (cached.size > 0) {
+            callback(cached);
+        } else {
+            window.ndk.fetchEvents(filters).then((events) => {
+                events.forEach(e => this.write(e));
+                callback(events);
             });
         }
     }
@@ -18804,8 +18797,6 @@ __webpack_require__.r(__webpack_exports__);
 
 // EXTERNAL MODULE: ./src/common.js + 13 modules
 var common = __webpack_require__(6213);
-// EXTERNAL MODULE: ./node_modules/@nostr-dev-kit/ndk/dist/index.mjs + 34 modules
-var dist = __webpack_require__(2483);
 // EXTERNAL MODULE: ./src/error.js
 var error = __webpack_require__(2171);
 // EXTERNAL MODULE: ./src/nostr.js
@@ -18914,7 +18905,6 @@ var relay = __webpack_require__(3894);
 
 
 
-
 const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
 
 $(window).on('DOMContentLoaded', async function () {
@@ -18929,7 +18919,7 @@ $(window).on('DOMContentLoaded', async function () {
     if (window.router.pageName == "editor") {
         window.loadNote();
     } else if (window.router.pageName == "browser") {
-        window.browseNote();
+        window.browseNoteFromUrl();
     }
 
     startAutoSave();
@@ -19016,7 +19006,7 @@ function loadNote() {
     }
 
     (0,common/* ensureConnected */.zs)().then(async () => {
-        const filter = await PageContext.instance.noteFilterFromUrl();
+        const filter = PageContext.instance.noteFilterFromUrl();
         relay/* Relay */.Z.instance.fetchEvent(filter, async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
@@ -19199,6 +19189,7 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
     const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
     $("#note-content").html(html);
+    bindPrefetchLinks();
     loadBackrefs();
 
     // editor
@@ -19275,10 +19266,11 @@ async function loadBackrefs() {
     };
     relay/* Relay */.Z.instance.fetchEvents(filters, (events) => {
         events.forEach(function(event) {
-        const href = window.router.urlFor(Router.BROWSER, event.encode());
-        const title = event.tags.find(t => t[0] == "title")[1];
-        $("#backref-content").append(`<li><a href='${href}'>${title}</a></li>`)
+            const href = window.router.urlFor(Router.BROWSER, event.encode());
+            const title = event.tags.find(t => t[0] == "title")[1];
+            $("#backref-content").append(`<li><a title='${title}' href='#tagayasu-prefetch'>${title}</a></li>`)
         });
+        bindPrefetchLinks();
     });
 }
 

@@ -1,4 +1,4 @@
-import { toggleConnect, ensureReadonlyConnected, npubToHexpubkey, dtagFor } from "./common.js"
+import { noteFilterFromIdentifier, toggleConnect, ensureReadonlyConnected } from "./common.js"
 import { Note } from "./note.js"
 import { Relay } from "./relay.js"
 
@@ -8,12 +8,16 @@ function connectWalletBrowse() {
 }
 window.connectWalletBrowse = connectWalletBrowse;
 
-
 // Run on page ready; loads the note content from nostr
-async function browseNote() {
+async function browseNoteFromUrl() {
+    browseNote(PageContext.instance.noteIdentifierFromUrl());
+}
+window.browseNoteFromUrl = browseNoteFromUrl;
+
+async function browseNote(identifier) {
   await ensureReadonlyConnected();
 
-  const filters = await PageContext.instance.noteFilterFromUrl();
+  const filters = noteFilterFromIdentifier(identifier);
   console.log(filters);
   Relay.instance.fetchEvent(filters, async (event) => {
       if (!!event) { await PageContext.instance.setNoteByNostrEvent(event); }
@@ -46,22 +50,8 @@ function openNoteInEditor() {
 }
 window.openNoteInEditor = openNoteInEditor;
 
-async function lookupNpubFromDns() {
-  const hostname = window.location.hostname;
-  const url = `https://1.1.1.1/dns-query?name=npub.${hostname}&type=TXT`;
-  const headers = {
-    'accept': 'application/dns-json'
-  };
-
-  // Make the fetch request
-  const npub = await fetch(url, {
-    headers: headers
-  })
-    .then(response => response.json()) // Parse the response as JSON
-    .then(data => data["Answer"][0]["data"].replace(/[^a-zA-Z0-9]/g, ''))
-    .catch(error => {
-      console.error('Error:', error);
-    });
-  return npub;
+function bindPrefetchLinks() {
+    $("a[href='#tagayasu-prefetch']").off('click.navigate');
+    $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => browseNote(e.target.title));
 }
-window.lookupNpubFromDns = lookupNpubFromDns;
+window.bindPrefetchLinks = bindPrefetchLinks;

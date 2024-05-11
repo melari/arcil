@@ -1,4 +1,4 @@
-import { filterFromId, npubToHexpubkey, dtagFor } from "./common.js";
+import { noteFilterFromIdentifier, npubToHexpubkey, dtagFor } from "./common.js";
 import { Note } from "./note.js";
 
 class PageContext {
@@ -36,36 +36,8 @@ class PageContext {
         return npub && npubToHexpubkey(npub);
     }
 
-    /**
-     * Handles several scenarios:
-     * - If the URL has a naddr, filter to that note by ID
-     * - If the URL has a plaintext title, filter to that note based on domain
-     * - If the URL has a plaintext title and there is no domain, return null
-     * - If the URL is empty, try to filter to the homepage based on domain
-     * - If the URL is empty and there is no domain, return null
-     */
-    async noteFilterFromUrl() {
-        const hexpubkey = this.dnslinkHexpubkey();
-        const explicitIdentifier = this.noteIdentifierFromUrl();
-        if (!explicitIdentifier && !hexpubkey) { return null; }
-        if (!explicitIdentifier) {
-            return {
-                authors: [hexpubkey],
-                kinds: [30023],
-                "#d": [dtagFor("homepage")]
-            };
-        }
-
-        const potentialFilter = filterFromId(explicitIdentifier);
-        if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
-        if (!!potentialFilter["#d"]) { return potentialFilter; }
-        if (!hexpubkey) { return null; }
-
-        return {
-            authors: [hexpubkey],
-            kinds: [30023],
-            "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
-        };
+    noteFilterFromUrl() {
+        return noteFilterFromIdentifier(this.noteIdentifierFromUrl());
     }
 
     noteIdentifierFromUrl() {
