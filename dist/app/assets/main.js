@@ -18769,10 +18769,14 @@ class Router {
         throw new Error('call route() first');
     }
 
+    get isEditorDomain() {
+        return this.editorDomains.includes(window.location.hostname);
+    }
+
     async route() {
         this._dnslinkNpub = await DnsClient.instance.npub('tagayasu.htlc.io');
 
-        if (this.editorDomains.includes(window.location.hostname)) {
+        if (this.isEditorDomain) {
             this._defaultPageName = Router.EDITOR;
         } else if (!!this._dnslinkNpub) {
             this._defaultPageName = Router.BROWSER;
@@ -18811,6 +18815,7 @@ class Router {
     }
 }
 window.Router = Router;
+
 
 /***/ }),
 
@@ -18938,6 +18943,9 @@ $(window).on('DOMContentLoaded', async function () {
     (0,nostr.startNostrMonitoring)();
 
     window.router = await (new Router().route());
+    if (window.router.isEditorDomain) {
+        $("#browser-navbar").show();
+    }
     $("#page-" + window.router.pageName).show();
 
     await window.trySeamlessConnection().catch(() => { });
@@ -19283,6 +19291,7 @@ async function loadBackrefs() {
 
     await (0,common/* ensureReadonlyConnected */.lD)();
 
+    hideBackrefs();
     $("#backref-content").empty();
 
     const hexpubkey = PageContext.instance.note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
@@ -19299,9 +19308,22 @@ async function loadBackrefs() {
             const title = event.tags.find(t => t[0] == "title")[1];
             const handle = (0,common/* handleFor */.t4)(title, event.pubkey);
             $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
+            showBackrefs();
         });
         bindPrefetchLinks();
     });
+}
+
+function hideBackrefs() {
+    $("#backref-container").hide();
+    $("#note-content").removeClass("col-lg-8");
+    $("#note-content").addClass("col-lg-12");
+}
+
+function showBackrefs() {
+    $("#backref-container").show();
+    $("#note-content").removeClass("col-lg-12");
+    $("#note-content").addClass("col-lg-8");
 }
 
 window.addEventListener(error/* ERROR_EVENT */.qi, function (e) {

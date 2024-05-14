@@ -41,10 +41,14 @@ class Router {
         throw new Error('call route() first');
     }
 
+    get isEditorDomain() {
+        return this.editorDomains.includes(window.location.hostname);
+    }
+
     async route() {
         this._dnslinkNpub = await DnsClient.instance.npub(window.location.hostname);
 
-        if (this.editorDomains.includes(window.location.hostname)) {
+        if (this.isEditorDomain) {
             this._defaultPageName = Router.EDITOR;
         } else if (!!this._dnslinkNpub) {
             this._defaultPageName = Router.BROWSER;

@@ -11,6 +11,9 @@ $(window).on('DOMContentLoaded', async function () {
     startNostrMonitoring();
 
     window.router = await (new Router().route());
+    if (window.router.isEditorDomain) {
+        $("#browser-navbar").show();
+    }
     $("#page-" + window.router.pageName).show();
 
     await window.trySeamlessConnection().catch(() => { });
@@ -356,6 +359,7 @@ async function loadBackrefs() {
 
     await ensureReadonlyConnected();
 
+    hideBackrefs();
     $("#backref-content").empty();
 
     const hexpubkey = PageContext.instance.note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
@@ -372,9 +376,22 @@ async function loadBackrefs() {
             const title = event.tags.find(t => t[0] == "title")[1];
             const handle = handleFor(title, event.pubkey);
             $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
+            showBackrefs();
         });
         bindPrefetchLinks();
     });
+}
+
+function hideBackrefs() {
+    $("#backref-container").hide();
+    $("#note-content").removeClass("col-lg-8");
+    $("#note-content").addClass("col-lg-12");
+}
+
+function showBackrefs() {
+    $("#backref-container").show();
+    $("#note-content").removeClass("col-lg-12");
+    $("#note-content").addClass("col-lg-8");
 }
 
 window.addEventListener(ERROR_EVENT, function (e) {
