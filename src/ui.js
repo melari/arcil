@@ -13,6 +13,9 @@ $(window).on('DOMContentLoaded', async function () {
     window.router = await (new Router().route());
     if (window.router.isEditorDomain) {
         $("#browser-navbar").show();
+    } else {
+        $("#custom-domain-row").show();
+        $("#custom-domain").html(window.location.hostname);
     }
     $("#page-" + window.router.pageName).show();
 
@@ -384,14 +387,10 @@ async function loadBackrefs() {
 
 function hideBackrefs() {
     $("#backref-container").hide();
-    $("#note-content").removeClass("col-lg-8");
-    $("#note-content").addClass("col-lg-12");
 }
 
 function showBackrefs() {
     $("#backref-container").show();
-    $("#note-content").removeClass("col-lg-12");
-    $("#note-content").addClass("col-lg-8");
 }
 
 window.addEventListener(ERROR_EVENT, function (e) {

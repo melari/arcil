@@ -20,13 +20,14 @@ async function navigateToNote(identifier, title) {
     history.pushState(state, '', url);
     browseNote(identifier);
 }
+window.navigateToNote = navigateToNote;
 
 async function browseNote(identifier) {
   await ensureReadonlyConnected();
 
   const filters = noteFilterFromIdentifier(identifier);
 
-  $("#note-content").html("<h2>🔍 searching for note...</h2>");
+  $("#note-content").html("<h2>🌱 loading...</h2>");
 
   let foundNote = false;
   let searchCompleted = false;
