@@ -12,7 +12,6 @@ export class Note {
         note.authorPubkey = event.pubkey;
         note.createdAt = event.created_at;
         note.onRelays = [];
-        note.isStub = false;
 
         if (note.private) {
             const { title, content } = await decryptNote(note.content);
@@ -23,15 +22,13 @@ export class Note {
         return note;
     }
 
-    static fromContent(pubkey, title, content) {
+    static fromContent(title, content) {
         const note = new Note();
-        note.authorPubkey = pubkey;
         note.title = title;
         note.content = content;
         note.originalContent = content;
         note.private = false;
         note.onRelays = [];
-        note.isStub = false;
         return note;
     }
 
@@ -64,7 +61,6 @@ export class Note {
         note.title = plain.title;
         note.createdAt = plain.createdAt;
         note.onRelays = [];
-        note.isStub = false;
 
         if (note.private) {
             const { title, content } = await decryptNote(note.content);

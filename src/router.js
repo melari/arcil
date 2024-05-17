@@ -46,7 +46,9 @@ class Router {
     }
 
     async route() {
-        this._dnslinkNpub = await DnsClient.instance.npub(window.location.hostname);
+        if (!this._dnslinkNpub) {
+            this._dnslinkNpub = await DnsClient.instance.npub(window.location.hostname);
+        }
 
         if (this.isEditorDomain) {
             this._defaultPageName = Router.EDITOR;
@@ -59,12 +61,12 @@ class Router {
         const urlParts = window.location.pathname.split('/').filter(x => x);
         if (Router.ALL_PAGES.includes(urlParts[0])) {
             this._pageName = urlParts[0];
-            this._parseInlineParams(this._pageName, urlParts.slice(1));
+            this._parseInlineParams(urlParts.slice(1));
             return this;
         }
         
         this._pageName = this._defaultPageName;
-        this._parseInlineParams(this._pageName, urlParts);
+        this._parseInlineParams(urlParts);
         return this;
     }
 
@@ -81,7 +83,7 @@ class Router {
         }
     }
 
-    _parseInlineParams(pageName, urlParts) {
+    _parseInlineParams(urlParts) {
         this._inlineParams = {};
         this._inlineParams[PageContext.NADDR_PARAM_NAME] = urlParts[0];
     }

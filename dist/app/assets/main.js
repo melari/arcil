@@ -12812,6 +12812,7 @@ async function navigateToNote(identifier, title) {
     const url = window.router.urlFor(Router.BROWSER, `${identifier}?title=${title}`);
     const state = { identifier }
     history.pushState(state, '', url);
+    await window.router.route();
     browseNote(identifier);
 }
 window.navigateToNote = navigateToNote;
@@ -12823,11 +12824,12 @@ async function browseNote(identifier) {
 
   $("#note-content").html("<h2>🌱 loading...</h2>");
 
-  let foundNote = false;
-  let searchCompleted = false;
   _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters, async (event) => {
       if (!!event) {
-          foundNote = true;
+          if (!!event.tags.find(t => t[0] === "private") && event.pubkey !== window.nostrUser?.hexpubkey) {
+              PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('', '### ❌ This note is private and cannot be decrypted.'));
+              return;
+          }
           await PageContext.instance.setNoteByNostrEvent(event);
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
@@ -12835,18 +12837,18 @@ async function browseNote(identifier) {
               kinds: [30023],
               "#d": aTags.map(t => t.split(':')[2])
           }
-          _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters, (events) => {});
+          _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters, (_) => {});
       } else {
-        const stubTitle = PageContext.instance.noteTitleFromUrl();
-        if (!!PageContext.instance.noteIdentifierFromUrl()) {
-          if (stubTitle) {
-            PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet. Click \`open in editor\` to start writing!`));
+          const stubTitle = PageContext.instance.noteTitleFromUrl();
+          if (!!PageContext.instance.noteIdentifierFromUrl()) {
+              if (stubTitle) {
+                  PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet.`));
+              } else {
+                  PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+              }
           } else {
-            PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], '', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+              PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
           }
-        } else {
-          PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(filters.authors[0], 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
-        }
       }
   });
 }
@@ -18325,7 +18327,6 @@ class Note {
         note.authorPubkey = event.pubkey;
         note.createdAt = event.created_at;
         note.onRelays = [];
-        note.isStub = false;
 
         if (note.private) {
             const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptNote */ .fD)(note.content);
@@ -18336,15 +18337,13 @@ class Note {
         return note;
     }
 
-    static fromContent(pubkey, title, content) {
+    static fromContent(title, content) {
         const note = new Note();
-        note.authorPubkey = pubkey;
         note.title = title;
         note.content = content;
         note.originalContent = content;
         note.private = false;
         note.onRelays = [];
-        note.isStub = false;
         return note;
     }
 
@@ -18377,7 +18376,6 @@ class Note {
         note.title = plain.title;
         note.createdAt = plain.createdAt;
         note.onRelays = [];
-        note.isStub = false;
 
         if (note.private) {
             const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptNote */ .fD)(note.content);
@@ -18388,6 +18386,7 @@ class Note {
         return note;
     }
 }
+
 
 /***/ }),
 
@@ -18739,6 +18738,7 @@ window.Relay = Relay;
 class Router {
     editorDomains = [
         'app.tagayasu.xyz',
+        '127.0.0.1',
     ];
 
     static EDITOR = 'editor';
@@ -18775,7 +18775,9 @@ class Router {
     }
 
     async route() {
-        this._dnslinkNpub = await DnsClient.instance.npub('tagayasu.htlc.io');
+        if (!this._dnslinkNpub) {
+            this._dnslinkNpub = await DnsClient.instance.npub('tagayasu.htlc.io');
+        }
 
         if (this.isEditorDomain) {
             this._defaultPageName = Router.EDITOR;
@@ -18788,12 +18790,12 @@ class Router {
         const urlParts = window.location.pathname.split('/').filter(x => x);
         if (Router.ALL_PAGES.includes(urlParts[0])) {
             this._pageName = urlParts[0];
-            this._parseInlineParams(this._pageName, urlParts.slice(1));
+            this._parseInlineParams(urlParts.slice(1));
             return this;
         }
         
         this._pageName = this._defaultPageName;
-        this._parseInlineParams(this._pageName, urlParts);
+        this._parseInlineParams(urlParts);
         return this;
     }
 
@@ -18810,7 +18812,7 @@ class Router {
         }
     }
 
-    _parseInlineParams(pageName, urlParts) {
+    _parseInlineParams(urlParts) {
         this._inlineParams = {};
         this._inlineParams[PageContext.NADDR_PARAM_NAME] = urlParts[0];
     }
@@ -18867,7 +18869,7 @@ class Database {
 
     search(wordList) {
         const uniqueNotes = new Set();
-        wordList.forEach(word => {
+        (wordList.length > 0 ? wordList : ['']).forEach(word => {
             const searchResults = this.noteTitleTrie.getData(word);
             if (!!searchResults) {
                 searchResults.forEach(noteId => uniqueNotes.add(noteId));
@@ -18931,6 +18933,7 @@ window.addEventListener(wallet.Wallet.WALLET_CONNECTED_EVENT, function (e) {
 // EXTERNAL MODULE: ./src/relay.js
 var relay = __webpack_require__(3894);
 ;// CONCATENATED MODULE: ./src/ui.js
+
 
 
 
@@ -19053,8 +19056,7 @@ function loadNote() {
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
-                window.MDEditor.value(`# ${title}`);
-                $("#note-title").val(title);
+                newNote(title, `# ${title}`);
             }
         });
     });
@@ -19083,7 +19085,7 @@ function searchNotes() {
     let notesListContent = "";
     window.tooltipList.forEach(tooltip => tooltip.dispose());
 
-    const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" "));
+    const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" ").filter(x => !!x));
 
     let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
@@ -19114,8 +19116,7 @@ window.editNote = editNote
 
 function newNote(title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
-    window.MDEditor.value(content);
-    $("#note-title").val(title);
+    PageContext.instance.setNote(src_note.Note.fromContent(title, content));
 }
 window.newNote = newNote;
 
@@ -19280,9 +19281,8 @@ function npubPreview() {
 
 function updateOwnerOnly() {
     if (
-        !!PageContext.instance.note.authorPubkey &&
-        !!window.nostrUser &&
-        PageContext.instance.note.authorPubkey == window.nostrUser.hexpubkey
+        !PageContext.instance.note.authorPubkey ||
+        PageContext.instance.note.authorPubkey == window.nostrUser?.hexpubkey
     ) {
         $(".owner-only").show();
     } else {

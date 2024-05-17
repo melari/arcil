@@ -3,6 +3,7 @@ import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_
 import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
 import { Relay } from "./relay.js";
+import { Note } from "./note.js";
 
 const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
 
@@ -120,8 +121,7 @@ function loadNote() {
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
-                window.MDEditor.value(`# ${title}`);
-                $("#note-title").val(title);
+                newNote(title, `# ${title}`);
             }
         });
     });
@@ -150,7 +150,7 @@ function searchNotes() {
     let notesListContent = "";
     window.tooltipList.forEach(tooltip => tooltip.dispose());
 
-    const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" "));
+    const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" ").filter(x => !!x));
 
     let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
@@ -181,8 +181,7 @@ window.editNote = editNote
 
 function newNote(title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
-    window.MDEditor.value(content);
-    $("#note-title").val(title);
+    PageContext.instance.setNote(Note.fromContent(title, content));
 }
 window.newNote = newNote;
 
@@ -347,9 +346,8 @@ function npubPreview() {
 
 function updateOwnerOnly() {
     if (
-        !!PageContext.instance.note.authorPubkey &&
-        !!window.nostrUser &&
-        PageContext.instance.note.authorPubkey == window.nostrUser.hexpubkey
+        !PageContext.instance.note.authorPubkey ||
+        PageContext.instance.note.authorPubkey == window.nostrUser?.hexpubkey
     ) {
         $(".owner-only").show();
     } else {

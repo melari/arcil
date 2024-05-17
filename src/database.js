@@ -27,7 +27,7 @@ export class Database {
 
     search(wordList) {
         const uniqueNotes = new Set();
-        wordList.forEach(word => {
+        (wordList.length > 0 ? wordList : ['']).forEach(word => {
             const searchResults = this.noteTitleTrie.getData(word);
             if (!!searchResults) {
                 searchResults.forEach(noteId => uniqueNotes.add(noteId));
