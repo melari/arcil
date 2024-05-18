@@ -34,7 +34,7 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        Relay.instance.fetchEvent(filter, async (event) => {
+        Relay.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 const parsed = JSON.parse(await decryptSelf(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
@@ -50,7 +50,7 @@ class Preferences {
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
             const content = await encryptSelf(JSON.stringify(this.current));
-            Relay.instance.publish(Preferences.KIND, content, tags, (saveEvent) => {
+            Relay.instance.publish(Preferences.KIND, content, tags).then((saveEvent) => {
                 showNotice("Your preferences have been saved.");
             });
         });

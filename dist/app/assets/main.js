@@ -12784,6 +12784,169 @@ __exportStar(__webpack_require__(3088), exports);
 
 /***/ }),
 
+/***/ 2082:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Blossom: () => (/* binding */ Blossom)
+/* harmony export */ });
+/* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3894);
+/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2483);
+
+
+const crypto = __webpack_require__(1354);
+
+
+class Blossom {
+    static SERVER_HINT_EVENT_KIND = 10063;
+    static AUTH_EVENT_KIND = 24242;
+    static DEFAULT_SERVERS = [
+        'https://blossom.tagayasu.xyz',
+    ];
+
+    userServers = new Set();
+    hexpubkey = null;
+
+    constructor(hexpubkey, useDefaultServers = false) {
+        this.hexpubkey = hexpubkey;
+        if (useDefaultServers) { this.userServers = new Set(Blossom.DEFAULT_SERVERS); }
+    }
+
+    async fetchFile(hash) {
+        const urls = await this.urlsForFile(hash);
+
+        for (const url of urls) {
+            let response;
+            try { response = await fetch(url); }
+            catch { continue; }
+            if (!response.ok) { continue; }
+
+            // Check that the file hash matches what we expected
+            const blob = await response.blob();
+            const arrayBuffer = await new Response(blob).arrayBuffer();
+            const wordArray = crypto.lib.WordArray.create(arrayBuffer);
+            const downloadedHash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
+            if (downloadedHash !== hash) {
+                console.warn(`File received from ${url} has a mismatched hash. Discarding.`, {
+                    expected: hash,
+                    received: downloadedHash,
+                });
+                continue;
+            }
+
+            // Found the correct file, create an referenceable internal URL
+            return URL.createObjectURL(blob);
+        }
+
+        throw new Error(`[404] blossom://${hash} was not found on any known servers`);
+    }
+
+    async uploadFile(blob) {
+        const arrayBuffer = await new Response(blob).arrayBuffer();
+        const wordArray = crypto.lib.WordArray.create(arrayBuffer);
+        const fileHash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
+
+        const fileSize = blob.size;
+        const auth = await this._nostrUploadAuth(fileSize);
+
+        const headers = new Headers();
+        headers.append('Authorization', auth);
+
+        const requestOptions = {
+            method: 'PUT',
+            headers,
+            body: blob,
+        };
+
+        const uploadUrls = await this.uploadUrls();
+        const successfulUploads = await Promise.allSettled(uploadUrls.map(url => new Promise((resolve, reject) => {
+            fetch(url, requestOptions).then(async response => {
+                const parsed = await response.json();
+                if (parsed.sha256 === fileHash) { resolve(parsed.url); }
+                else { reject('return hash did not match expected. Discarding'); }
+            }).catch(reason => reject(reason));
+        })));
+
+        if (successfulUploads.filter(r => r.status === 'fulfilled').length === 0) {
+            Promise.reject('failed to upload file to any blossom servers')
+        }
+
+        return Promise.resolve(fileHash);
+    }
+
+    async _nostrUploadAuth(fileSize) {
+        const unixTime = Math.floor(Date.now() / 1000);
+        const expiration = unixTime + (60 * 5);
+
+        const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__/* .NDKEvent */ ._C(window.ndk);
+        event.kind = Blossom.AUTH_EVENT_KIND;
+        event.content = 'File Upload';
+        event.tags = [
+            ['t', 'upload'],
+            ['size', fileSize],
+            ['expiration', expiration]
+        ];
+        await event.sign();
+
+        const authBase64 = btoa(JSON.stringify(event.rawEvent()))
+        return `Nostr ${authBase64}`;
+    }
+
+    async urlsForFile(hash) {
+        return [...(await this.serverList())].map(server => {
+            try { return (new URL(hash, server)).href; }
+            catch { return null; }
+        }).filter(x => !!x);
+    }
+
+    async uploadUrls() {
+        return [...(await this.serverList())].map(server => {
+            try { return (new URL('/upload', server)).href; }
+            catch { return null; }
+        }).filter(x => !!x);
+    }
+
+    async serverList() {
+        if (this.userServers.size > 0) {
+            return this.userServers;
+        }
+
+        const nostrHints = await this._getServersFromNostr();
+        if (nostrHints.length > 0) {
+            this.userServers = new Set(nostrHints);
+            return this.userServers;
+        }
+
+        this.userServers = new Set(Blossom.DEFAULT_SERVERS);
+        await this._saveServers();
+        return this.userServers;
+    }
+
+    async _getServersFromNostr() {
+        const filter = {
+            authors: [this.hexpubkey],
+            kinds: [Blossom.SERVER_HINT_EVENT_KIND]
+        }
+        return await _relay_js__WEBPACK_IMPORTED_MODULE_0__/* .Relay */ .Z.instance.fetchEvent(filter).then((event) => 
+              event?.tags.filter(t => t[0] === "server").map(t => t[1]) ?? []
+        );
+    }
+
+    async _saveServers() {
+        if (this.userServers.size === 0) { throw new Error('refusing to update blossom servers to empty list'); }
+
+        const tags = [];
+        this.userServers.forEach(server => tags.push(["server", server]));
+        return _relay_js__WEBPACK_IMPORTED_MODULE_0__/* .Relay */ .Z.instance.publish(Blossom.SERVER_HINT_EVENT_KIND, '', tags, this.hexpubkey);
+    }
+}
+window.Blossom = Blossom;
+
+
+/***/ }),
+
 /***/ 2451:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
@@ -12824,7 +12987,7 @@ async function browseNote(identifier) {
 
   $("#note-content").html("<h2>🌱 loading...</h2>");
 
-  _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters, async (event) => {
+  _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters).then(async (event) => {
       if (!!event) {
           if (!!event.tags.find(t => t[0] === "private") && event.pubkey !== window.nostrUser?.hexpubkey) {
               PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('', '### ❌ This note is private and cannot be decrypted.'));
@@ -18506,7 +18669,7 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filter, async (event) => {
+        _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 const parsed = JSON.parse(await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
@@ -18522,7 +18685,7 @@ class Preferences {
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
             const content = await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(this.current));
-            _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.publish(Preferences.KIND, content, tags, (saveEvent) => {
+            _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.publish(Preferences.KIND, content, tags).then((saveEvent) => {
                 (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your preferences have been saved.");
             });
         });
@@ -18568,16 +18731,18 @@ class Relay {
         if (!!Relay.instance) { throw new Error('Use singletone instance'); }
     }
 
-    async fetchEvent(filters, callback) {
-        const cached = this.readByFilter(filters);
-        if (cached.size > 0) {
-            callback([...cached][0]);
-        } else {
-            window.ndk.fetchEvent(filters).then((event) => {
-                this.write(event);
-                callback(event);
-            });
-        }
+    async fetchEvent(filters) {
+        return new Promise((resolve, reject) => {
+            const cached = this.readByFilter(filters);
+            if (cached.size > 0) {
+                callback([...cached][0]);
+            } else {
+                window.ndk.fetchEvent(filters).then((event) => {
+                    this.write(event);
+                    resolve(event);
+                });
+            }
+        });
     }
 
     async fetchEvents(filters, callback) {
@@ -18609,7 +18774,11 @@ class Relay {
 
     // Publishes a note to all relays, and adds it to the local cache as well
     // Once the event has been published to external relays, the callback is called with the saved nostr event
-    async publish(kind, content, tags, callback) {
+    async publish(kind, content, tags, hexpubkey) {
+        if (hexpubkey && hexpubkey !== window.ndk.activeUser?.hexpubkey) {
+            throw new Error('NDK is configured with an unexpected pubkey');
+        }
+
         const event = new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKEvent */ ._C(window.ndk);
         event.kind = kind;
         event.content = content;
@@ -18619,9 +18788,7 @@ class Relay {
             this.write(event);
         }
 
-        await event.publish().then((relaySet) => {
-            callback(event);
-        });
+        return event.publish().then(_relaySet => event);
     }
 
     // Publishes a kind 5 (delete request) event to relays,
@@ -19048,7 +19215,7 @@ function loadNote() {
 
     (0,common/* ensureConnected */.zs)().then(async () => {
         const filter = PageContext.instance.noteFilterFromUrl();
-        relay/* Relay */.Z.instance.fetchEvent(filter, async (event) => {
+        relay/* Relay */.Z.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
                     await Database.instance.addFromNostrEvent(event);
@@ -19174,7 +19341,7 @@ async function publishNote(message) {
             tags.push(["a", backref]);
         });
 
-        return relay/* Relay */.Z.instance.publish(30023, window.MDEditor.value(), tags, async (saveEvent) => {
+        return relay/* Relay */.Z.instance.publish(30023, window.MDEditor.value(), tags).then(async (saveEvent) => {
             (0,error/* showNotice */.s6)(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         });
@@ -19198,7 +19365,7 @@ function savePrivateNote() {
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
-        relay/* Relay */.Z.instance.publish(30023, content, tags,async (saveEvent) => {
+        relay/* Relay */.Z.instance.publish(30023, content, tags).then(async (saveEvent) => {
             ;(0,error/* showNotice */.s6)("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
@@ -41135,6 +41302,7 @@ const bytes = (/* unused pure expression or super */ null && (stringToBytes));
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
+__webpack_require__(2082);
 __webpack_require__(2451);
 __webpack_require__(7295);
 __webpack_require__(3797);

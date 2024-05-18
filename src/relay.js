@@ -21,16 +21,18 @@ export class Relay {
         if (!!Relay.instance) { throw new Error('Use singletone instance'); }
     }
 
-    async fetchEvent(filters, callback) {
-        const cached = this.readByFilter(filters);
-        if (cached.size > 0) {
-            callback([...cached][0]);
-        } else {
-            window.ndk.fetchEvent(filters).then((event) => {
-                this.write(event);
-                callback(event);
-            });
-        }
+    async fetchEvent(filters) {
+        return new Promise((resolve, reject) => {
+            const cached = this.readByFilter(filters);
+            if (cached.size > 0) {
+                callback([...cached][0]);
+            } else {
+                window.ndk.fetchEvent(filters).then((event) => {
+                    this.write(event);
+                    resolve(event);
+                });
+            }
+        });
     }
 
     async fetchEvents(filters, callback) {
@@ -62,7 +64,11 @@ export class Relay {
 
     // Publishes a note to all relays, and adds it to the local cache as well
     // Once the event has been published to external relays, the callback is called with the saved nostr event
-    async publish(kind, content, tags, callback) {
+    async publish(kind, content, tags, hexpubkey) {
+        if (hexpubkey && hexpubkey !== window.ndk.activeUser?.hexpubkey) {
+            throw new Error('NDK is configured with an unexpected pubkey');
+        }
+
         const event = new NDKEvent(window.ndk);
         event.kind = kind;
         event.content = content;
@@ -72,9 +78,7 @@ export class Relay {
             this.write(event);
         }
 
-        await event.publish().then((relaySet) => {
-            callback(event);
-        });
+        return event.publish().then(_relaySet => event);
     }
 
     // Publishes a kind 5 (delete request) event to relays,

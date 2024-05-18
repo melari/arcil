@@ -30,7 +30,7 @@ async function browseNote(identifier) {
 
   $("#note-content").html("<h2>🌱 loading...</h2>");
 
-  Relay.instance.fetchEvent(filters, async (event) => {
+  Relay.instance.fetchEvent(filters).then(async (event) => {
       if (!!event) {
           if (!!event.tags.find(t => t[0] === "private") && event.pubkey !== window.nostrUser?.hexpubkey) {
               PageContext.instance.setNote(Note.fromContent('', '### ❌ This note is private and cannot be decrypted.'));

@@ -113,7 +113,7 @@ function loadNote() {
 
     ensureConnected().then(async () => {
         const filter = PageContext.instance.noteFilterFromUrl();
-        Relay.instance.fetchEvent(filter, async (event) => {
+        Relay.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
                     await Database.instance.addFromNostrEvent(event);
@@ -239,7 +239,7 @@ async function publishNote(message) {
             tags.push(["a", backref]);
         });
 
-        return Relay.instance.publish(30023, window.MDEditor.value(), tags, async (saveEvent) => {
+        return Relay.instance.publish(30023, window.MDEditor.value(), tags).then(async (saveEvent) => {
             showNotice(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         });
@@ -263,7 +263,7 @@ function savePrivateNote() {
             ["private", "true"],
             ["published_at", Math.floor(Date.now() / 1000).toString()]
         ]
-        Relay.instance.publish(30023, content, tags,async (saveEvent) => {
+        Relay.instance.publish(30023, content, tags).then(async (saveEvent) => {
             showNotice("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })

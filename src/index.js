@@ -1,3 +1,4 @@
+require("./blossom.js");
 require("./browse.js");
 require("./nostr.js");
 require("./note.js");
