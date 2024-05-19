@@ -70,14 +70,27 @@ function openNoteInEditor() {
 }
 window.openNoteInEditor = openNoteInEditor;
 
-function bindPrefetchLinks() {
+function renderDynamicContent() {
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
     $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
         navigateToNote(e.target.title, e.target.innerText);
         return false; // block navigation
     });
+
+    $("[src='#blossom-src']").each(async (_, entity) => {
+        // prevents race conditions that cause the file to be fetched multiple times
+        entity.src = '#blossom-src-pending';
+
+        let match = entity.title.match(/blossom:\/\/(.*)/);
+        if (!match) { return; }
+
+        const hash = match[1];
+        const blobUrl = await Blossom.instance.fetchFile(hash, PageContext.instance.note.authorPubkey);
+
+        entity.src = blobUrl;
+    });
 }
-window.bindPrefetchLinks = bindPrefetchLinks;
+window.renderDynamicContent = renderDynamicContent;
 
 // When the browser back button is pressed
 window.addEventListener('popstate', (event) => {

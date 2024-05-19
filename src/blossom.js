@@ -13,13 +13,13 @@ export class Blossom {
     userServers = new Set();
     hexpubkey = null;
 
+    static instance = new Blossom();
     constructor(hexpubkey, useDefaultServers = false) {
-        this.hexpubkey = hexpubkey;
-        if (useDefaultServers) { this.userServers = new Set(Blossom.DEFAULT_SERVERS); }
+        if (!!Blossom.instance) { throw new Error('Use singleton instance'); }
     }
 
-    async fetchFile(hash) {
-        const urls = await this.urlsForFile(hash);
+    async fetchFile(hash, hexpubkey) {
+        const urls = await this.urlsForFile(hash, hexpubkey);
 
         for (const url of urls) {
             let response;
@@ -47,7 +47,7 @@ export class Blossom {
         throw new Error(`[404] blossom://${hash} was not found on any known servers`);
     }
 
-    async uploadFile(blob) {
+    async uploadFile(blob, hexpubkey) {
         const arrayBuffer = await new Response(blob).arrayBuffer();
         const wordArray = crypto.lib.WordArray.create(arrayBuffer);
         const fileHash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
@@ -64,7 +64,7 @@ export class Blossom {
             body: blob,
         };
 
-        const uploadUrls = await this.uploadUrls();
+        const uploadUrls = await this.uploadUrls(hexpubkey);
         const successfulUploads = await Promise.allSettled(uploadUrls.map(url => new Promise((resolve, reject) => {
             fetch(url, requestOptions).then(async response => {
                 const parsed = await response.json();
@@ -98,21 +98,26 @@ export class Blossom {
         return `Nostr ${authBase64}`;
     }
 
-    async urlsForFile(hash) {
-        return [...(await this.serverList())].map(server => {
+    async urlsForFile(hash, hexpubkey) {
+        return [...(await this.serverList(hexpubkey))].map(server => {
             try { return (new URL(hash, server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
-    async uploadUrls() {
-        return [...(await this.serverList())].map(server => {
+    async uploadUrls(hexpubkey) {
+        return [...(await this.serverList(hexpubkey))].map(server => {
             try { return (new URL('/upload', server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
-    async serverList() {
+    async serverList(hexpubkey) {
+        if (this.hexpubkey !== hexpubkey) {
+            this.hexpubkey = hexpubkey;
+            this.userServers = new Set();
+        }
+
         if (this.userServers.size > 0) {
             return this.userServers;
         }

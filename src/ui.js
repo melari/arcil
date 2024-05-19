@@ -293,7 +293,7 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
     const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
     $("#note-content").html(html);
-    bindPrefetchLinks();
+    renderDynamicContent();
     loadBackrefs();
 
     // editor
@@ -313,11 +313,52 @@ $(".connect-wallet").mouseleave(function() {
     renderConnectButtons({ hover: false });
 });
 
+async function uploadFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    return new Promise((resolve, reject) => {
+        ensureConnected().then(() => {
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+
+                reader.onloadend = async () => {
+                    const blob = new Blob([reader.result], { type: file.type });
+                    const hash = await Blossom.instance.uploadFile(blob, window.nostrUser.hexpubkey);
+                    resolve(hash);
+                }
+
+                if (file) {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reject('no file selected');
+                }
+            });
+
+            input.click();
+        });
+    });
+}
+
 function createMDE() {
     if (!!window.MDEditor) { window.MDEditor.toTextArea(); }
+
+    const test = {
+        name: "imageUpload",
+        className: "fa fa-upload",
+        title: "Upload image",
+        action: async (editor) => {
+            const hash = await uploadFile();
+            editor.codemirror.replaceSelection(`![](#blossom-src "blossom://${hash}")`);
+        }
+    };
+
     window.MDEditor = new SimpleMDE({
         toolbar: $(window).width() >= 750
-            ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
+            ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide", test]
             : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
         spellChecker: Preferences.instance.current.spellCheckEnabled,
         renderingConfig: {
@@ -379,7 +420,7 @@ async function loadBackrefs() {
             $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
             showBackrefs();
         });
-        bindPrefetchLinks();
+        renderDynamicContent();
     });
 }
 

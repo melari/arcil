@@ -12809,13 +12809,13 @@ class Blossom {
     userServers = new Set();
     hexpubkey = null;
 
+    static instance = new Blossom();
     constructor(hexpubkey, useDefaultServers = false) {
-        this.hexpubkey = hexpubkey;
-        if (useDefaultServers) { this.userServers = new Set(Blossom.DEFAULT_SERVERS); }
+        if (!!Blossom.instance) { throw new Error('Use singleton instance'); }
     }
 
-    async fetchFile(hash) {
-        const urls = await this.urlsForFile(hash);
+    async fetchFile(hash, hexpubkey) {
+        const urls = await this.urlsForFile(hash, hexpubkey);
 
         for (const url of urls) {
             let response;
@@ -12843,7 +12843,7 @@ class Blossom {
         throw new Error(`[404] blossom://${hash} was not found on any known servers`);
     }
 
-    async uploadFile(blob) {
+    async uploadFile(blob, hexpubkey) {
         const arrayBuffer = await new Response(blob).arrayBuffer();
         const wordArray = crypto.lib.WordArray.create(arrayBuffer);
         const fileHash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
@@ -12860,7 +12860,7 @@ class Blossom {
             body: blob,
         };
 
-        const uploadUrls = await this.uploadUrls();
+        const uploadUrls = await this.uploadUrls(hexpubkey);
         const successfulUploads = await Promise.allSettled(uploadUrls.map(url => new Promise((resolve, reject) => {
             fetch(url, requestOptions).then(async response => {
                 const parsed = await response.json();
@@ -12894,21 +12894,26 @@ class Blossom {
         return `Nostr ${authBase64}`;
     }
 
-    async urlsForFile(hash) {
-        return [...(await this.serverList())].map(server => {
+    async urlsForFile(hash, hexpubkey) {
+        return [...(await this.serverList(hexpubkey))].map(server => {
             try { return (new URL(hash, server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
-    async uploadUrls() {
-        return [...(await this.serverList())].map(server => {
+    async uploadUrls(hexpubkey) {
+        return [...(await this.serverList(hexpubkey))].map(server => {
             try { return (new URL('/upload', server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
-    async serverList() {
+    async serverList(hexpubkey) {
+        if (this.hexpubkey !== hexpubkey) {
+            this.hexpubkey = hexpubkey;
+            this.userServers = new Set();
+        }
+
         if (this.userServers.size > 0) {
             return this.userServers;
         }
@@ -13027,14 +13032,27 @@ function openNoteInEditor() {
 }
 window.openNoteInEditor = openNoteInEditor;
 
-function bindPrefetchLinks() {
+function renderDynamicContent() {
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
     $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
         navigateToNote(e.target.title, e.target.innerText);
         return false; // block navigation
     });
+
+    $("[src='#blossom-src']").each(async (_, entity) => {
+        // prevents race conditions that cause the file to be fetched multiple times
+        entity.src = '#blossom-src-pending';
+
+        let match = entity.title.match(/blossom:\/\/(.*)/);
+        if (!match) { return; }
+
+        const hash = match[1];
+        const blobUrl = await Blossom.instance.fetchFile(hash, PageContext.instance.note.authorPubkey);
+
+        entity.src = blobUrl;
+    });
 }
-window.bindPrefetchLinks = bindPrefetchLinks;
+window.renderDynamicContent = renderDynamicContent;
 
 // When the browser back button is pressed
 window.addEventListener('popstate', (event) => {
@@ -19395,7 +19413,7 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
     const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
     $("#note-content").html(html);
-    bindPrefetchLinks();
+    renderDynamicContent();
     loadBackrefs();
 
     // editor
@@ -19415,11 +19433,52 @@ $(".connect-wallet").mouseleave(function() {
     renderConnectButtons({ hover: false });
 });
 
+async function uploadFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    return new Promise((resolve, reject) => {
+        (0,common/* ensureConnected */.zs)().then(() => {
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+
+                reader.onloadend = async () => {
+                    const blob = new Blob([reader.result], { type: file.type });
+                    const hash = await Blossom.instance.uploadFile(blob, window.nostrUser.hexpubkey);
+                    resolve(hash);
+                }
+
+                if (file) {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reject('no file selected');
+                }
+            });
+
+            input.click();
+        });
+    });
+}
+
 function createMDE() {
     if (!!window.MDEditor) { window.MDEditor.toTextArea(); }
+
+    const test = {
+        name: "imageUpload",
+        className: "fa fa-upload",
+        title: "Upload image",
+        action: async (editor) => {
+            const hash = await uploadFile();
+            editor.codemirror.replaceSelection(`![](#blossom-src "blossom://${hash}")`);
+        }
+    };
+
     window.MDEditor = new SimpleMDE({
         toolbar: $(window).width() >= 750
-            ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide"]
+            ? ["bold", "italic", "strikethrough", "heading", "|", "code", "quote", "unordered-list", "ordered-list", "|", "link", "image", "table", "horizontal-rule", "|", "preview", "side-by-side", "fullscreen", "|", "guide", test]
             : ["bold", "italic", "heading", "|", "link", "image", "|", "preview", "guide"],
         spellChecker: Preferences.instance.current.spellCheckEnabled,
         renderingConfig: {
@@ -19481,7 +19540,7 @@ async function loadBackrefs() {
             $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
             showBackrefs();
         });
-        bindPrefetchLinks();
+        renderDynamicContent();
     });
 }
 
