@@ -14,7 +14,7 @@ export class Blossom {
     hexpubkey = null;
 
     static instance = new Blossom();
-    constructor(hexpubkey, useDefaultServers = false) {
+    constructor() {
         if (!!Blossom.instance) { throw new Error('Use singleton instance'); }
     }
 
@@ -47,10 +47,15 @@ export class Blossom {
         throw new Error(`[404] blossom://${hash} was not found on any known servers`);
     }
 
+    // On success returns:
+    // {
+    //   hash: 'abc123', 
+    //   downloadUrls: ['https://blossom.tagayasu.xyz/abc123', ...]
+    // }
     async uploadFile(blob, hexpubkey) {
         const arrayBuffer = await new Response(blob).arrayBuffer();
         const wordArray = crypto.lib.WordArray.create(arrayBuffer);
-        const fileHash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
+        const hash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
 
         const fileSize = blob.size;
         const auth = await this._nostrUploadAuth(fileSize);
@@ -68,16 +73,18 @@ export class Blossom {
         const successfulUploads = await Promise.allSettled(uploadUrls.map(url => new Promise((resolve, reject) => {
             fetch(url, requestOptions).then(async response => {
                 const parsed = await response.json();
-                if (parsed.sha256 === fileHash) { resolve(parsed.url); }
+                if (parsed.sha256 === hash) { resolve(parsed.url); }
                 else { reject('return hash did not match expected. Discarding'); }
             }).catch(reason => reject(reason));
         })));
 
-        if (successfulUploads.filter(r => r.status === 'fulfilled').length === 0) {
+        const downloadUrls = successfulUploads.filter(r => r.status === 'fulfilled').map(r => r.value);
+
+        if (downloadUrls.length === 0) {
             Promise.reject('failed to upload file to any blossom servers')
         }
 
-        return Promise.resolve(fileHash);
+        return Promise.resolve({ hash, downloadUrls });
     }
 
     async _nostrUploadAuth(fileSize) {

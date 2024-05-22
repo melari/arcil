@@ -12810,7 +12810,7 @@ class Blossom {
     hexpubkey = null;
 
     static instance = new Blossom();
-    constructor(hexpubkey, useDefaultServers = false) {
+    constructor() {
         if (!!Blossom.instance) { throw new Error('Use singleton instance'); }
     }
 
@@ -12843,10 +12843,15 @@ class Blossom {
         throw new Error(`[404] blossom://${hash} was not found on any known servers`);
     }
 
+    // On success returns:
+    // {
+    //   hash: 'abc123', 
+    //   downloadUrls: ['https://blossom.tagayasu.xyz/abc123', ...]
+    // }
     async uploadFile(blob, hexpubkey) {
         const arrayBuffer = await new Response(blob).arrayBuffer();
         const wordArray = crypto.lib.WordArray.create(arrayBuffer);
-        const fileHash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
+        const hash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
 
         const fileSize = blob.size;
         const auth = await this._nostrUploadAuth(fileSize);
@@ -12864,16 +12869,18 @@ class Blossom {
         const successfulUploads = await Promise.allSettled(uploadUrls.map(url => new Promise((resolve, reject) => {
             fetch(url, requestOptions).then(async response => {
                 const parsed = await response.json();
-                if (parsed.sha256 === fileHash) { resolve(parsed.url); }
+                if (parsed.sha256 === hash) { resolve(parsed.url); }
                 else { reject('return hash did not match expected. Discarding'); }
             }).catch(reason => reject(reason));
         })));
 
-        if (successfulUploads.filter(r => r.status === 'fulfilled').length === 0) {
+        const downloadUrls = successfulUploads.filter(r => r.status === 'fulfilled').map(r => r.value);
+
+        if (downloadUrls.length === 0) {
             Promise.reject('failed to upload file to any blossom servers')
         }
 
-        return Promise.resolve(fileHash);
+        return Promise.resolve({ hash, downloadUrls });
     }
 
     async _nostrUploadAuth(fileSize) {
@@ -13005,7 +13012,7 @@ async function browseNote(identifier) {
               kinds: [30023],
               "#d": aTags.map(t => t.split(':')[2])
           }
-          _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters, (_) => {});
+          _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters);
       } else {
           const stubTitle = PageContext.instance.noteTitleFromUrl();
           if (!!PageContext.instance.noteIdentifierFromUrl()) {
@@ -13039,14 +13046,14 @@ function renderDynamicContent() {
         return false; // block navigation
     });
 
-    $("[src='#blossom-src']").each(async (_, entity) => {
-        // prevents race conditions that cause the file to be fetched multiple times
-        entity.src = '#blossom-src-pending';
-
+    $("[title^='blossom://']").each(async (_, entity) => {
         let match = entity.title.match(/blossom:\/\/(.*)/);
         if (!match) { return; }
-
         const hash = match[1];
+
+        // prevents race conditions that cause the file to be fetched multiple times
+        entity.title = 'loading';
+
         const blobUrl = await Blossom.instance.fetchFile(hash, PageContext.instance.note.authorPubkey);
 
         entity.src = blobUrl;
@@ -18763,16 +18770,18 @@ class Relay {
         });
     }
 
-    async fetchEvents(filters, callback) {
-        const cached = this.readByFilter(filters);
-        if (cached.size > 0) {
-            callback(cached);
-        } else {
-            window.ndk.fetchEvents(filters).then((events) => {
-                events.forEach(e => this.write(e));
-                callback(events);
-            });
-        }
+    async fetchEvents(filters) {
+        return new Promise((resolve, reject) => {
+            const cached = this.readByFilter(filters);
+            if (cached.size > 0) {
+                resolve(cached);
+            } else {
+                window.ndk.fetchEvents(filters).then((events) => {
+                    events.forEach(e => this.write(e));
+                    resolve(events);
+                });
+            }
+        });
     }
 
     // subscribe does a combination of checking cache and external relays
@@ -19447,8 +19456,8 @@ async function uploadFile() {
 
                 reader.onloadend = async () => {
                     const blob = new Blob([reader.result], { type: file.type });
-                    const hash = await Blossom.instance.uploadFile(blob, window.nostrUser.hexpubkey);
-                    resolve(hash);
+                    const result = await Blossom.instance.uploadFile(blob, window.nostrUser.hexpubkey);
+                    resolve(result);
                 }
 
                 if (file) {
@@ -19471,8 +19480,8 @@ function createMDE() {
         className: "fa fa-upload",
         title: "Upload image",
         action: async (editor) => {
-            const hash = await uploadFile();
-            editor.codemirror.replaceSelection(`![](#blossom-src "blossom://${hash}")`);
+            const result = await uploadFile();
+            editor.codemirror.replaceSelection(`![](${result.downloadUrls[0]} "blossom://${result.hash}")`);
         }
     };
 
@@ -19533,7 +19542,7 @@ async function loadBackrefs() {
         kinds: [30023],
         "#a": [(0,common/* atagFor */.Mf)(title, hexpubkey)]
     };
-    relay/* Relay */.Z.instance.fetchEvents(filters, (events) => {
+    relay/* Relay */.Z.instance.fetchEvents(filters).then((events) => {
         events.forEach(function(event) {
             const title = event.tags.find(t => t[0] == "title")[1];
             const handle = (0,common/* handleFor */.t4)(title, event.pubkey);

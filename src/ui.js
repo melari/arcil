@@ -327,8 +327,8 @@ async function uploadFile() {
 
                 reader.onloadend = async () => {
                     const blob = new Blob([reader.result], { type: file.type });
-                    const hash = await Blossom.instance.uploadFile(blob, window.nostrUser.hexpubkey);
-                    resolve(hash);
+                    const result = await Blossom.instance.uploadFile(blob, window.nostrUser.hexpubkey);
+                    resolve(result);
                 }
 
                 if (file) {
@@ -351,8 +351,8 @@ function createMDE() {
         className: "fa fa-upload",
         title: "Upload image",
         action: async (editor) => {
-            const hash = await uploadFile();
-            editor.codemirror.replaceSelection(`![](#blossom-src "blossom://${hash}")`);
+            const result = await uploadFile();
+            editor.codemirror.replaceSelection(`![](${result.downloadUrls[0]} "blossom://${result.hash}")`);
         }
     };
 
@@ -413,7 +413,7 @@ async function loadBackrefs() {
         kinds: [30023],
         "#a": [atagFor(title, hexpubkey)]
     };
-    Relay.instance.fetchEvents(filters, (events) => {
+    Relay.instance.fetchEvents(filters).then((events) => {
         events.forEach(function(event) {
             const title = event.tags.find(t => t[0] == "title")[1];
             const handle = handleFor(title, event.pubkey);

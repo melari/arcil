@@ -43,7 +43,7 @@ async function browseNote(identifier) {
               kinds: [30023],
               "#d": aTags.map(t => t.split(':')[2])
           }
-          Relay.instance.fetchEvents(filters, (_) => {});
+          Relay.instance.fetchEvents(filters);
       } else {
           const stubTitle = PageContext.instance.noteTitleFromUrl();
           if (!!PageContext.instance.noteIdentifierFromUrl()) {
@@ -77,14 +77,14 @@ function renderDynamicContent() {
         return false; // block navigation
     });
 
-    $("[src='#blossom-src']").each(async (_, entity) => {
-        // prevents race conditions that cause the file to be fetched multiple times
-        entity.src = '#blossom-src-pending';
-
+    $("[title^='blossom://']").each(async (_, entity) => {
         let match = entity.title.match(/blossom:\/\/(.*)/);
         if (!match) { return; }
-
         const hash = match[1];
+
+        // prevents race conditions that cause the file to be fetched multiple times
+        entity.title = 'loading';
+
         const blobUrl = await Blossom.instance.fetchFile(hash, PageContext.instance.note.authorPubkey);
 
         entity.src = blobUrl;

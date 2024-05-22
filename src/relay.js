@@ -35,16 +35,18 @@ export class Relay {
         });
     }
 
-    async fetchEvents(filters, callback) {
-        const cached = this.readByFilter(filters);
-        if (cached.size > 0) {
-            callback(cached);
-        } else {
-            window.ndk.fetchEvents(filters).then((events) => {
-                events.forEach(e => this.write(e));
-                callback(events);
-            });
-        }
+    async fetchEvents(filters) {
+        return new Promise((resolve, reject) => {
+            const cached = this.readByFilter(filters);
+            if (cached.size > 0) {
+                resolve(cached);
+            } else {
+                window.ndk.fetchEvents(filters).then((events) => {
+                    events.forEach(e => this.write(e));
+                    resolve(events);
+                });
+            }
+        });
     }
 
     // subscribe does a combination of checking cache and external relays
