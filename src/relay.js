@@ -25,7 +25,7 @@ export class Relay {
         return new Promise((resolve, reject) => {
             const cached = this.readByFilter(filters);
             if (cached.size > 0) {
-                callback([...cached][0]);
+                resolve([...cached][0]);
             } else {
                 window.ndk.fetchEvent(filters).then((event) => {
                     this.write(event);
