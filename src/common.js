@@ -14,7 +14,8 @@ window.relays = {
     "wss://relay.nostr.band",
     "wss://offchain.pub",
     "wss://purplerelay.com",
-    "wss://nostr.bitcoiner.social"
+    "wss://nostr.bitcoiner.social",
+    "wss://thecitadel.nostr1.com"
   ],
   active: []
 }
