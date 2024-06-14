@@ -132,17 +132,19 @@ export class Relay {
 
     // Tries to load events from the cache using the filter. Not all possible
     // filters are supported. The expectation is to have:
-    // - hexpubkey
-    // - kind
-    // - ONE of "#d" or other tag in INDEXED_TAGS
+    // - EXACTLY ONE hexpubkey
+    // - ONE OR MORE kind
+    // - EXACTLY ONE of:
+    //   - "#d" tag
+    //   - other tag in INDEXED_TAGS
     //
-    // Each of these filter should in turn have only ONE value
+    // Performance: there will be one index lookup PER kind.
     // 
     // Example structure of nostr filter:
     // {
     //   #d: ['value'],
     //   authors: ['hexpubkey'],
-    //   kinds: [30023]
+    //   kinds: [30023, 31234]
     // }
     readByFilter(filter) {
         const supportedTags = ['#d', ...Relay.INDEXED_TAGS.map(t => `#${t}`)];
@@ -153,20 +155,21 @@ export class Relay {
 
         const tagToUse = tagsGiven[0];
 
-        if (filter.authors.length > 1 || filter.kinds.length > 1 || filter[tagToUse].length > 1) {
+        if (filter.authors.length > 1 || filter[tagToUse].length > 1) {
             return new Set();
         }
 
-        const kind = filter.kinds[0];
         const hexpubkey = filter.authors[0];
         const tagKind = tagToUse.slice(1);
         const tagValue = filter[tagToUse][0];
 
-        if (tagToUse === '#d') {
-            return this.readPrimaryIndex(kind, hexpubkey, tagValue);
-        }
-
-        return this.readTagIndex(kind, hexpubkey, tagKind, tagValue);
+        return filter.kinds.reduce((acc, kind) => {
+            const result = tagToUse === '#d'
+                ? this.readPrimaryIndex(kind, hexpubkey, tagValue)
+                : this.readTagIndex(kind, hexpubkey, tagKind, tagValue);
+            for (const item of result) { acc.add(item); }
+            return acc;
+        }, new Set());
     }
 
     readPrimaryIndex(kind, hexpubkey, dTag) {
