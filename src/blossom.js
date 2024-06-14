@@ -155,7 +155,7 @@ export class Blossom {
 
         const tags = [];
         this.userServers.forEach(server => tags.push(["server", server]));
-        return Relay.instance.publish(Blossom.SERVER_HINT_EVENT_KIND, '', tags, this.hexpubkey);
+        return Relay.instance.buildAndPublish(Blossom.SERVER_HINT_EVENT_KIND, '', tags, this.hexpubkey);
     }
 }
 window.Blossom = Blossom;

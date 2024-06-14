@@ -50,7 +50,7 @@ class Preferences {
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
             const content = await encryptSelf(JSON.stringify(this.current));
-            Relay.instance.publish(Preferences.KIND, content, tags).then((saveEvent) => {
+            Relay.instance.buildAndPublish(Preferences.KIND, content, tags).then((saveEvent) => {
                 showNotice("Your preferences have been saved.");
             });
         });

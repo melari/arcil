@@ -64,9 +64,23 @@ export class Relay {
         return subscription;
     }
 
+    // Build & Publishes a note to all relays, and adds it to the local cache as well
+    async buildAndPublish(kind, content, tags, hexpubkey) {
+        const event = this.buildEvent(kind, content, tags, hexpubkey);
+        return await publish(event);
+    }
+
     // Publishes a note to all relays, and adds it to the local cache as well
-    // Once the event has been published to external relays, the callback is called with the saved nostr event
-    async publish(kind, content, tags, hexpubkey) {
+    async publish(event) {
+        if (event.kind !== Relay.DELETE_EVENT_KIND) {
+            this.write(event);
+        }
+
+        return event.publish().then(_relaySet => event);
+    }
+
+    // Builds an unsigned NDKEvent
+    buildEvent(kind, content, tags, hexpubkey) {
         if (hexpubkey && hexpubkey !== window.ndk.activeUser?.hexpubkey) {
             throw new Error('NDK is configured with an unexpected pubkey');
         }
@@ -76,11 +90,7 @@ export class Relay {
         event.content = content;
         event.tags = tags;
 
-        if (kind !== Relay.DELETE_EVENT_KIND) {
-            this.write(event);
-        }
-
-        return event.publish().then(_relaySet => event);
+        return event;
     }
 
     // Publishes a kind 5 (delete request) event to relays,
@@ -96,7 +106,7 @@ export class Relay {
             }
         });
 
-        return this.publish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
+        return this.buildAndPublish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
     }
 
     write(note) {

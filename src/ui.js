@@ -1,4 +1,4 @@
-import { handleFor, delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptNote } from "./common.js"
+import { handleFor, delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptSelf } from "./common.js"
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
@@ -223,23 +223,9 @@ function saveNote() {
 window.saveNote = saveNote;
 
 async function publishNote(message) {
-    return ensureConnected().then(() => {
-        const title = $("#note-title").val();
-        if (dtagFor(title) == "tagayasu-") {
-            showError("Title cannot be empty");
-            return;
-        }
-
-        const tags = [
-            ["d", dtagFor(title)],
-            ["title", title],
-            ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ];
-        MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-            tags.push(["a", backref]);
-        });
-
-        return Relay.instance.publish(30023, window.MDEditor.value(), tags).then(async (saveEvent) => {
+    return ensureConnected().then(async () => {
+        const event = buildNoteFromEditor();
+        return Relay.instance.publish(event).then(async (saveEvent) => {
             showNotice(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         });
@@ -250,26 +236,43 @@ function savePrivateNote() {
     showPending("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     ensureConnected().then(async () => {
-        const title = $("#note-title").val();
-        if (dtagFor(title) == "tagayasu-") {
-            showError("Title cannot be empty");
-            return;
-        }
-
-        const content = await encryptNote(title, window.MDEditor.value());
+        const event = buildNoteFromEditor();
+        const payload = await encryptSelf(JSON.stringify(event.rawEvent()));
         const tags = [
-            ["d", dtagFor(title)],
-            ["title", "DRAFT"],
-            ["private", "true"],
-            ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ]
-        Relay.instance.publish(30023, content, tags).then(async (saveEvent) => {
+            ['d', event.tags.find((t) => t[0] === 'd')[1]],
+            ['k', event.kind.toString()],
+        ];
+        const draftEvent = Relay.instance.buildEvent(31234, payload, tags);
+        Relay.instance.publish(draftEvent).then(async (saveEvent) => {
             showNotice("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
 window.savePrivateNote = savePrivateNote;
+
+function buildNoteFromEditor() {
+    const title = $("#note-title").val();
+    const dtag = dtagFor(title);
+    if (dtag == "tagayasu-") {
+        showError("Title cannot be empty");
+        return;
+    }
+
+    const kind = 30023;
+    const content = window.MDEditor.value();
+    const tags = [
+        ["d", dtag],
+        ["title", title],
+        ["published_at", Math.floor(Date.now() / 1000).toString()]
+    ];
+
+    MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
+        tags.push(["a", backref]);
+    });
+
+    return Relay.instance.buildEvent(kind, content, tags);
+}
 
 async function viewPublishedNote() {
     window.location.href = window.router.urlFor(Router.BROWSER, PageContext.instance.note.handle);
