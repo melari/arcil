@@ -204,8 +204,8 @@ export function atagFor(title, hexpubkey) {
 }
 
 export async function encryptSelf(text) {
-  if (!!window.nostr && !!window.nostr.nip04) {
-    return window.nostr.nip04.encrypt(window.nostrUser.hexpubkey, text);
+  if (!!window.nostr && !!window.nostr.nip44) {
+    return window.nostr.nip44.encrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
     return Promise.resolve(crypto.AES.encrypt(text, window.sessionStorage.privateKey).toString());
   } else {
@@ -214,8 +214,8 @@ export async function encryptSelf(text) {
 }
 
 export async function decryptSelf(text) {
-  if (!!window.nostr && !!window.nostr.nip04) {
-    return window.nostr.nip04.decrypt(window.nostrUser.hexpubkey, text);
+  if (!!window.nostr && !!window.nostr.nip44) {
+    return window.nostr.nip44.decrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
     return Promise.resolve(crypto.AES.decrypt(text, window.sessionStorage.privateKey).toString(crypto.enc.Utf8));
   } else {
