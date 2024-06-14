@@ -11,9 +11,18 @@ export class Database {
     notes = {};
     noteTitleTrie = new Trie();
 
+    // Drafts are stored as a wrapper note with an encrypted note inside.
+    // Therefore the ID of the wrapper note will not match the actual inner note
+    // To support looking up a note by the wrapper ID, we keep a map of wrapper -> inner IDs
+    draftIdMap = {};
+
     static instance = new Database();
     constructor() {
         if (!!Database.instance) { throw new Error('Use singleton instance'); }
+    }
+
+    getNote(id) {
+        return this.notes[id] ?? this.notes[this.draftIdMap[id]];
     }
 
     clear() {
@@ -42,11 +51,14 @@ export class Database {
     }
 
     async addFromNostrEvent(event) {
-        this.addNote(await Note.fromNostrEvent(event));
+        const note = await Note.fromNostrEvent(event);
+        if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
+        this.addNote(note);
         this.pushStateToLocalStorage(window.nostrUser.npub);
+        return note;
     }
 
-    addNote(note) {
+    addNote(note, draftId = null) {
         if (this.notes[note.id]) { return; }
 
         this.notes[note.id] = note;

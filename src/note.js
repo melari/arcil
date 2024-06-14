@@ -1,23 +1,21 @@
-import { dtagFor, handleFor, decryptNote } from "./common.js";
+import { dtagFor, handleFor, decryptSelf } from "./common.js";
 
 export class Note {
     static async fromNostrEvent(event) {
-        const note = new Note();
-        note.id = event.id;
-        note.nostrEvent = event;
-        note.title = event.tags.find(t => t[0] == "title")[1];
-        note.private = !!event.tags.find(t => t[0] == "private");
-        note.content = event.content;
-        note.originalContent = event.content;
-        note.authorPubkey = event.pubkey;
-        note.createdAt = event.created_at;
-        note.onRelays = [];
+        const nostrEvent =
+            event.kind === 31234
+                ? JSON.parse(await decryptSelf(event.content))
+                : event.rawEvent();
 
-        if (note.private) {
-            const { title, content } = await decryptNote(note.content);
-            note.title = title;
-            note.content = content;
-        }
+        const note = new Note();
+        note.id = nostrEvent.id;
+        note.nostrEvent = nostrEvent;
+        note.title = nostrEvent.tags.find(t => t[0] == "title")[1];
+        note.private = event.kind === 31234;
+        note.content = nostrEvent.content;
+        note.authorPubkey = nostrEvent.pubkey;
+        note.createdAt = nostrEvent.created_at;
+        note.onRelays = [];
 
         return note;
     }
@@ -26,7 +24,6 @@ export class Note {
         const note = new Note();
         note.title = title;
         note.content = content;
-        note.originalContent = content;
         note.private = false;
         note.onRelays = [];
         return note;
@@ -44,8 +41,8 @@ export class Note {
         return {
             id: this.id,
             private: this.private,
-            title: this.private ? 'private' : this.title,
-            content: this.originalContent,
+            title: this.title,
+            content: this.content,
             pubkey: this.authorPubkey,
             createdAt: this.createdAt,
         };
@@ -56,17 +53,10 @@ export class Note {
         note.id = plain.id;
         note.private = plain.private;
         note.authorPubkey = plain.pubkey;
-        note.originalContent = plain.content;
         note.content = plain.content;
         note.title = plain.title;
         note.createdAt = plain.createdAt;
         note.onRelays = [];
-
-        if (note.private) {
-            const { title, content } = await decryptNote(note.content);
-            note.title = title;
-            note.content = content;
-        }
 
         return note;
     }

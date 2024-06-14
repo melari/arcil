@@ -40,7 +40,7 @@ async function browseNote(identifier) {
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
               authors: [event.pubkey],
-              kinds: [30023],
+              kinds: [30023, 31234],
               "#d": aTags.map(t => t.split(':')[2])
           }
           Relay.instance.fetchEvents(filters);

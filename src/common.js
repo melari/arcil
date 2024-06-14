@@ -223,24 +223,6 @@ export async function decryptSelf(text) {
   }
 }
 
-export async function encryptNote(title, content) {
-  const titleLength = title.length;
-  const body = `${titleLength}:${title}${content}`;
-  return await encryptSelf(body);
-}
-
-export async function decryptNote(cyphertext) {
-  const body = await decryptSelf(cyphertext);
-  const titleLength = parseInt(body.slice(0, body.indexOf(":")));
-
-  const titleOffset = body.indexOf(":") + 1;
-  const contentOffset = titleOffset + titleLength;
-
-  const title = body.slice(titleOffset, contentOffset);
-  const content = body.slice(contentOffset);
-  return { title, content };
-}
-
 export function npubToHexpubkey(npub) {
   const decoded = nip19.decode(npub);
   if (decoded.type !== "npub") {
@@ -263,19 +245,19 @@ export function noteFilterFromIdentifier(explicitIdentifier) {
     if (!explicitIdentifier) {
         return {
             authors: [hexpubkey],
-            kinds: [30023],
+            kinds: [30023, 31234],
             "#d": [dtagFor("homepage")]
         };
     }
 
     const potentialFilter = filterFromId(explicitIdentifier);
-    if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
+    if (!potentialFilter.kinds || potentialFilter.kinds == [30023]) { potentialFilter.kinds = [30023, 31234]; }
     if (!!potentialFilter["#d"]) { return potentialFilter; }
     if (!hexpubkey) { return null; }
 
     return {
         authors: [hexpubkey],
-        kinds: [30023],
+        kinds: [30023, 31234],
         "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
     };
 }

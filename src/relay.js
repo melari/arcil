@@ -89,6 +89,8 @@ export class Relay {
         event.kind = kind;
         event.content = content;
         event.tags = tags;
+        event.pubkey = window.ndk.activeUser?.hexpubkey;
+        event.id = event.getEventHash();
 
         return event;
     }

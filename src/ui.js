@@ -75,7 +75,7 @@ window.showPublishModal = showPublishModal;
 
 async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
-    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
+    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023, 31234] }
 
     const subscription = await Relay.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
@@ -91,7 +91,7 @@ async function fetchNotes() {
         let foundNew = false;
         subscription.eventsPerRelay.forEach((eventIds, relay) => {
             for (const eventId of eventIds) {
-                const note = Database.instance.notes[eventId];
+                const note = Database.instance.getNote(eventId);
                 if (note && !note.onRelays.includes(relay)) {
                     note.onRelays.push(relay);
                     foundNew = true;
@@ -116,8 +116,8 @@ function loadNote() {
         Relay.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
-                    await Database.instance.addFromNostrEvent(event);
-                    editNote(event.id);
+                    const note = await Database.instance.addFromNostrEvent(event);
+                    editNote(note.id);
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
@@ -154,7 +154,7 @@ function searchNotes() {
 
     let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
-        const note = Database.instance.notes[noteId];
+        const note = Database.instance.getNote(noteId);
         if (!note) { return; }
         if (notesDisplayed > 20) { return; }
         let noteRelays = "";
@@ -175,7 +175,7 @@ window.searchNotes = searchNotes;
 window.tooltipList = [];
 
 async function editNote(noteId) {
-    PageContext.instance.setNote(Database.instance.notes[noteId]);
+    PageContext.instance.setNote(Database.instance.getNote(noteId));
 }
 window.editNote = editNote
 
@@ -413,7 +413,7 @@ async function loadBackrefs() {
 
     const filters = {
         authors: [hexpubkey],
-        kinds: [30023],
+        kinds: [30023, 31234],
         "#a": [atagFor(title, hexpubkey)]
     };
     Relay.instance.fetchEvents(filters).then((events) => {
