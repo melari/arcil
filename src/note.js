@@ -14,7 +14,7 @@ export class Note {
         note.private = event.kind === 31234;
         note.content = nostrEvent.content;
         note.authorPubkey = nostrEvent.pubkey;
-        note.createdAt = nostrEvent.created_at;
+        note.createdAt = nostrEvent.created_at ?? event.created_at;
         note.onRelays = [];
 
         return note;

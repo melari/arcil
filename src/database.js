@@ -58,7 +58,7 @@ export class Database {
         return note;
     }
 
-    addNote(note, draftId = null) {
+    addNote(note) {
         if (this.notes[note.id]) { return; }
 
         this.notes[note.id] = note;

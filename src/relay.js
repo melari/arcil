@@ -25,7 +25,7 @@ export class Relay {
         return new Promise((resolve, reject) => {
             const cached = this.readByFilter(filters);
             if (cached.size > 0) {
-                resolve([...cached][0]);
+                resolve(this.latest(cached));
             } else {
                 window.ndk.fetchEvent(filters).then((event) => {
                     this.write(event);
@@ -190,6 +190,16 @@ export class Relay {
 
     tagIndexKey(kind, hexpubkey, tagKind, tagValue) {
         return `${kind}:${hexpubkey}:${tagKind}/${tagValue}`;
+    }
+
+    latest(eventSet) {
+        let result = undefined;
+        for (const event of eventSet) {
+            if (!result || event.created_at > result.created_at) {
+                result = event;
+            }
+        }
+        return result;
     }
 }
 window.Relay = Relay;
