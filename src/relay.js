@@ -67,7 +67,7 @@ export class Relay {
     // Build & Publishes a note to all relays, and adds it to the local cache as well
     async buildAndPublish(kind, content, tags, hexpubkey) {
         const event = this.buildEvent(kind, content, tags, hexpubkey);
-        return await publish(event);
+        return await this.publish(event);
     }
 
     // Publishes a note to all relays, and adds it to the local cache as well
