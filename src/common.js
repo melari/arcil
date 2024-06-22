@@ -34,7 +34,6 @@ export function shortHash(input, length = 64) {
 // Swaps between connected / disconnected
 export async function toggleConnect() {
   if (window.nip07signer) {
-    $(".connect-wallet").text("Connect");
     await disconnectNostr();
     return ensureReadonlyConnected().then(() => {
       window.dispatchEvent(new Event(Wallet.WALLET_DISCONNECTED_EVENT));

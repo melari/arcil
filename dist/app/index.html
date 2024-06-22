@@ -85,14 +85,44 @@ tbody, td, tfoot, th, thead, tr {
     margin-right: 20px;
 }
 
+.btn-subtle {
+    background: #e5e2e8;
+    color: #858288;
+}
+
 .connect-wallet {
     float: right;
     font-weight: bold;
     overflow: hidden;
 }
 
+.avatar-main {
+    font-weight: bold;
+    overflow: hidden;
+    width: 40px;
+    height: 40px;
+    padding: 0px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.avatar-main img {
+    min-width: 100%;
+    min-height: 100%;
+    object-fit: cover;
+}
+
+.avatar-inline img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    margin-right: 10px;
+}
+
 .navbar-main {
-   border-bottom: 1px solid; 
+   border-bottom: 1px solid;
+   padding: 5px 10px;
 }
 .navbar-bottom {
     border-top: 1px solid;
@@ -147,7 +177,8 @@ tbody, td, tfoot, th, thead, tr {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 100px);
-    padding: 10px;
+    padding: 0px;
+    border-left: 1px solid;
 }
 .notes-list {
     overflow: hidden;
@@ -212,6 +243,42 @@ tbody, td, tfoot, th, thead, tr {
     padding: 50px 0px;
 }
 
+.editor-toolbar, .CodeMirror {
+    border: none;
+}
+
+.container-fluid {
+    padding: 0px;
+}
+
+.dropdown-menu {
+    float: right;
+}
+
+.settings-list {
+    padding-right: 0px;
+    border-right: 1px solid #8e30eb;
+}
+
+.settings-list .active {
+    background-color: #8e30eb;
+}
+
+.settings-list .list-group, .settings-list .active {
+    border-color: #ddd;
+}
+
+.settings-npub {
+    font-size: 0.5em;
+    color: #bbb;
+    vertical-align: middle;
+}
+
+.settings-list-item:hover {
+    cursor: pointer;
+}
+
+
 </style>
 </head>
 
@@ -224,12 +291,14 @@ tbody, td, tfoot, th, thead, tr {
                 <a href="/" class="navbar-brand mb-2 mb-lg-0 text-center text-lg-start d-none d-lg-block"><span class="jp">耕す</span> t a g a y a s u</a>
                 <div class="d-flex flex-row justify-content-between justify-content-lg-end mt-lg-0 ml-lg-auto w-100 w-lg-auto" style="height:38px;">
                     <button class="btn btn-link mb-2 mb-lg-0" onclick="showMyNotes()">My Notes</button>
-                    <button class="btn connect-wallet" onclick="connectWalletApp()">Connect</button>
+                    <button class="btn connect-wallet" onclick="connectWallet()">Connect</button>
+                    <button class="btn btn-subtle avatar-main avatar" style="display:none" onclick="showSettings()"></button>
                 </div>
             </div>
         </nav>
         <div class="row">
-            <div class="col-lg-12 notes-editor"><textarea></textarea></div>
+            <div class="col-lg-3">hello</div>
+            <div class="col-lg-9 notes-editor"><textarea></textarea></div>
         </div>
         <nav class="navbar fixed-bottom navbar-bottom">
             <div class="d-flex flex-row align-items-md-center w-100">
@@ -354,7 +423,8 @@ tbody, td, tfoot, th, thead, tr {
                 <a href="/" class="navbar-brand mb-2 mb-lg-0 text-center text-lg-start d-none d-lg-block"><span class="jp">耕す</span> t a g a y a s u</a>
                 <div class="d-flex flex-row justify-content-between justify-content-lg-end mt-lg-0 ml-lg-auto w-100 w-lg-auto" style="height:38px;">
                     <button class="btn btn-link mb-2 mb-lg-0 owner-only" onclick="openNoteInEditor()"><i class="fa fa-pencil" aria-hidden="true"></i> open in editor</button>
-                    <button class="btn connect-wallet" onclick="connectWalletApp()">Connect</button>
+                    <button class="btn connect-wallet" onclick="connectWallet()">Connect</button>
+                    <button class="btn btn-subtle avatar-main avatar" style="display:none" onclick="showSettings()"></button>
                 </div>
             </div>
         </nav>
@@ -378,7 +448,8 @@ tbody, td, tfoot, th, thead, tr {
             <nav class="navbar navbar-main">
                 <a href="/" class="navbar-brand"><span class="jp">耕す</span> t a g a y a s u</a>
                 <div style="flex-grow: 1;">&nbsp;</div>
-                <button class="btn connect-wallet" onclick="connectWalletBrowse()">Connect</button>
+                    <button class="btn connect-wallet" onclick="connectWallet()">Connect</button>
+                    <button class="btn btn-subtle avatar-main avatar" style="display:none" onclick="showSettings()"></button>
             </nav>
             <div class="row">
                 <div class="col-lg-12">
@@ -387,7 +458,7 @@ tbody, td, tfoot, th, thead, tr {
                     <ul>
                         <li>Type: TXT</li>
                         <li>Host: npub</li>
-                        <li>Value: <span id="help-npub">your public key (connect wallet to see your key here)</span></li>
+                        <li>Value: <span id="npub">your public key (connect wallet to see your key here)</span></li>
                     </ul>
                 </div>
             </div>
@@ -424,7 +495,86 @@ tbody, td, tfoot, th, thead, tr {
         </form>
       </div>
     </div>
-  </div>
+</div>
+
+
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="settingsModalLabel"><span class="avatar-inline avatar"></span><span class="username"></span> <span class="settings-npub">(<span class="npub"></span>)<span></h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="row">
+            <div class="col-3 settings-list">
+                <ul class="list-group list-group-flush">
+                    <li id="settings-relays" class="settings-list-item list-group-item list-group-item-action active" onclick="openSettings('relays')">Relays</li>
+                    <li id="settings-editor-preferences" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('editor-preferences')">Editor Preferences</li>
+                    <li id="settings-file-storage" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('file-storage')">File Storage</li>
+                    <li id="settings-dns-link" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('dns-link')">DNS Link</li>
+                    <li class="settings-list-item list-group-item list-group-item-action list-group-item-danger" onclick="connectWallet()">Log Out</li>
+                </ul>
+            </div>
+
+            <div id="settings-page-relays" class="settings-page col-9">
+                relays
+            </div>
+
+            <div id="settings-page-editor-preferences" class="settings-page col-9" style="display:none">
+                <form class="form-inline" action="#">
+                    <div class="modal-body">
+                        <div class="row">
+                            <h3>Editor Preferences</h3>
+                            <div clas="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-spellcheck">
+                                    <label class="form-check-label" for="editor-prefs-spellcheck">Spellcheck Highlighting</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-aggressive-delete">
+                                    <label class="form-check-label" for="editor-prefs-aggressive-delete">Aggressive Delete <small>(empty out note content before deleting)</small></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <input type="submit" class="btn" value="Save" onclick="savePreferences()" />
+                    </div>
+                </form>
+            </div>
+
+
+            <div id="settings-page-file-storage" class="settings-page col-9" style="display:none">
+                file-storage
+            </div>
+
+            <div id="settings-page-dns-link" class="settings-page col-9" style="display:none">
+                <div class="modal-body">
+                    <h3>DNS Link</h3>
+
+                    <p>
+                        When hosting Tagayasu on your own domain, you can use human-friendly URLs by linking your npub to the domain.
+                        To do so, you need to configure the below record on your nameserver:
+                        <ul>
+                            <li>Type: TXT</li>
+                            <li>Host: npub</li>
+                            <li>Value: <span class="npub" style="display:block; overflow:overlay">your public key (connect wallet to see your key here)</span></li>
+                        </ul>
+                    </p>
+
+                    <blockquote>
+                        <h4>💡 Tips</h4>
+                        <p>The note that will be shown when visiting your root domain is the note titled <code>homepage</code>.</p>
+                        <p>Want to use your domain but not self host? Shoot me a DM and I'll whitelist your domain to point at the tagayasu.xyz servers</p>
+                    </blockquote>
+                </div>
+            </div>
+        </div>
+
+      </div>
+    </div>
+</div>
 
 
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>

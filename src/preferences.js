@@ -1,5 +1,4 @@
 import { ensureConnected, encryptSelf, decryptSelf } from "./common";
-import { NDKEvent } from "@nostr-dev-kit/ndk";
 import { showNotice } from "./error.js";
 import { Relay } from "./relay.js";
 
@@ -11,6 +10,7 @@ class Preferences {
 
     static DEFAULTS = {
         spellCheckEnabled: false,
+        aggressiveDelete: true,
     }
     current = Preferences.DEFAULTS;
 
@@ -38,8 +38,8 @@ class Preferences {
             if (!!event) {
                 const parsed = JSON.parse(await decryptSelf(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
-                window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
             }
+            window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
         });
     }
 

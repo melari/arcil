@@ -49,12 +49,12 @@ function restoreAutoSave() {
 }
 
 // Connect UI button
-function connectWalletApp() {
+function connectWallet() {
     toggleConnect().then(() => {
         if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
     })
 }
-window.connectWalletApp = connectWalletApp;
+window.connectWallet = connectWallet;
 
 function showMyNotes() {
     $("#notes-list").empty();
@@ -66,6 +66,20 @@ function showMyNotes() {
     })
 }
 window.showMyNotes = showMyNotes;
+
+function showSettings() {
+    window.settingsModal = new bootstrap.Modal('#settingsModal', {});
+    window.settingsModal.show();
+}
+window.showSettings = showSettings;
+
+function openSettings(pageName) {
+    $('.settings-list-item').removeClass('active');
+    $(`#settings-${pageName}`).addClass('active');
+    $('.settings-page').hide();
+    $(`#settings-page-${pageName}`).show();
+}
+window.openSettings = openSettings;
 
 function showPublishModal() {
     window.publishModal = new bootstrap.Modal('#publish-modal', {});
@@ -197,13 +211,19 @@ function deleteNote() {
 
         const noteId = PageContext.instance.note.id;
 
+        // If aggressiveDelete mode is enabled,
         // Save a new version with removed content to encourage clients not to show old versions of the note
         // Then, publish a kind-5 delete request to purge the event entirely
         window.MDEditor.value('');
-        publishNote('Your note has been deleted').then(() => {
+        if (Preferences.instance.current.aggressiveDelete) {
+            publishNote('Your note has been deleted').then(() => {
+                $("#note-title").val("");
+                Relay.instance.del(noteId);
+            });
+        } else {
             $("#note-title").val("");
             Relay.instance.del(noteId);
-        });
+        }
     });
 }
 window.deleteNote = deleteNote;
@@ -280,11 +300,10 @@ async function viewPublishedNote() {
 window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
-    $("#help-npub").html(window.nostrUser.npub);
+    setAvatarOnConnected();
 });
 
 window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
-    renderConnectButtons({ hover: false });
     updateOwnerOnly();
 });
 
@@ -307,13 +326,6 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
 
 $('#myNotesModal').on('shown.bs.modal', function () {
     $('#note-search-box').focus();
-});
-
-$(".connect-wallet").mouseenter(function() {
-    renderConnectButtons({ hover: true });
-});
-$(".connect-wallet").mouseleave(function() {
-    renderConnectButtons({ hover: false });
 });
 
 async function uploadFile() {
@@ -373,14 +385,33 @@ function createMDE() {
     });
 }
 
-function renderConnectButtons({ hover }) {
+async function setAvatarOnConnected() {
     $(".connect-wallet").each(function(_i, _obj) {
-      $(this).width("auto");
-      if (!window.nip07signer) { return; } // Only show disconnect hover text if connected
-      const width = $(this).width();
-      $(this).text(hover ? "🔴 Disconnect" : npubPreview());
-      $(this).width(hover ? `${width}px` : "auto");
+        $(this).hide();
     });
+
+    $(".avatar").each(function(_i, _obj) {
+        $(this).show();
+        $(this).html(`<i class="fa fa-user"></i>`);
+    });
+    $(".npub").each(function(_i, _obj) {
+        $(this).text(window.nostrUser.npub);
+    });
+
+    const profile = await window.ndk.activeUser.fetchProfile();
+    const url = profile?.image;
+    if (url) {
+      $(".avatar").each(function(_i, _obj) {
+        $(this).html(`<img src='${url}' />`);
+      });
+    }
+
+    const name=profile?.name
+    if (name) {
+      $(".username").each(function(_i, _obj) {
+          $(this).text(name);
+      });
+    }
 }
 
 function npubPreview() {
@@ -468,6 +499,9 @@ $("#toast").on("click", function () {
 
 window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
     createMDE();
+    const prefs = Preferences.instance.current;
+    $('#editor-prefs-spellcheck')[0].checked = prefs.spellCheckEnabled;
+    $('#editor-prefs-aggressive-delete')[0].checked = prefs.aggressiveDelete;
 });
 
 function confirmAction(question) {
@@ -490,3 +524,11 @@ function confirmAction(question) {
     });
 }
 window.confirmAction = confirmAction;
+
+function savePreferences() {
+    Preferences.instance.set({
+        spellCheckEnabled: $('#editor-prefs-spellcheck')[0].checked,
+        aggressiveDelete: $('#editor-prefs-aggressive-delete')[0].checked,
+    });
+}
+window.savePreferences = savePreferences;

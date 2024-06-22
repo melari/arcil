@@ -2,12 +2,6 @@ import { noteFilterFromIdentifier, toggleConnect, ensureReadonlyConnected } from
 import { Note } from "./note.js"
 import { Relay } from "./relay.js"
 
-// Connect UI button
-function connectWalletBrowse() {
-  toggleConnect();
-}
-window.connectWalletBrowse = connectWalletBrowse;
-
 // Run on page ready; loads the note content from nostr
 async function browseNoteFromUrl() {
     browseNote(PageContext.instance.noteIdentifierFromUrl());
