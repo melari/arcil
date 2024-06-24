@@ -6,18 +6,28 @@ const crypto = require('crypto-js');
 
 window.relays = {
   default: [
-    "wss://relay.tagayasu.xyz",
-    "wss://relay.damus.io",
-    "wss://nos.lol",
-    "wss://nostr.mom",
-    "wss://nostr.oxtr.dev",
-    "wss://relay.nostr.band",
-    "wss://offchain.pub",
-    "wss://purplerelay.com",
-    "wss://nostr.bitcoiner.social",
-    "wss://thecitadel.nostr1.com"
+    "wss://relay.tagayasu.xyz/",
+    "wss://relay.damus.io/",
+    "wss://nos.lol/",
+    "wss://nostr.mom/",
+    "wss://nostr.oxtr.dev/",
+    "wss://relay.nostr.band/",
+    "wss://offchain.pub/",
+    "wss://purplerelay.com/",
+    "wss://nostr.bitcoiner.social/",
+    "wss://thecitadel.nostr1.com/",
+    "wss://nostr.wine/",
+    "wss://nostr.land/",
   ],
-  active: []
+  active: [],
+  recommended: [
+    "wss://relay.tagayasu.xyz/",
+    "wss://relay.damus.io/",
+    "wss://thecitadel.nostr1.com/",
+    "wss://nos.lol/",
+    "wss://nostr.wine/",
+    "wss://nostr.land/",
+  ]
 }
 window.relays.active = window.relays.default;
 

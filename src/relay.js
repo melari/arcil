@@ -1,4 +1,4 @@
-import { NDKEvent } from "@nostr-dev-kit/ndk";
+import NDK, { NDKEvent, NDKRelay } from "@nostr-dev-kit/ndk";
 
 /**
  *  A low level cache of raw nostr events. These can belong to any user and will not be decrypted.
@@ -128,6 +128,14 @@ export class Relay {
             if (this.tagIndex[tagKey].has(primaryKey)) { return; }
             this.tagIndex[tagKey].add(primaryKey);
         });
+    }
+
+    // Returns true if the relay could be connected to within 1 second.
+    async getRelayStatus(url) {
+        window.ndk.pool.addRelay(new NDKRelay(url), false);
+        const relay = window.ndk.pool.relays.get(url);
+        try { await relay.connect(5000, false); } catch {}
+        return relay.connectivity.status === 1;
     }
 
     // Tries to load events from the cache using the filter. Not all possible

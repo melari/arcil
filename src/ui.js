@@ -4,6 +4,7 @@ import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
 import { Relay } from "./relay.js";
 import { Note } from "./note.js";
+import { RelayConfig } from "./relay_config.js";
 
 const INTRO_TEXT = "# Welcome to Tagayasu\n\nThis is the note editor, where you can create and edit your content.\n\nTo publish a note, make sure to enter a title below, then click `Publish`!";
 
@@ -70,6 +71,7 @@ window.showMyNotes = showMyNotes;
 function showSettings() {
     window.settingsModal = new bootstrap.Modal('#settingsModal', {});
     window.settingsModal.show();
+    renderRelays();
 }
 window.showSettings = showSettings;
 
@@ -532,3 +534,89 @@ function savePreferences() {
     });
 }
 window.savePreferences = savePreferences;
+
+function renderRelays() {
+    const relayConfig = new RelayConfig(window.nostrUser.hexpubkey);
+    relayConfig.getRelayUrls().then(urls => {
+        renderRelayTable('my-relays', urls, 'trash', 'removeRelay');
+    });
+    renderRelayTable('recommended-relays', window.relays.recommended, 'plus', 'addRelay');
+}
+
+function renderRelayTable(domId, urls, actionIcon, actionFnName) {
+    const updateRelayStatus = async (id, url) => {
+        const status = await Relay.instance.getRelayStatus(url)
+            ? 'online'
+            : 'offline';
+        $(`#relay-status-${domId}-${id}`).html(`<div class='${status}'></div> ${status}`);
+    };
+
+    let result = '';
+    let id = 0;
+    result += `
+      <table class='table table-sm relay-table'>
+        <thead>
+          <tr>
+            <th scope='col'>Address</th>
+            <th scope='col'>Status</th>
+            <th scope='col'>&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    urls.forEach(url => {
+        updateRelayStatus(id, url);
+        const relayHost = (new URL(url)).host;
+        result += `
+          <tr>
+            <td>${relayHost}</td>
+            <td id='relay-status-${domId}-${id}'><div class="unknown"></div> connecting...</td>
+            <td><i class="fa fa-${actionIcon}" style="cursor:pointer" onclick="${actionFnName}('${url}')"></i></td>
+          </tr>
+        `;
+        id += 1;
+    });
+
+    result += `
+        </tbody>
+      </table>
+    `;
+
+    $(`#${domId}`).html(result);
+}
+
+async function addRelay(url) {
+    showPending('adding relay...');
+    const relayConfig = new RelayConfig(window.nostrUser.hexpubkey);
+    relayConfig.addRelay(url).then(() => {
+        showNotice('relays updated');
+        renderRelays();
+    });
+}
+window.addRelay = addRelay;
+
+function addRelayFromInput() {
+    try {
+        const url = new URL($('#new-relay-url')[0].value);
+
+        if (url.protocol !== 'wss:') {
+            return showError('URL must start with wss://');
+        }
+
+        addRelay(url.toString());
+    } catch {
+        showError('invalid URL');
+    }
+}
+window.addRelayFromInput = addRelayFromInput;
+
+function removeRelay(url) {
+    showPending('removing relay...');
+    const relayConfig = new RelayConfig(window.nostrUser.hexpubkey);
+    relayConfig.removeRelay(url).then(() => {
+        showNotice('relays updated');
+        renderRelays();
+    });
+}
+window.removeRelay = removeRelay;

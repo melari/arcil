@@ -64,13 +64,13 @@ blockquote {
     background: #E0E5FE;
 }
 
-table {
+table:not(.table) {
   margin: auto;
-}
 
-tbody, td, tfoot, th, thead, tr {
-  border-width: 1px;
-  padding: 5px;
+  tbody, td, tfoot, th, thead, tr {
+    border-width: 1px;
+    padding: 5px;
+  }
 }
 
 .btn {
@@ -161,6 +161,33 @@ tbody, td, tfoot, th, thead, tr {
     height: 10px;
     width: 10px;
     margin: 1px;
+    border-radius: 10px;
+}
+
+.unknown {
+    float: left;
+    background-color: #d8d8d8;
+    height: 10px;
+    width: 10px;
+    margin: 8px 5px 0px 0px;
+    border-radius: 10px;
+}
+
+.online {
+    float: left;
+    background-color: #4ec497;
+    height: 10px;
+    width: 10px;
+    margin: 8px 5px 0px 0px;
+    border-radius: 10px;
+}
+
+.offline {
+    float: left;
+    background-color: #e55b5b;
+    height: 10px;
+    width: 10px;
+    margin: 8px 5px 0px 0px;
     border-radius: 10px;
 }
 
@@ -510,15 +537,52 @@ tbody, td, tfoot, th, thead, tr {
             <div class="col-3 settings-list">
                 <ul class="list-group list-group-flush">
                     <li id="settings-relays" class="settings-list-item list-group-item list-group-item-action active" onclick="openSettings('relays')">Relays</li>
-                    <li id="settings-editor-preferences" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('editor-preferences')">Editor Preferences</li>
                     <li id="settings-file-storage" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('file-storage')">File Storage</li>
+                    <li id="settings-editor-preferences" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('editor-preferences')">Editor Preferences</li>
                     <li id="settings-dns-link" class="settings-list-item list-group-item list-group-item-action" onclick="openSettings('dns-link')">DNS Link</li>
                     <li class="settings-list-item list-group-item list-group-item-action list-group-item-danger" onclick="connectWallet()">Log Out</li>
                 </ul>
             </div>
 
             <div id="settings-page-relays" class="settings-page col-9">
-                relays
+                <form class="form-inline" action="#">
+                    <div class="modal-body">
+                        <div class="row" style="margin-bottom: 40px">
+                            <div class="col-12">
+                                <h2>Relays</h2>
+                                Your written content is always saved locally on this device first. Relays are servers that provide multiple backups of your notes and make them accessible to others if you've made them public.
+                            </div>
+                        </div>
+
+                        <div class="row" style="margin-bottom: 40px">
+                            <h4>Add Relay</h4>
+                            <div class="col-10">
+                                <input class="form-control" type="text" placeholder="wss://" id="new-relay-url" />
+                            </div>
+                            <div class="col-2">
+                                <input type="submit" class="btn" value="Add" onclick="addRelayFromInput()" />
+                            </div>
+                        </div>
+
+                        <div class="row" style="margin-bottom: 40px">
+                            <h4>My Relays</h4>
+                            <div clas="col-12" id="my-relays">
+                                <i class="fa fa-spinner"></i> loading...
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <h4>Recommended Relays</h4>
+                            <div class="col-12" id="recommended-relays">
+                                <i class="fa fa-spinner"></i> loading...
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div id="settings-page-file-storage" class="settings-page col-9" style="display:none">
+                file-storage
             </div>
 
             <div id="settings-page-editor-preferences" class="settings-page col-9" style="display:none">
@@ -542,11 +606,6 @@ tbody, td, tfoot, th, thead, tr {
                         <input type="submit" class="btn" value="Save" onclick="savePreferences()" />
                     </div>
                 </form>
-            </div>
-
-
-            <div id="settings-page-file-storage" class="settings-page col-9" style="display:none">
-                file-storage
             </div>
 
             <div id="settings-page-dns-link" class="settings-page col-9" style="display:none">
