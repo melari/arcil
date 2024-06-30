@@ -582,7 +582,43 @@ table:not(.table) {
             </div>
 
             <div id="settings-page-file-storage" class="settings-page col-9" style="display:none">
-                file-storage
+                <form class="form-inline" action="#">
+                    <div class="modal-body">
+                        <div class="row" style="margin-bottom: 40px">
+                            <div class="col-12">
+                                <h2>File Storage</h2>
+                                These servers store your images, video, and other files. For now, only Blossom is supported, but nip96 is coming soon.
+                            </div>
+                        </div>
+
+                        <div class="row" style="margin-bottom: 40px">
+                            <h4>Upload Protocol</h4>
+                            <div class="col-12">
+                                <select class="form-select form-select-lg mb-3">
+                                  <option selected value="blossom">Blossom</option>
+                                  <option value="nip96" disabled>nip96 (coming soon)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row" style="margin-bottom: 40px">
+                            <h4>Add Blossom Server</h4>
+                            <div class="col-10">
+                                <input class="form-control" type="text" placeholder="https://" id="new-file-server-url" />
+                            </div>
+                            <div class="col-2">
+                                <input type="submit" class="btn" value="Add" onclick="addBlossomServerFromInput()" />
+                            </div>
+                        </div>
+
+                        <div class="row" style="margin-bottom: 40px">
+                            <h4>My Blossom Servers</h4>
+                            <div clas="col-12" id="my-file-servers">
+                                <i class="fa fa-spinner"></i> loading...
+                            </div>
+                        </div>
+                    </div>
+                </form>
             </div>
 
             <div id="settings-page-editor-preferences" class="settings-page col-9" style="display:none">

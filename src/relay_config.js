@@ -1,9 +1,21 @@
 export class RelayConfig {
     static RELAY_LIST_KIND = 10002;
+    static BLOSSOM_LIST_KIND = 10063;
     static RELAY_TAG = 'r';
+    static BLOSSOM_TAG = 'server';
 
-    constructor(hexpubkey) {
+    constructor(hexpubkey, kind, tag) {
         this.hexpubkey = hexpubkey;
+        this.kind = kind;
+        this.tag = tag;
+    }
+
+    static forRelays(hexpubkey) {
+        return new RelayConfig(hexpubkey, RelayConfig.RELAY_LIST_KIND, RelayConfig.RELAY_TAG);
+    }
+
+    static forBlossom(hexpubkey) {
+        return new RelayConfig(hexpubkey, RelayConfig.BLOSSOM_LIST_KIND, RelayConfig.BLOSSOM_TAG);
     }
 
     // Each relay in the list has the form:
@@ -12,11 +24,11 @@ export class RelayConfig {
     async getRelayList() {
         const filters = {
             authors: [this.hexpubkey],
-            kinds: [RelayConfig.RELAY_LIST_KIND]
+            kinds: [this.kind]
         };
         return Relay.instance.fetchEvent(filters).then(async (event) => {
             if (!!event) {
-                return event.tags.filter(t => t[0] === RelayConfig.RELAY_TAG).map(t => {
+                return event.tags.filter(t => t[0] === this.tag).map(t => {
                     return {
                         url: t[1],
                         mode: t[2] ?? 'both',
@@ -63,10 +75,10 @@ export class RelayConfig {
     async saveRelays(relayList) {
         const tags = relayList.map(r => {
             return r.mode === 'both'
-                ? [RelayConfig.RELAY_TAG, r.url]
-                : [RelayConfig.RELAY_TAG, r.url, r.mode];
+                ? [this.tag, r.url]
+                : [this.tag, r.url, r.mode];
         });
 
-        return Relay.instance.buildAndPublish(RelayConfig.RELAY_LIST_KIND, '', tags, this.hexpubkey);
+        return Relay.instance.buildAndPublish(this.kind, '', tags, this.hexpubkey);
     }
 }

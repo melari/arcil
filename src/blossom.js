@@ -1,14 +1,12 @@
 import { Relay } from "./relay.js";
 import { NDKEvent } from "@nostr-dev-kit/ndk";
+import { RelayConfig } from "./relay_config.js";
 const crypto = require('crypto-js');
 
 
 export class Blossom {
     static SERVER_HINT_EVENT_KIND = 10063;
     static AUTH_EVENT_KIND = 24242;
-    static DEFAULT_SERVERS = [
-        'https://blossom.tagayasu.xyz',
-    ];
 
     userServers = new Set();
     hexpubkey = null;
@@ -16,6 +14,13 @@ export class Blossom {
     static instance = new Blossom();
     constructor() {
         if (!!Blossom.instance) { throw new Error('Use singleton instance'); }
+    }
+
+    async getServerStatus(url) {
+        let response;
+        try { response = await fetch(new URL('/list/ping', url).toString()); }
+        catch { return false; }
+        return !!response.ok;
     }
 
     async fetchFile(hash, hexpubkey) {
@@ -106,56 +111,21 @@ export class Blossom {
     }
 
     async urlsForFile(hash, hexpubkey) {
-        return [...(await this.serverList(hexpubkey))].map(server => {
+        return (await this.serverList(hexpubkey)).map(server => {
             try { return (new URL(hash, server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
     async uploadUrls(hexpubkey) {
-        return [...(await this.serverList(hexpubkey))].map(server => {
+        return (await this.serverList(hexpubkey)).map(server => {
             try { return (new URL('/upload', server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
     async serverList(hexpubkey) {
-        if (this.hexpubkey !== hexpubkey) {
-            this.hexpubkey = hexpubkey;
-            this.userServers = new Set();
-        }
-
-        if (this.userServers.size > 0) {
-            return this.userServers;
-        }
-
-        const nostrHints = await this._getServersFromNostr();
-        if (nostrHints.length > 0) {
-            this.userServers = new Set(nostrHints);
-            return this.userServers;
-        }
-
-        this.userServers = new Set(Blossom.DEFAULT_SERVERS);
-        await this._saveServers();
-        return this.userServers;
-    }
-
-    async _getServersFromNostr() {
-        const filter = {
-            authors: [this.hexpubkey],
-            kinds: [Blossom.SERVER_HINT_EVENT_KIND]
-        }
-        return await Relay.instance.fetchEvent(filter).then((event) => 
-              event?.tags.filter(t => t[0] === "server").map(t => t[1]) ?? []
-        );
-    }
-
-    async _saveServers() {
-        if (this.userServers.size === 0) { throw new Error('refusing to update blossom servers to empty list'); }
-
-        const tags = [];
-        this.userServers.forEach(server => tags.push(["server", server]));
-        return Relay.instance.buildAndPublish(Blossom.SERVER_HINT_EVENT_KIND, '', tags, this.hexpubkey);
+        return RelayConfig.forBlossom(hexpubkey).getRelayUrls();
     }
 }
 window.Blossom = Blossom;

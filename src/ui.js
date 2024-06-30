@@ -369,7 +369,11 @@ function createMDE() {
         title: "Upload image",
         action: async (editor) => {
             const result = await uploadFile();
-            editor.codemirror.replaceSelection(`![](${result.downloadUrls[0]} "blossom://${result.hash}")`);
+            if (result.downloadUrls.length > 0) {
+                editor.codemirror.replaceSelection(`![](${result.downloadUrls[0]} "blossom://${result.hash}")`);
+            } else {
+                showError('No file servers accepted your upload');
+            }
         }
     };
 
@@ -536,16 +540,24 @@ function savePreferences() {
 window.savePreferences = savePreferences;
 
 function renderRelays() {
-    const relayConfig = new RelayConfig(window.nostrUser.hexpubkey);
+    const relayConfig = RelayConfig.forRelays(window.nostrUser.hexpubkey);
     relayConfig.getRelayUrls().then(urls => {
         renderRelayTable('my-relays', urls, 'trash', 'removeRelay');
     });
     renderRelayTable('recommended-relays', window.relays.recommended, 'plus', 'addRelay');
+
+    const blossomConfig = RelayConfig.forBlossom(window.nostrUser.hexpubkey);
+    blossomConfig.getRelayUrls().then(urls => {
+        renderRelayTable('my-file-servers', urls, 'trash', 'removeBlossomServer');
+    });
 }
 
 function renderRelayTable(domId, urls, actionIcon, actionFnName) {
     const updateRelayStatus = async (id, url) => {
-        const status = await Relay.instance.getRelayStatus(url)
+        const statusProvider = url.startsWith('wss')
+            ? Relay.instance.getRelayStatus
+            : Blossom.instance.getServerStatus;
+        const status = await statusProvider(url)
             ? 'online'
             : 'offline';
         $(`#relay-status-${domId}-${id}`).html(`<div class='${status}'></div> ${status}`);
@@ -588,7 +600,7 @@ function renderRelayTable(domId, urls, actionIcon, actionFnName) {
 
 async function addRelay(url) {
     showPending('adding relay...');
-    const relayConfig = new RelayConfig(window.nostrUser.hexpubkey);
+    const relayConfig = RelayConfig.forRelays(window.nostrUser.hexpubkey);
     relayConfig.addRelay(url).then(() => {
         showNotice('relays updated');
         renderRelays();
@@ -613,10 +625,40 @@ window.addRelayFromInput = addRelayFromInput;
 
 function removeRelay(url) {
     showPending('removing relay...');
-    const relayConfig = new RelayConfig(window.nostrUser.hexpubkey);
+    const relayConfig = RelayConfig.forRelays(window.nostrUser.hexpubkey);
     relayConfig.removeRelay(url).then(() => {
         showNotice('relays updated');
         renderRelays();
     });
 }
 window.removeRelay = removeRelay;
+
+function addBlossomServerFromInput() {
+    try {
+        const url = new URL($('#new-file-server-url')[0].value);
+
+        if (url.protocol !== 'https:') {
+            return showError('URL must start with https://');
+        }
+
+        showPending('adding blossom server...');
+        const relayConfig = RelayConfig.forBlossom(window.nostrUser.hexpubkey);
+        relayConfig.addRelay(url.toString()).then(() => {
+            showNotice('blossom servers updated');
+            renderRelays();
+        });
+    } catch {
+        showError('invalid URL');
+    }
+}
+window.addBlossomServerFromInput = addBlossomServerFromInput;
+
+function removeBlossomServer(url) {
+    showPending('removing blossom server...');
+    const relayConfig = RelayConfig.forBlossom(window.nostrUser.hexpubkey);
+    relayConfig.removeRelay(url).then(() => {
+        showNotice('blossom servers updated');
+        renderRelays();
+    });
+}
+window.removeBlossomServer = removeBlossomServer;

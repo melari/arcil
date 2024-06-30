@@ -12793,7 +12793,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   Blossom: () => (/* binding */ Blossom)
 /* harmony export */ });
 /* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3894);
-/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2483);
+/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(468);
+/* harmony import */ var _relay_config_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(188);
+
 
 
 const crypto = __webpack_require__(1354);
@@ -12802,9 +12804,6 @@ const crypto = __webpack_require__(1354);
 class Blossom {
     static SERVER_HINT_EVENT_KIND = 10063;
     static AUTH_EVENT_KIND = 24242;
-    static DEFAULT_SERVERS = [
-        'https://blossom.tagayasu.xyz',
-    ];
 
     userServers = new Set();
     hexpubkey = null;
@@ -12812,6 +12811,13 @@ class Blossom {
     static instance = new Blossom();
     constructor() {
         if (!!Blossom.instance) { throw new Error('Use singleton instance'); }
+    }
+
+    async getServerStatus(url) {
+        let response;
+        try { response = await fetch(new URL('/list/ping', url).toString()); }
+        catch { return false; }
+        return !!response.ok;
     }
 
     async fetchFile(hash, hexpubkey) {
@@ -12902,56 +12908,21 @@ class Blossom {
     }
 
     async urlsForFile(hash, hexpubkey) {
-        return [...(await this.serverList(hexpubkey))].map(server => {
+        return (await this.serverList(hexpubkey)).map(server => {
             try { return (new URL(hash, server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
     async uploadUrls(hexpubkey) {
-        return [...(await this.serverList(hexpubkey))].map(server => {
+        return (await this.serverList(hexpubkey)).map(server => {
             try { return (new URL('/upload', server)).href; }
             catch { return null; }
         }).filter(x => !!x);
     }
 
     async serverList(hexpubkey) {
-        if (this.hexpubkey !== hexpubkey) {
-            this.hexpubkey = hexpubkey;
-            this.userServers = new Set();
-        }
-
-        if (this.userServers.size > 0) {
-            return this.userServers;
-        }
-
-        const nostrHints = await this._getServersFromNostr();
-        if (nostrHints.length > 0) {
-            this.userServers = new Set(nostrHints);
-            return this.userServers;
-        }
-
-        this.userServers = new Set(Blossom.DEFAULT_SERVERS);
-        await this._saveServers();
-        return this.userServers;
-    }
-
-    async _getServersFromNostr() {
-        const filter = {
-            authors: [this.hexpubkey],
-            kinds: [Blossom.SERVER_HINT_EVENT_KIND]
-        }
-        return await _relay_js__WEBPACK_IMPORTED_MODULE_0__/* .Relay */ .Z.instance.fetchEvent(filter).then((event) => 
-              event?.tags.filter(t => t[0] === "server").map(t => t[1]) ?? []
-        );
-    }
-
-    async _saveServers() {
-        if (this.userServers.size === 0) { throw new Error('refusing to update blossom servers to empty list'); }
-
-        const tags = [];
-        this.userServers.forEach(server => tags.push(["server", server]));
-        return _relay_js__WEBPACK_IMPORTED_MODULE_0__/* .Relay */ .Z.instance.publish(Blossom.SERVER_HINT_EVENT_KIND, '', tags, this.hexpubkey);
+        return _relay_config_js__WEBPACK_IMPORTED_MODULE_2__/* .RelayConfig */ .f.forBlossom(hexpubkey).getRelayUrls();
     }
 }
 window.Blossom = Blossom;
@@ -12964,18 +12935,12 @@ window.Blossom = Blossom;
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
 /* harmony import */ var _note_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3797);
 /* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3894);
 
 
 
-
-// Connect UI button
-function connectWalletBrowse() {
-  (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .toggleConnect */ .Ti)();
-}
-window.connectWalletBrowse = connectWalletBrowse;
 
 // Run on page ready; loads the note content from nostr
 async function browseNoteFromUrl() {
@@ -13009,7 +12974,7 @@ async function browseNote(identifier) {
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
               authors: [event.pubkey],
-              kinds: [30023],
+              kinds: [30023, 31234],
               "#d": aTags.map(t => t.split(':')[2])
           }
           _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters);
@@ -13069,7 +13034,7 @@ window.addEventListener('popstate', (event) => {
 
 /***/ }),
 
-/***/ 6213:
+/***/ 308:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -13077,11 +13042,9 @@ window.addEventListener('popstate', (event) => {
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
   Mf: () => (/* binding */ atagFor),
-  fD: () => (/* binding */ decryptNote),
   Gk: () => (/* binding */ decryptSelf),
   gw: () => (/* binding */ delay),
   oF: () => (/* binding */ dtagFor),
-  r0: () => (/* binding */ encryptNote),
   DE: () => (/* binding */ encryptSelf),
   zs: () => (/* binding */ ensureConnected),
   lD: () => (/* binding */ ensureReadonlyConnected),
@@ -13110,8 +13073,8 @@ __webpack_require__.d(abstract_utils_namespaceObject, {
   FF: () => (validateObject)
 });
 
-// EXTERNAL MODULE: ./node_modules/@nostr-dev-kit/ndk/dist/index.mjs + 34 modules
-var dist = __webpack_require__(2483);
+// EXTERNAL MODULE: ./node_modules/@nostr-dev-kit/ndk/dist/index.mjs + 39 modules
+var dist = __webpack_require__(468);
 ;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/curves/node_modules/@noble/hashes/esm/_assert.js
 function number(n) {
     if (!Number.isSafeInteger(n) || n < 0)
@@ -15805,19 +15768,1889 @@ var utils = __webpack_require__(3486);
 var esm_sha256 = __webpack_require__(7748);
 // EXTERNAL MODULE: ./node_modules/@scure/base/lib/esm/index.js
 var esm = __webpack_require__(7410);
-// EXTERNAL MODULE: ./node_modules/@noble/ciphers/esm/chacha.js + 3 modules
-var chacha = __webpack_require__(282);
-// EXTERNAL MODULE: ./node_modules/@noble/ciphers/esm/utils.js
-var esm_utils = __webpack_require__(4207);
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/_assert.js
+function _assert_number(n) {
+    if (!Number.isSafeInteger(n) || n < 0)
+        throw new Error(`positive integer expected, not ${n}`);
+}
+function _assert_bool(b) {
+    if (typeof b !== 'boolean')
+        throw new Error(`boolean expected, not ${b}`);
+}
+function isBytes(a) {
+    return (a instanceof Uint8Array ||
+        (a != null && typeof a === 'object' && a.constructor.name === 'Uint8Array'));
+}
+function _assert_bytes(b, ...lengths) {
+    if (!isBytes(b))
+        throw new Error('Uint8Array expected');
+    if (lengths.length > 0 && !lengths.includes(b.length))
+        throw new Error(`Uint8Array expected of length ${lengths}, not of length=${b.length}`);
+}
+function hash(hash) {
+    if (typeof hash !== 'function' || typeof hash.create !== 'function')
+        throw new Error('hash must be wrapped by utils.wrapConstructor');
+    _assert_number(hash.outputLen);
+    _assert_number(hash.blockLen);
+}
+function _assert_exists(instance, checkFinished = true) {
+    if (instance.destroyed)
+        throw new Error('Hash instance has been destroyed');
+    if (checkFinished && instance.finished)
+        throw new Error('Hash#digest() has already been called');
+}
+function _assert_output(out, instance) {
+    _assert_bytes(out);
+    const min = instance.outputLen;
+    if (out.length < min) {
+        throw new Error(`digestInto() expects output buffer of length at least ${min}`);
+    }
+}
+
+const _assert_assert = { number: _assert_number, bool: _assert_bool, bytes: _assert_bytes, hash, exists: _assert_exists, output: _assert_output };
+/* harmony default export */ const esm_assert = ((/* unused pure expression or super */ null && (_assert_assert)));
+//# sourceMappingURL=_assert.js.map
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/utils.js
+/*! noble-ciphers - MIT License (c) 2023 Paul Miller (paulmillr.com) */
+
+// Cast array to different type
+const utils_u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+const u16 = (arr) => new Uint16Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 2));
+const utils_u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
+// Cast array to view
+const utils_createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+// big-endian hardware is rare. Just in case someone still decides to run ciphers:
+// early-throw an error because we don't support BE yet.
+const utils_isLE = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
+if (!utils_isLE)
+    throw new Error('Non little-endian hardware is not supported');
+// Array where index 0xf0 (240) is mapped to string 'f0'
+const esm_utils_hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+/**
+ * @example bytesToHex(Uint8Array.from([0xca, 0xfe, 0x01, 0x23])) // 'cafe0123'
+ */
+function esm_utils_bytesToHex(bytes) {
+    abytes(bytes);
+    // pre-caching improves the speed 6x
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+        hex += esm_utils_hexes[bytes[i]];
+    }
+    return hex;
+}
+// We use optimized technique to convert hex string to byte array
+const asciis = { _0: 48, _9: 57, _A: 65, _F: 70, _a: 97, _f: 102 };
+function asciiToBase16(char) {
+    if (char >= asciis._0 && char <= asciis._9)
+        return char - asciis._0;
+    if (char >= asciis._A && char <= asciis._F)
+        return char - (asciis._A - 10);
+    if (char >= asciis._a && char <= asciis._f)
+        return char - (asciis._a - 10);
+    return;
+}
+/**
+ * @example hexToBytes('cafe0123') // Uint8Array.from([0xca, 0xfe, 0x01, 0x23])
+ */
+function esm_utils_hexToBytes(hex) {
+    if (typeof hex !== 'string')
+        throw new Error('hex string expected, got ' + typeof hex);
+    const hl = hex.length;
+    const al = hl / 2;
+    if (hl % 2)
+        throw new Error('padded hex string expected, got unpadded hex of length ' + hl);
+    const array = new Uint8Array(al);
+    for (let ai = 0, hi = 0; ai < al; ai++, hi += 2) {
+        const n1 = asciiToBase16(hex.charCodeAt(hi));
+        const n2 = asciiToBase16(hex.charCodeAt(hi + 1));
+        if (n1 === undefined || n2 === undefined) {
+            const char = hex[hi] + hex[hi + 1];
+            throw new Error('hex string expected, got non-hex character "' + char + '" at index ' + hi);
+        }
+        array[ai] = n1 * 16 + n2;
+    }
+    return array;
+}
+function utils_hexToNumber(hex) {
+    if (typeof hex !== 'string')
+        throw new Error('hex string expected, got ' + typeof hex);
+    // Big Endian
+    return BigInt(hex === '' ? '0' : `0x${hex}`);
+}
+// BE: Big Endian, LE: Little Endian
+function esm_utils_bytesToNumberBE(bytes) {
+    return utils_hexToNumber(esm_utils_bytesToHex(bytes));
+}
+function utils_numberToBytesBE(n, len) {
+    return esm_utils_hexToBytes(n.toString(16).padStart(len * 2, '0'));
+}
+// There is no setImmediate in browser and setTimeout is slow.
+// call of async fn will return Promise, which will be fullfiled only on
+// next scheduler queue processing step and this is exactly what we need.
+const utils_nextTick = async () => { };
+// Returns control to thread each 'tick' ms to avoid blocking
+async function utils_asyncLoop(iters, tick, cb) {
+    let ts = Date.now();
+    for (let i = 0; i < iters; i++) {
+        cb(i);
+        // Date.now() is not monotonic, so in case if clock goes backwards we return return control too
+        const diff = Date.now() - ts;
+        if (diff >= 0 && diff < tick)
+            continue;
+        await utils_nextTick();
+        ts += diff;
+    }
+}
+/**
+ * @example utf8ToBytes('abc') // new Uint8Array([97, 98, 99])
+ */
+function esm_utils_utf8ToBytes(str) {
+    if (typeof str !== 'string')
+        throw new Error(`string expected, got ${typeof str}`);
+    return new Uint8Array(new TextEncoder().encode(str)); // https://bugzil.la/1681809
+}
+/**
+ * @example bytesToUtf8(new Uint8Array([97, 98, 99])) // 'abc'
+ */
+function bytesToUtf8(bytes) {
+    return new TextDecoder().decode(bytes);
+}
+/**
+ * Normalizes (non-hex) string or Uint8Array to Uint8Array.
+ * Warning: when Uint8Array is passed, it would NOT get copied.
+ * Keep in mind for future mutable operations.
+ */
+function utils_toBytes(data) {
+    if (typeof data === 'string')
+        data = esm_utils_utf8ToBytes(data);
+    else if (isBytes(data))
+        data = data.slice();
+    else
+        throw new Error(`Uint8Array expected, got ${typeof data}`);
+    return data;
+}
+/**
+ * Copies several Uint8Arrays into one.
+ */
+function esm_utils_concatBytes(...arrays) {
+    let sum = 0;
+    for (let i = 0; i < arrays.length; i++) {
+        const a = arrays[i];
+        abytes(a);
+        sum += a.length;
+    }
+    const res = new Uint8Array(sum);
+    for (let i = 0, pad = 0; i < arrays.length; i++) {
+        const a = arrays[i];
+        res.set(a, pad);
+        pad += a.length;
+    }
+    return res;
+}
+function utils_checkOpts(defaults, opts) {
+    if (opts == null || typeof opts !== 'object')
+        throw new Error('options must be defined');
+    const merged = Object.assign(defaults, opts);
+    return merged;
+}
+// Compares 2 u8a-s in kinda constant time
+function utils_equalBytes(a, b) {
+    if (a.length !== b.length)
+        return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++)
+        diff |= a[i] ^ b[i];
+    return diff === 0;
+}
+// For runtime check if class implements interface
+class utils_Hash {
+}
+/**
+ * @__NO_SIDE_EFFECTS__
+ */
+const wrapCipher = (params, c) => {
+    Object.assign(c, params);
+    return c;
+};
+// Polyfill for Safari 14
+function utils_setBigUint64(view, byteOffset, value, isLE) {
+    if (typeof view.setBigUint64 === 'function')
+        return view.setBigUint64(byteOffset, value, isLE);
+    const _32n = BigInt(32);
+    const _u32_max = BigInt(0xffffffff);
+    const wh = Number((value >> _32n) & _u32_max);
+    const wl = Number(value & _u32_max);
+    const h = isLE ? 4 : 0;
+    const l = isLE ? 0 : 4;
+    view.setUint32(byteOffset + h, wh, isLE);
+    view.setUint32(byteOffset + l, wl, isLE);
+}
+function u64Lengths(ciphertext, AAD) {
+    const num = new Uint8Array(16);
+    const view = utils_createView(num);
+    utils_setBigUint64(view, 0, BigInt(AAD ? AAD.length : 0), true);
+    utils_setBigUint64(view, 8, BigInt(ciphertext.length), true);
+    return num;
+}
+//# sourceMappingURL=utils.js.map
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/_polyval.js
+
+
+// GHash from AES-GCM and its little-endian "mirror image" Polyval from AES-SIV.
+// Implemented in terms of GHash with conversion function for keys
+// GCM GHASH from NIST SP800-38d, SIV from RFC 8452.
+// https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
+// GHASH   modulo: x^128 + x^7   + x^2   + x     + 1
+// POLYVAL modulo: x^128 + x^127 + x^126 + x^121 + 1
+const BLOCK_SIZE = 16;
+// TODO: rewrite
+// temporary padding buffer
+const ZEROS16 = /* @__PURE__ */ new Uint8Array(16);
+const ZEROS32 = utils_u32(ZEROS16);
+const POLY = 0xe1; // v = 2*v % POLY
+// v = 2*v % POLY
+// NOTE: because x + x = 0 (add/sub is same), mul2(x) != x+x
+// We can multiply any number using montgomery ladder and this function (works as double, add is simple xor)
+const mul2 = (s0, s1, s2, s3) => {
+    const hiBit = s3 & 1;
+    return {
+        s3: (s2 << 31) | (s3 >>> 1),
+        s2: (s1 << 31) | (s2 >>> 1),
+        s1: (s0 << 31) | (s1 >>> 1),
+        s0: (s0 >>> 1) ^ ((POLY << 24) & -(hiBit & 1)), // reduce % poly
+    };
+};
+const swapLE = (n) => (((n >>> 0) & 0xff) << 24) |
+    (((n >>> 8) & 0xff) << 16) |
+    (((n >>> 16) & 0xff) << 8) |
+    ((n >>> 24) & 0xff) |
+    0;
+/**
+ * `mulX_POLYVAL(ByteReverse(H))` from spec
+ * @param k mutated in place
+ */
+function _toGHASHKey(k) {
+    k.reverse();
+    const hiBit = k[15] & 1;
+    // k >>= 1
+    let carry = 0;
+    for (let i = 0; i < k.length; i++) {
+        const t = k[i];
+        k[i] = (t >>> 1) | carry;
+        carry = (t & 1) << 7;
+    }
+    k[0] ^= -hiBit & 0xe1; // if (hiBit) n ^= 0xe1000000000000000000000000000000;
+    return k;
+}
+const estimateWindow = (bytes) => {
+    if (bytes > 64 * 1024)
+        return 8;
+    if (bytes > 1024)
+        return 4;
+    return 2;
+};
+class GHASH {
+    // We select bits per window adaptively based on expectedLength
+    constructor(key, expectedLength) {
+        this.blockLen = BLOCK_SIZE;
+        this.outputLen = BLOCK_SIZE;
+        this.s0 = 0;
+        this.s1 = 0;
+        this.s2 = 0;
+        this.s3 = 0;
+        this.finished = false;
+        key = utils_toBytes(key);
+        _assert_bytes(key, 16);
+        const kView = utils_createView(key);
+        let k0 = kView.getUint32(0, false);
+        let k1 = kView.getUint32(4, false);
+        let k2 = kView.getUint32(8, false);
+        let k3 = kView.getUint32(12, false);
+        // generate table of doubled keys (half of montgomery ladder)
+        const doubles = [];
+        for (let i = 0; i < 128; i++) {
+            doubles.push({ s0: swapLE(k0), s1: swapLE(k1), s2: swapLE(k2), s3: swapLE(k3) });
+            ({ s0: k0, s1: k1, s2: k2, s3: k3 } = mul2(k0, k1, k2, k3));
+        }
+        const W = estimateWindow(expectedLength || 1024);
+        if (![1, 2, 4, 8].includes(W))
+            throw new Error(`ghash: wrong window size=${W}, should be 2, 4 or 8`);
+        this.W = W;
+        const bits = 128; // always 128 bits;
+        const windows = bits / W;
+        const windowSize = (this.windowSize = 2 ** W);
+        const items = [];
+        // Create precompute table for window of W bits
+        for (let w = 0; w < windows; w++) {
+            // truth table: 00, 01, 10, 11
+            for (let byte = 0; byte < windowSize; byte++) {
+                // prettier-ignore
+                let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+                for (let j = 0; j < W; j++) {
+                    const bit = (byte >>> (W - j - 1)) & 1;
+                    if (!bit)
+                        continue;
+                    const { s0: d0, s1: d1, s2: d2, s3: d3 } = doubles[W * w + j];
+                    (s0 ^= d0), (s1 ^= d1), (s2 ^= d2), (s3 ^= d3);
+                }
+                items.push({ s0, s1, s2, s3 });
+            }
+        }
+        this.t = items;
+    }
+    _updateBlock(s0, s1, s2, s3) {
+        (s0 ^= this.s0), (s1 ^= this.s1), (s2 ^= this.s2), (s3 ^= this.s3);
+        const { W, t, windowSize } = this;
+        // prettier-ignore
+        let o0 = 0, o1 = 0, o2 = 0, o3 = 0;
+        const mask = (1 << W) - 1; // 2**W will kill performance.
+        let w = 0;
+        for (const num of [s0, s1, s2, s3]) {
+            for (let bytePos = 0; bytePos < 4; bytePos++) {
+                const byte = (num >>> (8 * bytePos)) & 0xff;
+                for (let bitPos = 8 / W - 1; bitPos >= 0; bitPos--) {
+                    const bit = (byte >>> (W * bitPos)) & mask;
+                    const { s0: e0, s1: e1, s2: e2, s3: e3 } = t[w * windowSize + bit];
+                    (o0 ^= e0), (o1 ^= e1), (o2 ^= e2), (o3 ^= e3);
+                    w += 1;
+                }
+            }
+        }
+        this.s0 = o0;
+        this.s1 = o1;
+        this.s2 = o2;
+        this.s3 = o3;
+    }
+    update(data) {
+        data = utils_toBytes(data);
+        _assert_exists(this);
+        const b32 = utils_u32(data);
+        const blocks = Math.floor(data.length / BLOCK_SIZE);
+        const left = data.length % BLOCK_SIZE;
+        for (let i = 0; i < blocks; i++) {
+            this._updateBlock(b32[i * 4 + 0], b32[i * 4 + 1], b32[i * 4 + 2], b32[i * 4 + 3]);
+        }
+        if (left) {
+            ZEROS16.set(data.subarray(blocks * BLOCK_SIZE));
+            this._updateBlock(ZEROS32[0], ZEROS32[1], ZEROS32[2], ZEROS32[3]);
+            ZEROS32.fill(0); // clean tmp buffer
+        }
+        return this;
+    }
+    destroy() {
+        const { t } = this;
+        // clean precompute table
+        for (const elm of t) {
+            (elm.s0 = 0), (elm.s1 = 0), (elm.s2 = 0), (elm.s3 = 0);
+        }
+    }
+    digestInto(out) {
+        _assert_exists(this);
+        _assert_output(out, this);
+        this.finished = true;
+        const { s0, s1, s2, s3 } = this;
+        const o32 = utils_u32(out);
+        o32[0] = s0;
+        o32[1] = s1;
+        o32[2] = s2;
+        o32[3] = s3;
+        return out;
+    }
+    digest() {
+        const res = new Uint8Array(BLOCK_SIZE);
+        this.digestInto(res);
+        this.destroy();
+        return res;
+    }
+}
+class Polyval extends GHASH {
+    constructor(key, expectedLength) {
+        key = utils_toBytes(key);
+        const ghKey = _toGHASHKey(key.slice());
+        super(ghKey, expectedLength);
+        ghKey.fill(0);
+    }
+    update(data) {
+        data = utils_toBytes(data);
+        _assert_exists(this);
+        const b32 = utils_u32(data);
+        const left = data.length % BLOCK_SIZE;
+        const blocks = Math.floor(data.length / BLOCK_SIZE);
+        for (let i = 0; i < blocks; i++) {
+            this._updateBlock(swapLE(b32[i * 4 + 3]), swapLE(b32[i * 4 + 2]), swapLE(b32[i * 4 + 1]), swapLE(b32[i * 4 + 0]));
+        }
+        if (left) {
+            ZEROS16.set(data.subarray(blocks * BLOCK_SIZE));
+            this._updateBlock(swapLE(ZEROS32[3]), swapLE(ZEROS32[2]), swapLE(ZEROS32[1]), swapLE(ZEROS32[0]));
+            ZEROS32.fill(0); // clean tmp buffer
+        }
+        return this;
+    }
+    digestInto(out) {
+        _assert_exists(this);
+        _assert_output(out, this);
+        this.finished = true;
+        // tmp ugly hack
+        const { s0, s1, s2, s3 } = this;
+        const o32 = utils_u32(out);
+        o32[0] = s0;
+        o32[1] = s1;
+        o32[2] = s2;
+        o32[3] = s3;
+        return out.reverse();
+    }
+}
+function wrapConstructorWithKey(hashCons) {
+    const hashC = (msg, key) => hashCons(key, msg.length).update(utils_toBytes(msg)).digest();
+    const tmp = hashCons(new Uint8Array(16), 0);
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = (key, expectedLength) => hashCons(key, expectedLength);
+    return hashC;
+}
+const ghash = wrapConstructorWithKey((key, expectedLength) => new GHASH(key, expectedLength));
+const polyval = wrapConstructorWithKey((key, expectedLength) => new Polyval(key, expectedLength));
+//# sourceMappingURL=_polyval.js.map
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/aes.js
+// prettier-ignore
+
+
+
+/*
+AES (Advanced Encryption Standard) aka Rijndael block cipher.
+
+Data is split into 128-bit blocks. Encrypted in 10/12/14 rounds (128/192/256 bits). In every round:
+1. **S-box**, table substitution
+2. **Shift rows**, cyclic shift left of all rows of data array
+3. **Mix columns**, multiplying every column by fixed polynomial
+4. **Add round key**, round_key xor i-th column of array
+
+Resources:
+- FIPS-197 https://csrc.nist.gov/files/pubs/fips/197/final/docs/fips-197.pdf
+- Original proposal: https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/aes-development/rijndael-ammended.pdf
+*/
+const aes_BLOCK_SIZE = 16;
+const BLOCK_SIZE32 = 4;
+const EMPTY_BLOCK = new Uint8Array(aes_BLOCK_SIZE);
+const aes_POLY = 0x11b; // 1 + x + x**3 + x**4 + x**8
+// TODO: remove multiplication, binary ops only
+function aes_mul2(n) {
+    return (n << 1) ^ (aes_POLY & -(n >> 7));
+}
+function mul(a, b) {
+    let res = 0;
+    for (; b > 0; b >>= 1) {
+        // Montgomery ladder
+        res ^= a & -(b & 1); // if (b&1) res ^=a (but const-time).
+        a = aes_mul2(a); // a = 2*a
+    }
+    return res;
+}
+// AES S-box is generated using finite field inversion,
+// an affine transform, and xor of a constant 0x63.
+const sbox = /* @__PURE__ */ (() => {
+    let t = new Uint8Array(256);
+    for (let i = 0, x = 1; i < 256; i++, x ^= aes_mul2(x))
+        t[i] = x;
+    const box = new Uint8Array(256);
+    box[0] = 0x63; // first elm
+    for (let i = 0; i < 255; i++) {
+        let x = t[255 - i];
+        x |= x << 8;
+        box[t[i]] = (x ^ (x >> 4) ^ (x >> 5) ^ (x >> 6) ^ (x >> 7) ^ 0x63) & 0xff;
+    }
+    return box;
+})();
+// Inverted S-box
+const invSbox = /* @__PURE__ */ sbox.map((_, j) => sbox.indexOf(j));
+// Rotate u32 by 8
+const rotr32_8 = (n) => (n << 24) | (n >>> 8);
+const rotl32_8 = (n) => (n << 8) | (n >>> 24);
+// T-table is optimization suggested in 5.2 of original proposal (missed from FIPS-197). Changes:
+// - LE instead of BE
+// - bigger tables: T0 and T1 are merged into T01 table and T2 & T3 into T23;
+//   so index is u16, instead of u8. This speeds up things, unexpectedly
+function genTtable(sbox, fn) {
+    if (sbox.length !== 256)
+        throw new Error('Wrong sbox length');
+    const T0 = new Uint32Array(256).map((_, j) => fn(sbox[j]));
+    const T1 = T0.map(rotl32_8);
+    const T2 = T1.map(rotl32_8);
+    const T3 = T2.map(rotl32_8);
+    const T01 = new Uint32Array(256 * 256);
+    const T23 = new Uint32Array(256 * 256);
+    const sbox2 = new Uint16Array(256 * 256);
+    for (let i = 0; i < 256; i++) {
+        for (let j = 0; j < 256; j++) {
+            const idx = i * 256 + j;
+            T01[idx] = T0[i] ^ T1[j];
+            T23[idx] = T2[i] ^ T3[j];
+            sbox2[idx] = (sbox[i] << 8) | sbox[j];
+        }
+    }
+    return { sbox, sbox2, T0, T1, T2, T3, T01, T23 };
+}
+const tableEncoding = /* @__PURE__ */ genTtable(sbox, (s) => (mul(s, 3) << 24) | (s << 16) | (s << 8) | mul(s, 2));
+const tableDecoding = /* @__PURE__ */ genTtable(invSbox, (s) => (mul(s, 11) << 24) | (mul(s, 13) << 16) | (mul(s, 9) << 8) | mul(s, 14));
+const xPowers = /* @__PURE__ */ (() => {
+    const p = new Uint8Array(16);
+    for (let i = 0, x = 1; i < 16; i++, x = aes_mul2(x))
+        p[i] = x;
+    return p;
+})();
+function expandKeyLE(key) {
+    _assert_bytes(key);
+    const len = key.length;
+    if (![16, 24, 32].includes(len))
+        throw new Error(`aes: wrong key size: should be 16, 24 or 32, got: ${len}`);
+    const { sbox2 } = tableEncoding;
+    const k32 = utils_u32(key);
+    const Nk = k32.length;
+    const subByte = (n) => applySbox(sbox2, n, n, n, n);
+    const xk = new Uint32Array(len + 28); // expanded key
+    xk.set(k32);
+    // 4.3.1 Key expansion
+    for (let i = Nk; i < xk.length; i++) {
+        let t = xk[i - 1];
+        if (i % Nk === 0)
+            t = subByte(rotr32_8(t)) ^ xPowers[i / Nk - 1];
+        else if (Nk > 6 && i % Nk === 4)
+            t = subByte(t);
+        xk[i] = xk[i - Nk] ^ t;
+    }
+    return xk;
+}
+function expandKeyDecLE(key) {
+    const encKey = expandKeyLE(key);
+    const xk = encKey.slice();
+    const Nk = encKey.length;
+    const { sbox2 } = tableEncoding;
+    const { T0, T1, T2, T3 } = tableDecoding;
+    // Inverse key by chunks of 4 (rounds)
+    for (let i = 0; i < Nk; i += 4) {
+        for (let j = 0; j < 4; j++)
+            xk[i + j] = encKey[Nk - i - 4 + j];
+    }
+    encKey.fill(0);
+    // apply InvMixColumn except first & last round
+    for (let i = 4; i < Nk - 4; i++) {
+        const x = xk[i];
+        const w = applySbox(sbox2, x, x, x, x);
+        xk[i] = T0[w & 0xff] ^ T1[(w >>> 8) & 0xff] ^ T2[(w >>> 16) & 0xff] ^ T3[w >>> 24];
+    }
+    return xk;
+}
+// Apply tables
+function apply0123(T01, T23, s0, s1, s2, s3) {
+    return (T01[((s0 << 8) & 0xff00) | ((s1 >>> 8) & 0xff)] ^
+        T23[((s2 >>> 8) & 0xff00) | ((s3 >>> 24) & 0xff)]);
+}
+function applySbox(sbox2, s0, s1, s2, s3) {
+    return (sbox2[(s0 & 0xff) | (s1 & 0xff00)] |
+        (sbox2[((s2 >>> 16) & 0xff) | ((s3 >>> 16) & 0xff00)] << 16));
+}
+function encrypt(xk, s0, s1, s2, s3) {
+    const { sbox2, T01, T23 } = tableEncoding;
+    let k = 0;
+    (s0 ^= xk[k++]), (s1 ^= xk[k++]), (s2 ^= xk[k++]), (s3 ^= xk[k++]);
+    const rounds = xk.length / 4 - 2;
+    for (let i = 0; i < rounds; i++) {
+        const t0 = xk[k++] ^ apply0123(T01, T23, s0, s1, s2, s3);
+        const t1 = xk[k++] ^ apply0123(T01, T23, s1, s2, s3, s0);
+        const t2 = xk[k++] ^ apply0123(T01, T23, s2, s3, s0, s1);
+        const t3 = xk[k++] ^ apply0123(T01, T23, s3, s0, s1, s2);
+        (s0 = t0), (s1 = t1), (s2 = t2), (s3 = t3);
+    }
+    // last round (without mixcolumns, so using SBOX2 table)
+    const t0 = xk[k++] ^ applySbox(sbox2, s0, s1, s2, s3);
+    const t1 = xk[k++] ^ applySbox(sbox2, s1, s2, s3, s0);
+    const t2 = xk[k++] ^ applySbox(sbox2, s2, s3, s0, s1);
+    const t3 = xk[k++] ^ applySbox(sbox2, s3, s0, s1, s2);
+    return { s0: t0, s1: t1, s2: t2, s3: t3 };
+}
+function decrypt(xk, s0, s1, s2, s3) {
+    const { sbox2, T01, T23 } = tableDecoding;
+    let k = 0;
+    (s0 ^= xk[k++]), (s1 ^= xk[k++]), (s2 ^= xk[k++]), (s3 ^= xk[k++]);
+    const rounds = xk.length / 4 - 2;
+    for (let i = 0; i < rounds; i++) {
+        const t0 = xk[k++] ^ apply0123(T01, T23, s0, s3, s2, s1);
+        const t1 = xk[k++] ^ apply0123(T01, T23, s1, s0, s3, s2);
+        const t2 = xk[k++] ^ apply0123(T01, T23, s2, s1, s0, s3);
+        const t3 = xk[k++] ^ apply0123(T01, T23, s3, s2, s1, s0);
+        (s0 = t0), (s1 = t1), (s2 = t2), (s3 = t3);
+    }
+    // Last round
+    const t0 = xk[k++] ^ applySbox(sbox2, s0, s3, s2, s1);
+    const t1 = xk[k++] ^ applySbox(sbox2, s1, s0, s3, s2);
+    const t2 = xk[k++] ^ applySbox(sbox2, s2, s1, s0, s3);
+    const t3 = xk[k++] ^ applySbox(sbox2, s3, s2, s1, s0);
+    return { s0: t0, s1: t1, s2: t2, s3: t3 };
+}
+function getDst(len, dst) {
+    if (!dst)
+        return new Uint8Array(len);
+    _assert_bytes(dst);
+    if (dst.length < len)
+        throw new Error(`aes: wrong destination length, expected at least ${len}, got: ${dst.length}`);
+    return dst;
+}
+// TODO: investigate merging with ctr32
+function ctrCounter(xk, nonce, src, dst) {
+    _assert_bytes(nonce, aes_BLOCK_SIZE);
+    _assert_bytes(src);
+    const srcLen = src.length;
+    dst = getDst(srcLen, dst);
+    const ctr = nonce;
+    const c32 = utils_u32(ctr);
+    // Fill block (empty, ctr=0)
+    let { s0, s1, s2, s3 } = encrypt(xk, c32[0], c32[1], c32[2], c32[3]);
+    const src32 = utils_u32(src);
+    const dst32 = utils_u32(dst);
+    // process blocks
+    for (let i = 0; i + 4 <= src32.length; i += 4) {
+        dst32[i + 0] = src32[i + 0] ^ s0;
+        dst32[i + 1] = src32[i + 1] ^ s1;
+        dst32[i + 2] = src32[i + 2] ^ s2;
+        dst32[i + 3] = src32[i + 3] ^ s3;
+        // Full 128 bit counter with wrap around
+        let carry = 1;
+        for (let i = ctr.length - 1; i >= 0; i--) {
+            carry = (carry + (ctr[i] & 0xff)) | 0;
+            ctr[i] = carry & 0xff;
+            carry >>>= 8;
+        }
+        ({ s0, s1, s2, s3 } = encrypt(xk, c32[0], c32[1], c32[2], c32[3]));
+    }
+    // leftovers (less than block)
+    // It's possible to handle > u32 fast, but is it worth it?
+    const start = aes_BLOCK_SIZE * Math.floor(src32.length / BLOCK_SIZE32);
+    if (start < srcLen) {
+        const b32 = new Uint32Array([s0, s1, s2, s3]);
+        const buf = utils_u8(b32);
+        for (let i = start, pos = 0; i < srcLen; i++, pos++)
+            dst[i] = src[i] ^ buf[pos];
+    }
+    return dst;
+}
+// AES CTR with overflowing 32 bit counter
+// It's possible to do 32le significantly simpler (and probably faster) by using u32.
+// But, we need both, and perf bottleneck is in ghash anyway.
+function ctr32(xk, isLE, nonce, src, dst) {
+    _assert_bytes(nonce, aes_BLOCK_SIZE);
+    _assert_bytes(src);
+    dst = getDst(src.length, dst);
+    const ctr = nonce; // write new value to nonce, so it can be re-used
+    const c32 = utils_u32(ctr);
+    const view = utils_createView(ctr);
+    const src32 = utils_u32(src);
+    const dst32 = utils_u32(dst);
+    const ctrPos = isLE ? 0 : 12;
+    const srcLen = src.length;
+    // Fill block (empty, ctr=0)
+    let ctrNum = view.getUint32(ctrPos, isLE); // read current counter value
+    let { s0, s1, s2, s3 } = encrypt(xk, c32[0], c32[1], c32[2], c32[3]);
+    // process blocks
+    for (let i = 0; i + 4 <= src32.length; i += 4) {
+        dst32[i + 0] = src32[i + 0] ^ s0;
+        dst32[i + 1] = src32[i + 1] ^ s1;
+        dst32[i + 2] = src32[i + 2] ^ s2;
+        dst32[i + 3] = src32[i + 3] ^ s3;
+        ctrNum = (ctrNum + 1) >>> 0; // u32 wrap
+        view.setUint32(ctrPos, ctrNum, isLE);
+        ({ s0, s1, s2, s3 } = encrypt(xk, c32[0], c32[1], c32[2], c32[3]));
+    }
+    // leftovers (less than a block)
+    const start = aes_BLOCK_SIZE * Math.floor(src32.length / BLOCK_SIZE32);
+    if (start < srcLen) {
+        const b32 = new Uint32Array([s0, s1, s2, s3]);
+        const buf = utils_u8(b32);
+        for (let i = start, pos = 0; i < srcLen; i++, pos++)
+            dst[i] = src[i] ^ buf[pos];
+    }
+    return dst;
+}
+/**
+ * CTR: counter mode. Creates stream cipher.
+ * Requires good IV. Parallelizable. OK, but no MAC.
+ */
+const ctr = wrapCipher({ blockSize: 16, nonceLength: 16 }, function ctr(key, nonce) {
+    _assert_bytes(key);
+    _assert_bytes(nonce, aes_BLOCK_SIZE);
+    function processCtr(buf, dst) {
+        const xk = expandKeyLE(key);
+        const n = nonce.slice();
+        const out = ctrCounter(xk, n, buf, dst);
+        xk.fill(0);
+        n.fill(0);
+        return out;
+    }
+    return {
+        encrypt: (plaintext, dst) => processCtr(plaintext, dst),
+        decrypt: (ciphertext, dst) => processCtr(ciphertext, dst),
+    };
+});
+function validateBlockDecrypt(data) {
+    _assert_bytes(data);
+    if (data.length % aes_BLOCK_SIZE !== 0) {
+        throw new Error(`aes/(cbc-ecb).decrypt ciphertext should consist of blocks with size ${aes_BLOCK_SIZE}`);
+    }
+}
+function validateBlockEncrypt(plaintext, pcks5, dst) {
+    let outLen = plaintext.length;
+    const remaining = outLen % aes_BLOCK_SIZE;
+    if (!pcks5 && remaining !== 0)
+        throw new Error('aec/(cbc-ecb): unpadded plaintext with disabled padding');
+    const b = utils_u32(plaintext);
+    if (pcks5) {
+        let left = aes_BLOCK_SIZE - remaining;
+        if (!left)
+            left = aes_BLOCK_SIZE; // if no bytes left, create empty padding block
+        outLen = outLen + left;
+    }
+    const out = getDst(outLen, dst);
+    const o = utils_u32(out);
+    return { b, o, out };
+}
+function validatePCKS(data, pcks5) {
+    if (!pcks5)
+        return data;
+    const len = data.length;
+    if (!len)
+        throw new Error(`aes/pcks5: empty ciphertext not allowed`);
+    const lastByte = data[len - 1];
+    if (lastByte <= 0 || lastByte > 16)
+        throw new Error(`aes/pcks5: wrong padding byte: ${lastByte}`);
+    const out = data.subarray(0, -lastByte);
+    for (let i = 0; i < lastByte; i++)
+        if (data[len - i - 1] !== lastByte)
+            throw new Error(`aes/pcks5: wrong padding`);
+    return out;
+}
+function padPCKS(left) {
+    const tmp = new Uint8Array(16);
+    const tmp32 = utils_u32(tmp);
+    tmp.set(left);
+    const paddingByte = aes_BLOCK_SIZE - left.length;
+    for (let i = aes_BLOCK_SIZE - paddingByte; i < aes_BLOCK_SIZE; i++)
+        tmp[i] = paddingByte;
+    return tmp32;
+}
+/**
+ * ECB: Electronic CodeBook. Simple deterministic replacement.
+ * Dangerous: always map x to y. See [AES Penguin](https://words.filippo.io/the-ecb-penguin/).
+ */
+const ecb = wrapCipher({ blockSize: 16 }, function ecb(key, opts = {}) {
+    _assert_bytes(key);
+    const pcks5 = !opts.disablePadding;
+    return {
+        encrypt: (plaintext, dst) => {
+            _assert_bytes(plaintext);
+            const { b, o, out: _out } = validateBlockEncrypt(plaintext, pcks5, dst);
+            const xk = expandKeyLE(key);
+            let i = 0;
+            for (; i + 4 <= b.length;) {
+                const { s0, s1, s2, s3 } = encrypt(xk, b[i + 0], b[i + 1], b[i + 2], b[i + 3]);
+                (o[i++] = s0), (o[i++] = s1), (o[i++] = s2), (o[i++] = s3);
+            }
+            if (pcks5) {
+                const tmp32 = padPCKS(plaintext.subarray(i * 4));
+                const { s0, s1, s2, s3 } = encrypt(xk, tmp32[0], tmp32[1], tmp32[2], tmp32[3]);
+                (o[i++] = s0), (o[i++] = s1), (o[i++] = s2), (o[i++] = s3);
+            }
+            xk.fill(0);
+            return _out;
+        },
+        decrypt: (ciphertext, dst) => {
+            validateBlockDecrypt(ciphertext);
+            const xk = expandKeyDecLE(key);
+            const out = getDst(ciphertext.length, dst);
+            const b = utils_u32(ciphertext);
+            const o = utils_u32(out);
+            for (let i = 0; i + 4 <= b.length;) {
+                const { s0, s1, s2, s3 } = decrypt(xk, b[i + 0], b[i + 1], b[i + 2], b[i + 3]);
+                (o[i++] = s0), (o[i++] = s1), (o[i++] = s2), (o[i++] = s3);
+            }
+            xk.fill(0);
+            return validatePCKS(out, pcks5);
+        },
+    };
+});
+/**
+ * CBC: Cipher-Block-Chaining. Key is previous round’s block.
+ * Fragile: needs proper padding. Unauthenticated: needs MAC.
+ */
+const cbc = wrapCipher({ blockSize: 16, nonceLength: 16 }, function cbc(key, iv, opts = {}) {
+    _assert_bytes(key);
+    _assert_bytes(iv, 16);
+    const pcks5 = !opts.disablePadding;
+    return {
+        encrypt: (plaintext, dst) => {
+            const xk = expandKeyLE(key);
+            const { b, o, out: _out } = validateBlockEncrypt(plaintext, pcks5, dst);
+            const n32 = utils_u32(iv);
+            // prettier-ignore
+            let s0 = n32[0], s1 = n32[1], s2 = n32[2], s3 = n32[3];
+            let i = 0;
+            for (; i + 4 <= b.length;) {
+                (s0 ^= b[i + 0]), (s1 ^= b[i + 1]), (s2 ^= b[i + 2]), (s3 ^= b[i + 3]);
+                ({ s0, s1, s2, s3 } = encrypt(xk, s0, s1, s2, s3));
+                (o[i++] = s0), (o[i++] = s1), (o[i++] = s2), (o[i++] = s3);
+            }
+            if (pcks5) {
+                const tmp32 = padPCKS(plaintext.subarray(i * 4));
+                (s0 ^= tmp32[0]), (s1 ^= tmp32[1]), (s2 ^= tmp32[2]), (s3 ^= tmp32[3]);
+                ({ s0, s1, s2, s3 } = encrypt(xk, s0, s1, s2, s3));
+                (o[i++] = s0), (o[i++] = s1), (o[i++] = s2), (o[i++] = s3);
+            }
+            xk.fill(0);
+            return _out;
+        },
+        decrypt: (ciphertext, dst) => {
+            validateBlockDecrypt(ciphertext);
+            const xk = expandKeyDecLE(key);
+            const n32 = utils_u32(iv);
+            const out = getDst(ciphertext.length, dst);
+            const b = utils_u32(ciphertext);
+            const o = utils_u32(out);
+            // prettier-ignore
+            let s0 = n32[0], s1 = n32[1], s2 = n32[2], s3 = n32[3];
+            for (let i = 0; i + 4 <= b.length;) {
+                // prettier-ignore
+                const ps0 = s0, ps1 = s1, ps2 = s2, ps3 = s3;
+                (s0 = b[i + 0]), (s1 = b[i + 1]), (s2 = b[i + 2]), (s3 = b[i + 3]);
+                const { s0: o0, s1: o1, s2: o2, s3: o3 } = decrypt(xk, s0, s1, s2, s3);
+                (o[i++] = o0 ^ ps0), (o[i++] = o1 ^ ps1), (o[i++] = o2 ^ ps2), (o[i++] = o3 ^ ps3);
+            }
+            xk.fill(0);
+            return validatePCKS(out, pcks5);
+        },
+    };
+});
+/**
+ * CFB: Cipher Feedback Mode. The input for the block cipher is the previous cipher output.
+ * Unauthenticated: needs MAC.
+ */
+const cfb = wrapCipher({ blockSize: 16, nonceLength: 16 }, function cfb(key, iv) {
+    _assert_bytes(key);
+    _assert_bytes(iv, 16);
+    function processCfb(src, isEncrypt, dst) {
+        const xk = expandKeyLE(key);
+        const srcLen = src.length;
+        dst = getDst(srcLen, dst);
+        const src32 = utils_u32(src);
+        const dst32 = utils_u32(dst);
+        const next32 = isEncrypt ? dst32 : src32;
+        const n32 = utils_u32(iv);
+        // prettier-ignore
+        let s0 = n32[0], s1 = n32[1], s2 = n32[2], s3 = n32[3];
+        for (let i = 0; i + 4 <= src32.length;) {
+            const { s0: e0, s1: e1, s2: e2, s3: e3 } = encrypt(xk, s0, s1, s2, s3);
+            dst32[i + 0] = src32[i + 0] ^ e0;
+            dst32[i + 1] = src32[i + 1] ^ e1;
+            dst32[i + 2] = src32[i + 2] ^ e2;
+            dst32[i + 3] = src32[i + 3] ^ e3;
+            (s0 = next32[i++]), (s1 = next32[i++]), (s2 = next32[i++]), (s3 = next32[i++]);
+        }
+        // leftovers (less than block)
+        const start = aes_BLOCK_SIZE * Math.floor(src32.length / BLOCK_SIZE32);
+        if (start < srcLen) {
+            ({ s0, s1, s2, s3 } = encrypt(xk, s0, s1, s2, s3));
+            const buf = utils_u8(new Uint32Array([s0, s1, s2, s3]));
+            for (let i = start, pos = 0; i < srcLen; i++, pos++)
+                dst[i] = src[i] ^ buf[pos];
+            buf.fill(0);
+        }
+        xk.fill(0);
+        return dst;
+    }
+    return {
+        encrypt: (plaintext, dst) => processCfb(plaintext, true, dst),
+        decrypt: (ciphertext, dst) => processCfb(ciphertext, false, dst),
+    };
+});
+// TODO: merge with chacha, however gcm has bitLen while chacha has byteLen
+function computeTag(fn, isLE, key, data, AAD) {
+    const h = fn.create(key, data.length + (AAD?.length || 0));
+    if (AAD)
+        h.update(AAD);
+    h.update(data);
+    const num = new Uint8Array(16);
+    const view = utils_createView(num);
+    if (AAD)
+        utils_setBigUint64(view, 0, BigInt(AAD.length * 8), isLE);
+    utils_setBigUint64(view, 8, BigInt(data.length * 8), isLE);
+    h.update(num);
+    return h.digest();
+}
+/**
+ * GCM: Galois/Counter Mode.
+ * Good, modern version of CTR, parallel, with MAC.
+ * Be careful: MACs can be forged.
+ */
+const gcm = wrapCipher({ blockSize: 16, nonceLength: 12, tagLength: 16 }, function gcm(key, nonce, AAD) {
+    _assert_bytes(nonce);
+    // Nonce can be pretty much anything (even 1 byte). But smaller nonces less secure.
+    if (nonce.length === 0)
+        throw new Error('aes/gcm: empty nonce');
+    const tagLength = 16;
+    function _computeTag(authKey, tagMask, data) {
+        const tag = computeTag(ghash, false, authKey, data, AAD);
+        for (let i = 0; i < tagMask.length; i++)
+            tag[i] ^= tagMask[i];
+        return tag;
+    }
+    function deriveKeys() {
+        const xk = expandKeyLE(key);
+        const authKey = EMPTY_BLOCK.slice();
+        const counter = EMPTY_BLOCK.slice();
+        ctr32(xk, false, counter, counter, authKey);
+        if (nonce.length === 12) {
+            counter.set(nonce);
+        }
+        else {
+            // Spec (NIST 800-38d) supports variable size nonce.
+            // Not supported for now, but can be useful.
+            const nonceLen = EMPTY_BLOCK.slice();
+            const view = utils_createView(nonceLen);
+            utils_setBigUint64(view, 8, BigInt(nonce.length * 8), false);
+            // ghash(nonce || u64be(0) || u64be(nonceLen*8))
+            ghash.create(authKey).update(nonce).update(nonceLen).digestInto(counter);
+        }
+        const tagMask = ctr32(xk, false, counter, EMPTY_BLOCK);
+        return { xk, authKey, counter, tagMask };
+    }
+    return {
+        encrypt: (plaintext) => {
+            _assert_bytes(plaintext);
+            const { xk, authKey, counter, tagMask } = deriveKeys();
+            const out = new Uint8Array(plaintext.length + tagLength);
+            ctr32(xk, false, counter, plaintext, out);
+            const tag = _computeTag(authKey, tagMask, out.subarray(0, out.length - tagLength));
+            out.set(tag, plaintext.length);
+            xk.fill(0);
+            return out;
+        },
+        decrypt: (ciphertext) => {
+            _assert_bytes(ciphertext);
+            if (ciphertext.length < tagLength)
+                throw new Error(`aes/gcm: ciphertext less than tagLen (${tagLength})`);
+            const { xk, authKey, counter, tagMask } = deriveKeys();
+            const data = ciphertext.subarray(0, -tagLength);
+            const passedTag = ciphertext.subarray(-tagLength);
+            const tag = _computeTag(authKey, tagMask, data);
+            if (!utils_equalBytes(tag, passedTag))
+                throw new Error('aes/gcm: invalid ghash tag');
+            const out = ctr32(xk, false, counter, data);
+            authKey.fill(0);
+            tagMask.fill(0);
+            xk.fill(0);
+            return out;
+        },
+    };
+});
+const limit = (name, min, max) => (value) => {
+    if (!Number.isSafeInteger(value) || min > value || value > max)
+        throw new Error(`${name}: invalid value=${value}, must be [${min}..${max}]`);
+};
+/**
+ * AES-GCM-SIV: classic AES-GCM with nonce-misuse resistance.
+ * Guarantees that, when a nonce is repeated, the only security loss is that identical
+ * plaintexts will produce identical ciphertexts.
+ * RFC 8452, https://datatracker.ietf.org/doc/html/rfc8452
+ */
+const siv = wrapCipher({ blockSize: 16, nonceLength: 12, tagLength: 16 }, function siv(key, nonce, AAD) {
+    const tagLength = 16;
+    // From RFC 8452: Section 6
+    const AAD_LIMIT = limit('AAD', 0, 2 ** 36);
+    const PLAIN_LIMIT = limit('plaintext', 0, 2 ** 36);
+    const NONCE_LIMIT = limit('nonce', 12, 12);
+    const CIPHER_LIMIT = limit('ciphertext', 16, 2 ** 36 + 16);
+    _assert_bytes(nonce);
+    NONCE_LIMIT(nonce.length);
+    if (AAD) {
+        _assert_bytes(AAD);
+        AAD_LIMIT(AAD.length);
+    }
+    function deriveKeys() {
+        const len = key.length;
+        if (len !== 16 && len !== 24 && len !== 32)
+            throw new Error(`key length must be 16, 24 or 32 bytes, got: ${len} bytes`);
+        const xk = expandKeyLE(key);
+        const encKey = new Uint8Array(len);
+        const authKey = new Uint8Array(16);
+        const n32 = utils_u32(nonce);
+        // prettier-ignore
+        let s0 = 0, s1 = n32[0], s2 = n32[1], s3 = n32[2];
+        let counter = 0;
+        for (const derivedKey of [authKey, encKey].map(utils_u32)) {
+            const d32 = utils_u32(derivedKey);
+            for (let i = 0; i < d32.length; i += 2) {
+                // aes(u32le(0) || nonce)[:8] || aes(u32le(1) || nonce)[:8] ...
+                const { s0: o0, s1: o1 } = encrypt(xk, s0, s1, s2, s3);
+                d32[i + 0] = o0;
+                d32[i + 1] = o1;
+                s0 = ++counter; // increment counter inside state
+            }
+        }
+        xk.fill(0);
+        return { authKey, encKey: expandKeyLE(encKey) };
+    }
+    function _computeTag(encKey, authKey, data) {
+        const tag = computeTag(polyval, true, authKey, data, AAD);
+        // Compute the expected tag by XORing S_s and the nonce, clearing the
+        // most significant bit of the last byte and encrypting with the
+        // message-encryption key.
+        for (let i = 0; i < 12; i++)
+            tag[i] ^= nonce[i];
+        tag[15] &= 0x7f; // Clear the highest bit
+        // encrypt tag as block
+        const t32 = utils_u32(tag);
+        // prettier-ignore
+        let s0 = t32[0], s1 = t32[1], s2 = t32[2], s3 = t32[3];
+        ({ s0, s1, s2, s3 } = encrypt(encKey, s0, s1, s2, s3));
+        (t32[0] = s0), (t32[1] = s1), (t32[2] = s2), (t32[3] = s3);
+        return tag;
+    }
+    // actual decrypt/encrypt of message.
+    function processSiv(encKey, tag, input) {
+        let block = tag.slice();
+        block[15] |= 0x80; // Force highest bit
+        return ctr32(encKey, true, block, input);
+    }
+    return {
+        encrypt: (plaintext) => {
+            _assert_bytes(plaintext);
+            PLAIN_LIMIT(plaintext.length);
+            const { encKey, authKey } = deriveKeys();
+            const tag = _computeTag(encKey, authKey, plaintext);
+            const out = new Uint8Array(plaintext.length + tagLength);
+            out.set(tag, plaintext.length);
+            out.set(processSiv(encKey, tag, plaintext));
+            encKey.fill(0);
+            authKey.fill(0);
+            return out;
+        },
+        decrypt: (ciphertext) => {
+            _assert_bytes(ciphertext);
+            CIPHER_LIMIT(ciphertext.length);
+            const tag = ciphertext.subarray(-tagLength);
+            const { encKey, authKey } = deriveKeys();
+            const plaintext = processSiv(encKey, tag, ciphertext.subarray(0, -tagLength));
+            const expectedTag = _computeTag(encKey, authKey, plaintext);
+            encKey.fill(0);
+            authKey.fill(0);
+            if (!utils_equalBytes(tag, expectedTag))
+                throw new Error('invalid polyval tag');
+            return plaintext;
+        },
+    };
+});
+function isBytes32(a) {
+    return (a != null &&
+        typeof a === 'object' &&
+        (a instanceof Uint32Array || a.constructor.name === 'Uint32Array'));
+}
+function encryptBlock(xk, block) {
+    _assert_bytes(block, 16);
+    if (!isBytes32(xk))
+        throw new Error('_encryptBlock accepts result of expandKeyLE');
+    const b32 = utils_u32(block);
+    let { s0, s1, s2, s3 } = encrypt(xk, b32[0], b32[1], b32[2], b32[3]);
+    (b32[0] = s0), (b32[1] = s1), (b32[2] = s2), (b32[3] = s3);
+    return block;
+}
+function decryptBlock(xk, block) {
+    _assert_bytes(block, 16);
+    if (!isBytes32(xk))
+        throw new Error('_decryptBlock accepts result of expandKeyLE');
+    const b32 = utils_u32(block);
+    let { s0, s1, s2, s3 } = decrypt(xk, b32[0], b32[1], b32[2], b32[3]);
+    (b32[0] = s0), (b32[1] = s1), (b32[2] = s2), (b32[3] = s3);
+    return block;
+}
+// Highly unsafe private functions for implementing new modes or ciphers based on AES
+// Can change at any time, no API guarantees
+const unsafe = {
+    expandKeyLE,
+    expandKeyDecLE,
+    encrypt,
+    decrypt,
+    encryptBlock,
+    decryptBlock,
+    ctrCounter,
+    ctr32,
+};
+//# sourceMappingURL=aes.js.map
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/_poly1305.js
+
+
+// Poly1305 is a fast and parallel secret-key message-authentication code.
+// https://cr.yp.to/mac.html, https://cr.yp.to/mac/poly1305-20050329.pdf
+// https://datatracker.ietf.org/doc/html/rfc8439
+// Based on Public Domain poly1305-donna https://github.com/floodyberry/poly1305-donna
+const u8to16 = (a, i) => (a[i++] & 0xff) | ((a[i++] & 0xff) << 8);
+class Poly1305 {
+    constructor(key) {
+        this.blockLen = 16;
+        this.outputLen = 16;
+        this.buffer = new Uint8Array(16);
+        this.r = new Uint16Array(10);
+        this.h = new Uint16Array(10);
+        this.pad = new Uint16Array(8);
+        this.pos = 0;
+        this.finished = false;
+        key = utils_toBytes(key);
+        _assert_bytes(key, 32);
+        const t0 = u8to16(key, 0);
+        const t1 = u8to16(key, 2);
+        const t2 = u8to16(key, 4);
+        const t3 = u8to16(key, 6);
+        const t4 = u8to16(key, 8);
+        const t5 = u8to16(key, 10);
+        const t6 = u8to16(key, 12);
+        const t7 = u8to16(key, 14);
+        // https://github.com/floodyberry/poly1305-donna/blob/e6ad6e091d30d7f4ec2d4f978be1fcfcbce72781/poly1305-donna-16.h#L47
+        this.r[0] = t0 & 0x1fff;
+        this.r[1] = ((t0 >>> 13) | (t1 << 3)) & 0x1fff;
+        this.r[2] = ((t1 >>> 10) | (t2 << 6)) & 0x1f03;
+        this.r[3] = ((t2 >>> 7) | (t3 << 9)) & 0x1fff;
+        this.r[4] = ((t3 >>> 4) | (t4 << 12)) & 0x00ff;
+        this.r[5] = (t4 >>> 1) & 0x1ffe;
+        this.r[6] = ((t4 >>> 14) | (t5 << 2)) & 0x1fff;
+        this.r[7] = ((t5 >>> 11) | (t6 << 5)) & 0x1f81;
+        this.r[8] = ((t6 >>> 8) | (t7 << 8)) & 0x1fff;
+        this.r[9] = (t7 >>> 5) & 0x007f;
+        for (let i = 0; i < 8; i++)
+            this.pad[i] = u8to16(key, 16 + 2 * i);
+    }
+    process(data, offset, isLast = false) {
+        const hibit = isLast ? 0 : 1 << 11;
+        const { h, r } = this;
+        const r0 = r[0];
+        const r1 = r[1];
+        const r2 = r[2];
+        const r3 = r[3];
+        const r4 = r[4];
+        const r5 = r[5];
+        const r6 = r[6];
+        const r7 = r[7];
+        const r8 = r[8];
+        const r9 = r[9];
+        const t0 = u8to16(data, offset + 0);
+        const t1 = u8to16(data, offset + 2);
+        const t2 = u8to16(data, offset + 4);
+        const t3 = u8to16(data, offset + 6);
+        const t4 = u8to16(data, offset + 8);
+        const t5 = u8to16(data, offset + 10);
+        const t6 = u8to16(data, offset + 12);
+        const t7 = u8to16(data, offset + 14);
+        let h0 = h[0] + (t0 & 0x1fff);
+        let h1 = h[1] + (((t0 >>> 13) | (t1 << 3)) & 0x1fff);
+        let h2 = h[2] + (((t1 >>> 10) | (t2 << 6)) & 0x1fff);
+        let h3 = h[3] + (((t2 >>> 7) | (t3 << 9)) & 0x1fff);
+        let h4 = h[4] + (((t3 >>> 4) | (t4 << 12)) & 0x1fff);
+        let h5 = h[5] + ((t4 >>> 1) & 0x1fff);
+        let h6 = h[6] + (((t4 >>> 14) | (t5 << 2)) & 0x1fff);
+        let h7 = h[7] + (((t5 >>> 11) | (t6 << 5)) & 0x1fff);
+        let h8 = h[8] + (((t6 >>> 8) | (t7 << 8)) & 0x1fff);
+        let h9 = h[9] + ((t7 >>> 5) | hibit);
+        let c = 0;
+        let d0 = c + h0 * r0 + h1 * (5 * r9) + h2 * (5 * r8) + h3 * (5 * r7) + h4 * (5 * r6);
+        c = d0 >>> 13;
+        d0 &= 0x1fff;
+        d0 += h5 * (5 * r5) + h6 * (5 * r4) + h7 * (5 * r3) + h8 * (5 * r2) + h9 * (5 * r1);
+        c += d0 >>> 13;
+        d0 &= 0x1fff;
+        let d1 = c + h0 * r1 + h1 * r0 + h2 * (5 * r9) + h3 * (5 * r8) + h4 * (5 * r7);
+        c = d1 >>> 13;
+        d1 &= 0x1fff;
+        d1 += h5 * (5 * r6) + h6 * (5 * r5) + h7 * (5 * r4) + h8 * (5 * r3) + h9 * (5 * r2);
+        c += d1 >>> 13;
+        d1 &= 0x1fff;
+        let d2 = c + h0 * r2 + h1 * r1 + h2 * r0 + h3 * (5 * r9) + h4 * (5 * r8);
+        c = d2 >>> 13;
+        d2 &= 0x1fff;
+        d2 += h5 * (5 * r7) + h6 * (5 * r6) + h7 * (5 * r5) + h8 * (5 * r4) + h9 * (5 * r3);
+        c += d2 >>> 13;
+        d2 &= 0x1fff;
+        let d3 = c + h0 * r3 + h1 * r2 + h2 * r1 + h3 * r0 + h4 * (5 * r9);
+        c = d3 >>> 13;
+        d3 &= 0x1fff;
+        d3 += h5 * (5 * r8) + h6 * (5 * r7) + h7 * (5 * r6) + h8 * (5 * r5) + h9 * (5 * r4);
+        c += d3 >>> 13;
+        d3 &= 0x1fff;
+        let d4 = c + h0 * r4 + h1 * r3 + h2 * r2 + h3 * r1 + h4 * r0;
+        c = d4 >>> 13;
+        d4 &= 0x1fff;
+        d4 += h5 * (5 * r9) + h6 * (5 * r8) + h7 * (5 * r7) + h8 * (5 * r6) + h9 * (5 * r5);
+        c += d4 >>> 13;
+        d4 &= 0x1fff;
+        let d5 = c + h0 * r5 + h1 * r4 + h2 * r3 + h3 * r2 + h4 * r1;
+        c = d5 >>> 13;
+        d5 &= 0x1fff;
+        d5 += h5 * r0 + h6 * (5 * r9) + h7 * (5 * r8) + h8 * (5 * r7) + h9 * (5 * r6);
+        c += d5 >>> 13;
+        d5 &= 0x1fff;
+        let d6 = c + h0 * r6 + h1 * r5 + h2 * r4 + h3 * r3 + h4 * r2;
+        c = d6 >>> 13;
+        d6 &= 0x1fff;
+        d6 += h5 * r1 + h6 * r0 + h7 * (5 * r9) + h8 * (5 * r8) + h9 * (5 * r7);
+        c += d6 >>> 13;
+        d6 &= 0x1fff;
+        let d7 = c + h0 * r7 + h1 * r6 + h2 * r5 + h3 * r4 + h4 * r3;
+        c = d7 >>> 13;
+        d7 &= 0x1fff;
+        d7 += h5 * r2 + h6 * r1 + h7 * r0 + h8 * (5 * r9) + h9 * (5 * r8);
+        c += d7 >>> 13;
+        d7 &= 0x1fff;
+        let d8 = c + h0 * r8 + h1 * r7 + h2 * r6 + h3 * r5 + h4 * r4;
+        c = d8 >>> 13;
+        d8 &= 0x1fff;
+        d8 += h5 * r3 + h6 * r2 + h7 * r1 + h8 * r0 + h9 * (5 * r9);
+        c += d8 >>> 13;
+        d8 &= 0x1fff;
+        let d9 = c + h0 * r9 + h1 * r8 + h2 * r7 + h3 * r6 + h4 * r5;
+        c = d9 >>> 13;
+        d9 &= 0x1fff;
+        d9 += h5 * r4 + h6 * r3 + h7 * r2 + h8 * r1 + h9 * r0;
+        c += d9 >>> 13;
+        d9 &= 0x1fff;
+        c = ((c << 2) + c) | 0;
+        c = (c + d0) | 0;
+        d0 = c & 0x1fff;
+        c = c >>> 13;
+        d1 += c;
+        h[0] = d0;
+        h[1] = d1;
+        h[2] = d2;
+        h[3] = d3;
+        h[4] = d4;
+        h[5] = d5;
+        h[6] = d6;
+        h[7] = d7;
+        h[8] = d8;
+        h[9] = d9;
+    }
+    finalize() {
+        const { h, pad } = this;
+        const g = new Uint16Array(10);
+        let c = h[1] >>> 13;
+        h[1] &= 0x1fff;
+        for (let i = 2; i < 10; i++) {
+            h[i] += c;
+            c = h[i] >>> 13;
+            h[i] &= 0x1fff;
+        }
+        h[0] += c * 5;
+        c = h[0] >>> 13;
+        h[0] &= 0x1fff;
+        h[1] += c;
+        c = h[1] >>> 13;
+        h[1] &= 0x1fff;
+        h[2] += c;
+        g[0] = h[0] + 5;
+        c = g[0] >>> 13;
+        g[0] &= 0x1fff;
+        for (let i = 1; i < 10; i++) {
+            g[i] = h[i] + c;
+            c = g[i] >>> 13;
+            g[i] &= 0x1fff;
+        }
+        g[9] -= 1 << 13;
+        let mask = (c ^ 1) - 1;
+        for (let i = 0; i < 10; i++)
+            g[i] &= mask;
+        mask = ~mask;
+        for (let i = 0; i < 10; i++)
+            h[i] = (h[i] & mask) | g[i];
+        h[0] = (h[0] | (h[1] << 13)) & 0xffff;
+        h[1] = ((h[1] >>> 3) | (h[2] << 10)) & 0xffff;
+        h[2] = ((h[2] >>> 6) | (h[3] << 7)) & 0xffff;
+        h[3] = ((h[3] >>> 9) | (h[4] << 4)) & 0xffff;
+        h[4] = ((h[4] >>> 12) | (h[5] << 1) | (h[6] << 14)) & 0xffff;
+        h[5] = ((h[6] >>> 2) | (h[7] << 11)) & 0xffff;
+        h[6] = ((h[7] >>> 5) | (h[8] << 8)) & 0xffff;
+        h[7] = ((h[8] >>> 8) | (h[9] << 5)) & 0xffff;
+        let f = h[0] + pad[0];
+        h[0] = f & 0xffff;
+        for (let i = 1; i < 8; i++) {
+            f = (((h[i] + pad[i]) | 0) + (f >>> 16)) | 0;
+            h[i] = f & 0xffff;
+        }
+    }
+    update(data) {
+        _assert_exists(this);
+        const { buffer, blockLen } = this;
+        data = utils_toBytes(data);
+        const len = data.length;
+        for (let pos = 0; pos < len;) {
+            const take = Math.min(blockLen - this.pos, len - pos);
+            // Fast path: we have at least one block in input
+            if (take === blockLen) {
+                for (; blockLen <= len - pos; pos += blockLen)
+                    this.process(data, pos);
+                continue;
+            }
+            buffer.set(data.subarray(pos, pos + take), this.pos);
+            this.pos += take;
+            pos += take;
+            if (this.pos === blockLen) {
+                this.process(buffer, 0, false);
+                this.pos = 0;
+            }
+        }
+        return this;
+    }
+    destroy() {
+        this.h.fill(0);
+        this.r.fill(0);
+        this.buffer.fill(0);
+        this.pad.fill(0);
+    }
+    digestInto(out) {
+        _assert_exists(this);
+        _assert_output(out, this);
+        this.finished = true;
+        const { buffer, h } = this;
+        let { pos } = this;
+        if (pos) {
+            buffer[pos++] = 1;
+            // buffer.subarray(pos).fill(0);
+            for (; pos < 16; pos++)
+                buffer[pos] = 0;
+            this.process(buffer, 0, true);
+        }
+        this.finalize();
+        let opos = 0;
+        for (let i = 0; i < 8; i++) {
+            out[opos++] = h[i] >>> 0;
+            out[opos++] = h[i] >>> 8;
+        }
+        return out;
+    }
+    digest() {
+        const { buffer, outputLen } = this;
+        this.digestInto(buffer);
+        const res = buffer.slice(0, outputLen);
+        this.destroy();
+        return res;
+    }
+}
+function _poly1305_wrapConstructorWithKey(hashCons) {
+    const hashC = (msg, key) => hashCons(key).update(utils_toBytes(msg)).digest();
+    const tmp = hashCons(new Uint8Array(32));
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = (key) => hashCons(key);
+    return hashC;
+}
+const poly1305 = _poly1305_wrapConstructorWithKey((key) => new Poly1305(key));
+//# sourceMappingURL=_poly1305.js.map
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/_arx.js
+// Basic utils for ARX (add-rotate-xor) salsa and chacha ciphers.
+
+
+/*
+RFC8439 requires multi-step cipher stream, where
+authKey starts with counter: 0, actual msg with counter: 1.
+
+For this, we need a way to re-use nonce / counter:
+
+    const counter = new Uint8Array(4);
+    chacha(..., counter, ...); // counter is now 1
+    chacha(..., counter, ...); // counter is now 2
+
+This is complicated:
+
+- 32-bit counters are enough, no need for 64-bit: max ArrayBuffer size in JS is 4GB
+- Original papers don't allow mutating counters
+- Counter overflow is undefined [^1]
+- Idea A: allow providing (nonce | counter) instead of just nonce, re-use it
+- Caveat: Cannot be re-used through all cases:
+- * chacha has (counter | nonce)
+- * xchacha has (nonce16 | counter | nonce16)
+- Idea B: separate nonce / counter and provide separate API for counter re-use
+- Caveat: there are different counter sizes depending on an algorithm.
+- salsa & chacha also differ in structures of key & sigma:
+  salsa20:      s[0] | k(4) | s[1] | nonce(2) | ctr(2) | s[2] | k(4) | s[3]
+  chacha:       s(4) | k(8) | ctr(1) | nonce(3)
+  chacha20orig: s(4) | k(8) | ctr(2) | nonce(2)
+- Idea C: helper method such as `setSalsaState(key, nonce, sigma, data)`
+- Caveat: we can't re-use counter array
+
+xchacha [^2] uses the subkey and remaining 8 byte nonce with ChaCha20 as normal
+(prefixed by 4 NUL bytes, since [RFC8439] specifies a 12-byte nonce).
+
+[^1]: https://mailarchive.ietf.org/arch/msg/cfrg/gsOnTJzcbgG6OqD8Sc0GO5aR_tU/
+[^2]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha#appendix-A.2
+*/
+// We can't make top-level var depend on utils.utf8ToBytes
+// because it's not present in all envs. Creating a similar fn here
+const _utf8ToBytes = (str) => Uint8Array.from(str.split('').map((c) => c.charCodeAt(0)));
+const sigma16 = _utf8ToBytes('expand 16-byte k');
+const sigma32 = _utf8ToBytes('expand 32-byte k');
+const sigma16_32 = utils_u32(sigma16);
+const sigma32_32 = utils_u32(sigma32);
+const sigma = sigma32_32.slice();
+function rotl(a, b) {
+    return (a << b) | (a >>> (32 - b));
+}
+// Is byte array aligned to 4 byte offset (u32)?
+function isAligned32(b) {
+    return b.byteOffset % 4 === 0;
+}
+// Salsa and Chacha block length is always 512-bit
+const BLOCK_LEN = 64;
+const BLOCK_LEN32 = 16;
+// new Uint32Array([2**32])   // => Uint32Array(1) [ 0 ]
+// new Uint32Array([2**32-1]) // => Uint32Array(1) [ 4294967295 ]
+const MAX_COUNTER = 2 ** 32 - 1;
+const U32_EMPTY = new Uint32Array();
+function runCipher(core, sigma, key, nonce, data, output, counter, rounds) {
+    const len = data.length;
+    const block = new Uint8Array(BLOCK_LEN);
+    const b32 = utils_u32(block);
+    // Make sure that buffers aligned to 4 bytes
+    const isAligned = isAligned32(data) && isAligned32(output);
+    const d32 = isAligned ? utils_u32(data) : U32_EMPTY;
+    const o32 = isAligned ? utils_u32(output) : U32_EMPTY;
+    for (let pos = 0; pos < len; counter++) {
+        core(sigma, key, nonce, b32, counter, rounds);
+        if (counter >= MAX_COUNTER)
+            throw new Error('arx: counter overflow');
+        const take = Math.min(BLOCK_LEN, len - pos);
+        // aligned to 4 bytes
+        if (isAligned && take === BLOCK_LEN) {
+            const pos32 = pos / 4;
+            if (pos % 4 !== 0)
+                throw new Error('arx: invalid block position');
+            for (let j = 0, posj; j < BLOCK_LEN32; j++) {
+                posj = pos32 + j;
+                o32[posj] = d32[posj] ^ b32[j];
+            }
+            pos += BLOCK_LEN;
+            continue;
+        }
+        for (let j = 0, posj; j < take; j++) {
+            posj = pos + j;
+            output[posj] = data[posj] ^ block[j];
+        }
+        pos += take;
+    }
+}
+function createCipher(core, opts) {
+    const { allowShortKeys, extendNonceFn, counterLength, counterRight, rounds } = utils_checkOpts({ allowShortKeys: false, counterLength: 8, counterRight: false, rounds: 20 }, opts);
+    if (typeof core !== 'function')
+        throw new Error('core must be a function');
+    _assert_number(counterLength);
+    _assert_number(rounds);
+    _assert_bool(counterRight);
+    _assert_bool(allowShortKeys);
+    return (key, nonce, data, output, counter = 0) => {
+        _assert_bytes(key);
+        _assert_bytes(nonce);
+        _assert_bytes(data);
+        const len = data.length;
+        if (!output)
+            output = new Uint8Array(len);
+        _assert_bytes(output);
+        _assert_number(counter);
+        if (counter < 0 || counter >= MAX_COUNTER)
+            throw new Error('arx: counter overflow');
+        if (output.length < len)
+            throw new Error(`arx: output (${output.length}) is shorter than data (${len})`);
+        const toClean = [];
+        // Key & sigma
+        // key=16 -> sigma16, k=key|key
+        // key=32 -> sigma32, k=key
+        let l = key.length, k, sigma;
+        if (l === 32) {
+            k = key.slice();
+            toClean.push(k);
+            sigma = sigma32_32;
+        }
+        else if (l === 16 && allowShortKeys) {
+            k = new Uint8Array(32);
+            k.set(key);
+            k.set(key, 16);
+            sigma = sigma16_32;
+            toClean.push(k);
+        }
+        else {
+            throw new Error(`arx: invalid 32-byte key, got length=${l}`);
+        }
+        // Nonce
+        // salsa20:      8   (8-byte counter)
+        // chacha20orig: 8   (8-byte counter)
+        // chacha20:     12  (4-byte counter)
+        // xsalsa20:     24  (16 -> hsalsa,  8 -> old nonce)
+        // xchacha20:    24  (16 -> hchacha, 8 -> old nonce)
+        // Align nonce to 4 bytes
+        if (!isAligned32(nonce)) {
+            nonce = nonce.slice();
+            toClean.push(nonce);
+        }
+        const k32 = utils_u32(k);
+        // hsalsa & hchacha: handle extended nonce
+        if (extendNonceFn) {
+            if (nonce.length !== 24)
+                throw new Error(`arx: extended nonce must be 24 bytes`);
+            extendNonceFn(sigma, k32, utils_u32(nonce.subarray(0, 16)), k32);
+            nonce = nonce.subarray(16);
+        }
+        // Handle nonce counter
+        const nonceNcLen = 16 - counterLength;
+        if (nonceNcLen !== nonce.length)
+            throw new Error(`arx: nonce must be ${nonceNcLen} or 16 bytes`);
+        // Pad counter when nonce is 64 bit
+        if (nonceNcLen !== 12) {
+            const nc = new Uint8Array(12);
+            nc.set(nonce, counterRight ? 0 : 12 - nonce.length);
+            nonce = nc;
+            toClean.push(nonce);
+        }
+        const n32 = utils_u32(nonce);
+        runCipher(core, sigma, k32, n32, data, output, counter, rounds);
+        while (toClean.length > 0)
+            toClean.pop().fill(0);
+        return output;
+    };
+}
+//# sourceMappingURL=_arx.js.map
+;// CONCATENATED MODULE: ./node_modules/nostr-tools/node_modules/@noble/ciphers/esm/chacha.js
+// prettier-ignore
+
+
+
+
+// ChaCha20 stream cipher was released in 2008. ChaCha aims to increase
+// the diffusion per round, but had slightly less cryptanalysis.
+// https://cr.yp.to/chacha.html, http://cr.yp.to/chacha/chacha-20080128.pdf
+/**
+ * ChaCha core function.
+ */
+// prettier-ignore
+function chachaCore(s, k, n, out, cnt, rounds = 20) {
+    let y00 = s[0], y01 = s[1], y02 = s[2], y03 = s[3], // "expa"   "nd 3"  "2-by"  "te k"
+    y04 = k[0], y05 = k[1], y06 = k[2], y07 = k[3], // Key      Key     Key     Key
+    y08 = k[4], y09 = k[5], y10 = k[6], y11 = k[7], // Key      Key     Key     Key
+    y12 = cnt, y13 = n[0], y14 = n[1], y15 = n[2]; // Counter  Counter	Nonce   Nonce
+    // Save state to temporary variables
+    let x00 = y00, x01 = y01, x02 = y02, x03 = y03, x04 = y04, x05 = y05, x06 = y06, x07 = y07, x08 = y08, x09 = y09, x10 = y10, x11 = y11, x12 = y12, x13 = y13, x14 = y14, x15 = y15;
+    for (let r = 0; r < rounds; r += 2) {
+        x00 = (x00 + x04) | 0;
+        x12 = rotl(x12 ^ x00, 16);
+        x08 = (x08 + x12) | 0;
+        x04 = rotl(x04 ^ x08, 12);
+        x00 = (x00 + x04) | 0;
+        x12 = rotl(x12 ^ x00, 8);
+        x08 = (x08 + x12) | 0;
+        x04 = rotl(x04 ^ x08, 7);
+        x01 = (x01 + x05) | 0;
+        x13 = rotl(x13 ^ x01, 16);
+        x09 = (x09 + x13) | 0;
+        x05 = rotl(x05 ^ x09, 12);
+        x01 = (x01 + x05) | 0;
+        x13 = rotl(x13 ^ x01, 8);
+        x09 = (x09 + x13) | 0;
+        x05 = rotl(x05 ^ x09, 7);
+        x02 = (x02 + x06) | 0;
+        x14 = rotl(x14 ^ x02, 16);
+        x10 = (x10 + x14) | 0;
+        x06 = rotl(x06 ^ x10, 12);
+        x02 = (x02 + x06) | 0;
+        x14 = rotl(x14 ^ x02, 8);
+        x10 = (x10 + x14) | 0;
+        x06 = rotl(x06 ^ x10, 7);
+        x03 = (x03 + x07) | 0;
+        x15 = rotl(x15 ^ x03, 16);
+        x11 = (x11 + x15) | 0;
+        x07 = rotl(x07 ^ x11, 12);
+        x03 = (x03 + x07) | 0;
+        x15 = rotl(x15 ^ x03, 8);
+        x11 = (x11 + x15) | 0;
+        x07 = rotl(x07 ^ x11, 7);
+        x00 = (x00 + x05) | 0;
+        x15 = rotl(x15 ^ x00, 16);
+        x10 = (x10 + x15) | 0;
+        x05 = rotl(x05 ^ x10, 12);
+        x00 = (x00 + x05) | 0;
+        x15 = rotl(x15 ^ x00, 8);
+        x10 = (x10 + x15) | 0;
+        x05 = rotl(x05 ^ x10, 7);
+        x01 = (x01 + x06) | 0;
+        x12 = rotl(x12 ^ x01, 16);
+        x11 = (x11 + x12) | 0;
+        x06 = rotl(x06 ^ x11, 12);
+        x01 = (x01 + x06) | 0;
+        x12 = rotl(x12 ^ x01, 8);
+        x11 = (x11 + x12) | 0;
+        x06 = rotl(x06 ^ x11, 7);
+        x02 = (x02 + x07) | 0;
+        x13 = rotl(x13 ^ x02, 16);
+        x08 = (x08 + x13) | 0;
+        x07 = rotl(x07 ^ x08, 12);
+        x02 = (x02 + x07) | 0;
+        x13 = rotl(x13 ^ x02, 8);
+        x08 = (x08 + x13) | 0;
+        x07 = rotl(x07 ^ x08, 7);
+        x03 = (x03 + x04) | 0;
+        x14 = rotl(x14 ^ x03, 16);
+        x09 = (x09 + x14) | 0;
+        x04 = rotl(x04 ^ x09, 12);
+        x03 = (x03 + x04) | 0;
+        x14 = rotl(x14 ^ x03, 8);
+        x09 = (x09 + x14) | 0;
+        x04 = rotl(x04 ^ x09, 7);
+    }
+    // Write output
+    let oi = 0;
+    out[oi++] = (y00 + x00) | 0;
+    out[oi++] = (y01 + x01) | 0;
+    out[oi++] = (y02 + x02) | 0;
+    out[oi++] = (y03 + x03) | 0;
+    out[oi++] = (y04 + x04) | 0;
+    out[oi++] = (y05 + x05) | 0;
+    out[oi++] = (y06 + x06) | 0;
+    out[oi++] = (y07 + x07) | 0;
+    out[oi++] = (y08 + x08) | 0;
+    out[oi++] = (y09 + x09) | 0;
+    out[oi++] = (y10 + x10) | 0;
+    out[oi++] = (y11 + x11) | 0;
+    out[oi++] = (y12 + x12) | 0;
+    out[oi++] = (y13 + x13) | 0;
+    out[oi++] = (y14 + x14) | 0;
+    out[oi++] = (y15 + x15) | 0;
+}
+/**
+ * hchacha helper method, used primarily in xchacha, to hash
+ * key and nonce into key' and nonce'.
+ * Same as chachaCore, but there doesn't seem to be a way to move the block
+ * out without 25% performance hit.
+ */
+// prettier-ignore
+function hchacha(s, k, i, o32) {
+    let x00 = s[0], x01 = s[1], x02 = s[2], x03 = s[3], x04 = k[0], x05 = k[1], x06 = k[2], x07 = k[3], x08 = k[4], x09 = k[5], x10 = k[6], x11 = k[7], x12 = i[0], x13 = i[1], x14 = i[2], x15 = i[3];
+    for (let r = 0; r < 20; r += 2) {
+        x00 = (x00 + x04) | 0;
+        x12 = rotl(x12 ^ x00, 16);
+        x08 = (x08 + x12) | 0;
+        x04 = rotl(x04 ^ x08, 12);
+        x00 = (x00 + x04) | 0;
+        x12 = rotl(x12 ^ x00, 8);
+        x08 = (x08 + x12) | 0;
+        x04 = rotl(x04 ^ x08, 7);
+        x01 = (x01 + x05) | 0;
+        x13 = rotl(x13 ^ x01, 16);
+        x09 = (x09 + x13) | 0;
+        x05 = rotl(x05 ^ x09, 12);
+        x01 = (x01 + x05) | 0;
+        x13 = rotl(x13 ^ x01, 8);
+        x09 = (x09 + x13) | 0;
+        x05 = rotl(x05 ^ x09, 7);
+        x02 = (x02 + x06) | 0;
+        x14 = rotl(x14 ^ x02, 16);
+        x10 = (x10 + x14) | 0;
+        x06 = rotl(x06 ^ x10, 12);
+        x02 = (x02 + x06) | 0;
+        x14 = rotl(x14 ^ x02, 8);
+        x10 = (x10 + x14) | 0;
+        x06 = rotl(x06 ^ x10, 7);
+        x03 = (x03 + x07) | 0;
+        x15 = rotl(x15 ^ x03, 16);
+        x11 = (x11 + x15) | 0;
+        x07 = rotl(x07 ^ x11, 12);
+        x03 = (x03 + x07) | 0;
+        x15 = rotl(x15 ^ x03, 8);
+        x11 = (x11 + x15) | 0;
+        x07 = rotl(x07 ^ x11, 7);
+        x00 = (x00 + x05) | 0;
+        x15 = rotl(x15 ^ x00, 16);
+        x10 = (x10 + x15) | 0;
+        x05 = rotl(x05 ^ x10, 12);
+        x00 = (x00 + x05) | 0;
+        x15 = rotl(x15 ^ x00, 8);
+        x10 = (x10 + x15) | 0;
+        x05 = rotl(x05 ^ x10, 7);
+        x01 = (x01 + x06) | 0;
+        x12 = rotl(x12 ^ x01, 16);
+        x11 = (x11 + x12) | 0;
+        x06 = rotl(x06 ^ x11, 12);
+        x01 = (x01 + x06) | 0;
+        x12 = rotl(x12 ^ x01, 8);
+        x11 = (x11 + x12) | 0;
+        x06 = rotl(x06 ^ x11, 7);
+        x02 = (x02 + x07) | 0;
+        x13 = rotl(x13 ^ x02, 16);
+        x08 = (x08 + x13) | 0;
+        x07 = rotl(x07 ^ x08, 12);
+        x02 = (x02 + x07) | 0;
+        x13 = rotl(x13 ^ x02, 8);
+        x08 = (x08 + x13) | 0;
+        x07 = rotl(x07 ^ x08, 7);
+        x03 = (x03 + x04) | 0;
+        x14 = rotl(x14 ^ x03, 16);
+        x09 = (x09 + x14) | 0;
+        x04 = rotl(x04 ^ x09, 12);
+        x03 = (x03 + x04) | 0;
+        x14 = rotl(x14 ^ x03, 8);
+        x09 = (x09 + x14) | 0;
+        x04 = rotl(x04 ^ x09, 7);
+    }
+    let oi = 0;
+    o32[oi++] = x00;
+    o32[oi++] = x01;
+    o32[oi++] = x02;
+    o32[oi++] = x03;
+    o32[oi++] = x12;
+    o32[oi++] = x13;
+    o32[oi++] = x14;
+    o32[oi++] = x15;
+}
+/**
+ * Original, non-RFC chacha20 from DJB. 8-byte nonce, 8-byte counter.
+ */
+const chacha20orig = /* @__PURE__ */ createCipher(chachaCore, {
+    counterRight: false,
+    counterLength: 8,
+    allowShortKeys: true,
+});
+/**
+ * ChaCha stream cipher. Conforms to RFC 8439 (IETF, TLS). 12-byte nonce, 4-byte counter.
+ * With 12-byte nonce, it's not safe to use fill it with random (CSPRNG), due to collision chance.
+ */
+const chacha20 = /* @__PURE__ */ createCipher(chachaCore, {
+    counterRight: false,
+    counterLength: 4,
+    allowShortKeys: false,
+});
+/**
+ * XChaCha eXtended-nonce ChaCha. 24-byte nonce.
+ * With 24-byte nonce, it's safe to use fill it with random (CSPRNG).
+ * https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha
+ */
+const xchacha20 = /* @__PURE__ */ createCipher(chachaCore, {
+    counterRight: false,
+    counterLength: 8,
+    extendNonceFn: hchacha,
+    allowShortKeys: false,
+});
+/**
+ * Reduced 8-round chacha, described in original paper.
+ */
+const chacha8 = /* @__PURE__ */ createCipher(chachaCore, {
+    counterRight: false,
+    counterLength: 4,
+    rounds: 8,
+});
+/**
+ * Reduced 12-round chacha, described in original paper.
+ */
+const chacha12 = /* @__PURE__ */ createCipher(chachaCore, {
+    counterRight: false,
+    counterLength: 4,
+    rounds: 12,
+});
+const chacha_ZEROS16 = /* @__PURE__ */ new Uint8Array(16);
+// Pad to digest size with zeros
+const updatePadded = (h, msg) => {
+    h.update(msg);
+    const left = msg.length % 16;
+    if (left)
+        h.update(chacha_ZEROS16.subarray(left));
+};
+const chacha_ZEROS32 = /* @__PURE__ */ new Uint8Array(32);
+function chacha_computeTag(fn, key, nonce, data, AAD) {
+    const authKey = fn(key, nonce, chacha_ZEROS32);
+    const h = poly1305.create(authKey);
+    if (AAD)
+        updatePadded(h, AAD);
+    updatePadded(h, data);
+    const num = new Uint8Array(16);
+    const view = utils_createView(num);
+    utils_setBigUint64(view, 0, BigInt(AAD ? AAD.length : 0), true);
+    utils_setBigUint64(view, 8, BigInt(data.length), true);
+    h.update(num);
+    const res = h.digest();
+    authKey.fill(0);
+    return res;
+}
+/**
+ * AEAD algorithm from RFC 8439.
+ * Salsa20 and chacha (RFC 8439) use poly1305 differently.
+ * We could have composed them similar to:
+ * https://github.com/paulmillr/scure-base/blob/b266c73dde977b1dd7ef40ef7a23cc15aab526b3/index.ts#L250
+ * But it's hard because of authKey:
+ * In salsa20, authKey changes position in salsa stream.
+ * In chacha, authKey can't be computed inside computeTag, it modifies the counter.
+ */
+const _poly1305_aead = (xorStream) => (key, nonce, AAD) => {
+    const tagLength = 16;
+    _assert_bytes(key, 32);
+    _assert_bytes(nonce);
+    return {
+        encrypt: (plaintext, output) => {
+            const plength = plaintext.length;
+            const clength = plength + tagLength;
+            if (output) {
+                _assert_bytes(output, clength);
+            }
+            else {
+                output = new Uint8Array(clength);
+            }
+            xorStream(key, nonce, plaintext, output, 1);
+            const tag = chacha_computeTag(xorStream, key, nonce, output.subarray(0, -tagLength), AAD);
+            output.set(tag, plength); // append tag
+            return output;
+        },
+        decrypt: (ciphertext, output) => {
+            const clength = ciphertext.length;
+            const plength = clength - tagLength;
+            if (clength < tagLength)
+                throw new Error(`encrypted data must be at least ${tagLength} bytes`);
+            if (output) {
+                _assert_bytes(output, plength);
+            }
+            else {
+                output = new Uint8Array(plength);
+            }
+            const data = ciphertext.subarray(0, -tagLength);
+            const passedTag = ciphertext.subarray(-tagLength);
+            const tag = chacha_computeTag(xorStream, key, nonce, data, AAD);
+            if (!utils_equalBytes(passedTag, tag))
+                throw new Error('invalid tag');
+            xorStream(key, nonce, data, output, 1);
+            return output;
+        },
+    };
+};
+/**
+ * ChaCha20-Poly1305 from RFC 8439.
+ * With 12-byte nonce, it's not safe to use fill it with random (CSPRNG), due to collision chance.
+ */
+const chacha20poly1305 = /* @__PURE__ */ wrapCipher({ blockSize: 64, nonceLength: 12, tagLength: 16 }, _poly1305_aead(chacha20));
+/**
+ * XChaCha20-Poly1305 extended-nonce chacha.
+ * https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha
+ * With 24-byte nonce, it's safe to use fill it with random (CSPRNG).
+ */
+const xchacha20poly1305 = /* @__PURE__ */ wrapCipher({ blockSize: 64, nonceLength: 24, tagLength: 16 }, _poly1305_aead(xchacha20));
+//# sourceMappingURL=chacha.js.map
 // EXTERNAL MODULE: ./node_modules/@noble/hashes/esm/hkdf.js
 var hkdf = __webpack_require__(7518);
 // EXTERNAL MODULE: ./node_modules/@noble/hashes/esm/hmac.js
 var esm_hmac = __webpack_require__(9905);
 ;// CONCATENATED MODULE: ./node_modules/nostr-tools/lib/esm/index.js
 var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __publicField = (obj, key, value) => {
+  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  return value;
 };
 
 // pure.ts
@@ -15852,6 +17685,14 @@ function validateEvent(event) {
     }
   }
   return true;
+}
+function sortEvents(events) {
+  return events.sort((a, b) => {
+    if (a.created_at !== b.created_at) {
+      return b.created_at - a.created_at;
+    }
+    return a.id.localeCompare(b.id);
+  });
 }
 
 // pure.ts
@@ -16233,8 +18074,9 @@ function matchFilter(filter, event) {
 }
 function matchFilters(filters, event) {
   for (let i2 = 0; i2 < filters.length; i2++) {
-    if (matchFilter(filters[i2], event))
+    if (matchFilter(filters[i2], event)) {
       return true;
+    }
   }
   return false;
 }
@@ -16358,11 +18200,20 @@ var alwaysTrue = (t) => {
 };
 
 // abstract-relay.ts
+var _WebSocket;
+try {
+  _WebSocket = WebSocket;
+} catch {
+}
+function useWebSocketImplementation(websocketImplementation) {
+  _WebSocket = websocketImplementation;
+}
 var AbstractRelay = class {
   url;
   _connected = false;
   onclose = null;
   onnotice = (msg) => console.debug(`NOTICE from ${this.url}: ${msg}`);
+  _onauth = null;
   baseEoseTimeout = 4400;
   connectionTimeout = 4400;
   openSubs = /* @__PURE__ */ new Map();
@@ -16414,7 +18265,7 @@ var AbstractRelay = class {
         this.closeAllSubscriptions("relay connection timed out");
       }, this.connectionTimeout);
       try {
-        this.ws = new WebSocket(this.url);
+        this.ws = new _WebSocket(this.url);
       } catch (err) {
         reject(err);
         return;
@@ -16427,16 +18278,19 @@ var AbstractRelay = class {
       this.ws.onerror = (ev) => {
         reject(ev.message);
         if (this._connected) {
+          this._connected = false;
+          this.connectionPromise = void 0;
           this.onclose?.();
           this.closeAllSubscriptions("relay connection errored");
-          this._connected = false;
         }
       };
       this.ws.onclose = async () => {
-        this.connectionPromise = void 0;
-        this.onclose?.();
-        this.closeAllSubscriptions("relay connection closed");
-        this._connected = false;
+        if (this._connected) {
+          this._connected = false;
+          this.connectionPromise = void 0;
+          this.onclose?.();
+          this.closeAllSubscriptions("relay connection closed");
+        }
       };
       this.ws.onmessage = this._onmessage.bind(this);
     });
@@ -16524,6 +18378,7 @@ var AbstractRelay = class {
           return;
         case "AUTH": {
           this.challenge = data[1];
+          this._onauth?.(data[1]);
           return;
         }
       }
@@ -16561,7 +18416,7 @@ var AbstractRelay = class {
     const ret = new Promise((resolve, reject) => {
       this.openCountRequests.set(id, { resolve, reject });
     });
-    this.send('["COUNT","' + id + '",' + JSON.stringify(filters) + "]");
+    this.send('["COUNT","' + id + '",' + JSON.stringify(filters).substring(1));
     return ret;
   }
   subscribe(filters, params) {
@@ -16629,7 +18484,7 @@ var Subscription = class {
     this.oneose?.();
   }
   close(reason = "closed by caller") {
-    if (!this.closed) {
+    if (!this.closed && this.relay.connected) {
       this.relay.send('["CLOSE",' + JSON.stringify(this.id) + "]");
       this.closed = true;
     }
@@ -16683,6 +18538,9 @@ var AbstractSimplePool = class {
     });
   }
   subscribeMany(relays, filters, params) {
+    return this.subscribeManyMap(Object.fromEntries(relays.map((url) => [url, filters])), params);
+  }
+  subscribeManyMap(requests, params) {
     if (this.trackRelays) {
       params.receivedEvent = (relay, id) => {
         let set = this.seenOn.get(id);
@@ -16695,10 +18553,11 @@ var AbstractSimplePool = class {
     }
     const _knownIds = /* @__PURE__ */ new Set();
     const subs = [];
+    const relaysLength = Object.keys(requests).length;
     const eosesReceived = [];
     let handleEose = (i2) => {
       eosesReceived[i2] = true;
-      if (eosesReceived.filter((a) => a).length === relays.length) {
+      if (eosesReceived.filter((a) => a).length === relaysLength) {
         params.oneose?.();
         handleEose = () => {
         };
@@ -16708,7 +18567,7 @@ var AbstractSimplePool = class {
     let handleClose = (i2, reason) => {
       handleEose(i2);
       closesReceived[i2] = reason;
-      if (closesReceived.filter((a) => a).length === relays.length) {
+      if (closesReceived.filter((a) => a).length === relaysLength) {
         params.onclose?.(closesReceived);
         handleClose = () => {
         };
@@ -16723,11 +18582,13 @@ var AbstractSimplePool = class {
       return have;
     };
     const allOpened = Promise.all(
-      relays.map(normalizeURL).map(async (url, i2, arr) => {
-        if (arr.indexOf(url) !== i2) {
+      Object.entries(requests).map(async (req, i2, arr) => {
+        if (arr.indexOf(req) !== i2) {
           handleClose(i2, "duplicate url");
           return;
         }
+        let [url, filters] = req;
+        url = normalizeURL(url);
         let relay;
         try {
           relay = await this.ensureRelay(url, {
@@ -16807,7 +18668,9 @@ var SimplePool = class extends (/* unused pure expression or super */ null && (A
 var nip19_exports = {};
 __export(nip19_exports, {
   BECH32_REGEX: () => BECH32_REGEX,
+  Bech32MaxSize: () => Bech32MaxSize,
   decode: () => decode,
+  encodeBytes: () => encodeBytes,
   naddrEncode: () => naddrEncode,
   neventEncode: () => neventEncode,
   noteEncode: () => noteEncode,
@@ -17080,38 +18943,33 @@ function parseReferences(evt) {
 // nip04.ts
 var nip04_exports = {};
 __export(nip04_exports, {
-  decrypt: () => decrypt,
-  encrypt: () => encrypt
+  decrypt: () => esm_decrypt,
+  encrypt: () => esm_encrypt
 });
 
 
 
-if (typeof crypto !== "undefined" && !crypto.subtle && crypto.webcrypto) {
-  crypto.subtle = crypto.webcrypto.subtle;
-}
-async function encrypt(secretKey, pubkey, text) {
+
+async function esm_encrypt(secretKey, pubkey, text) {
   const privkey = secretKey instanceof Uint8Array ? (0,utils/* bytesToHex */.ci)(secretKey) : secretKey;
   const key = secp256k1.getSharedSecret(privkey, "02" + pubkey);
   const normalizedKey = getNormalizedX(key);
   let iv = Uint8Array.from((0,utils/* randomBytes */.O6)(16));
   let plaintext = utf8Encoder.encode(text);
-  let cryptoKey = await crypto.subtle.importKey("raw", normalizedKey, { name: "AES-CBC" }, false, ["encrypt"]);
-  let ciphertext = await crypto.subtle.encrypt({ name: "AES-CBC", iv }, cryptoKey, plaintext);
+  let ciphertext = cbc(normalizedKey, iv).encrypt(plaintext);
   let ctb64 = esm/* base64 */.US.encode(new Uint8Array(ciphertext));
   let ivb64 = esm/* base64 */.US.encode(new Uint8Array(iv.buffer));
   return `${ctb64}?iv=${ivb64}`;
 }
-async function decrypt(secretKey, pubkey, data) {
+async function esm_decrypt(secretKey, pubkey, data) {
   const privkey = secretKey instanceof Uint8Array ? (0,utils/* bytesToHex */.ci)(secretKey) : secretKey;
   let [ctb64, ivb64] = data.split("?iv=");
   let key = secp256k1.getSharedSecret(privkey, "02" + pubkey);
   let normalizedKey = getNormalizedX(key);
-  let cryptoKey = await crypto.subtle.importKey("raw", normalizedKey, { name: "AES-CBC" }, false, ["decrypt"]);
-  let ciphertext = esm/* base64 */.US.decode(ctb64);
   let iv = esm/* base64 */.US.decode(ivb64);
-  let plaintext = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, cryptoKey, ciphertext);
-  let text = utf8Decoder.decode(plaintext);
-  return text;
+  let ciphertext = esm/* base64 */.US.decode(ctb64);
+  let plaintext = cbc(normalizedKey, iv).decrypt(ciphertext);
+  return utf8Decoder.decode(plaintext);
 }
 function getNormalizedX(key) {
   return key.slice(1, 33);
@@ -17121,11 +18979,12 @@ function getNormalizedX(key) {
 var nip05_exports = {};
 __export(nip05_exports, {
   NIP05_REGEX: () => NIP05_REGEX,
+  isValid: () => isValid,
   queryProfile: () => queryProfile,
   searchDomain: () => searchDomain,
   useFetchImplementation: () => useFetchImplementation
 });
-var NIP05_REGEX = /^(?:([\w.+-]+)@)?([\w.-]+)$/;
+var NIP05_REGEX = /^(?:([\w.+-]+)@)?([\w_-]+(\.[\w_-]+)+)$/;
 var _fetch;
 try {
   _fetch = fetch;
@@ -17136,8 +18995,10 @@ function useFetchImplementation(fetchImplementation) {
 }
 async function searchDomain(domain, query = "") {
   try {
-    let res = await (await _fetch(`https://${domain}/.well-known/nostr.json?name=${query}`)).json();
-    return res.names;
+    const url = `https://${domain}/.well-known/nostr.json?name=${query}`;
+    const res = await _fetch(url, { redirect: "error" });
+    const json = await res.json();
+    return json.names;
   } catch (_) {
     return {};
   }
@@ -17148,32 +19009,17 @@ async function queryProfile(fullname) {
     return null;
   const [_, name = "_", domain] = match;
   try {
-    const res = await _fetch(`https://${domain}/.well-known/nostr.json?name=${name}`);
-    const { names, relays } = parseNIP05Result(await res.json());
-    const pubkey = names[name];
-    return pubkey ? { pubkey, relays: relays?.[pubkey] } : null;
+    const url = `https://${domain}/.well-known/nostr.json?name=${name}`;
+    const res = await (await _fetch(url, { redirect: "error" })).json();
+    let pubkey = res.names[name];
+    return pubkey ? { pubkey, relays: res.relays?.[pubkey] } : null;
   } catch (_e) {
     return null;
   }
 }
-function parseNIP05Result(json) {
-  const result = {
-    names: {}
-  };
-  for (const [name, pubkey] of Object.entries(json.names)) {
-    if (typeof name === "string" && typeof pubkey === "string") {
-      result.names[name] = pubkey;
-    }
-  }
-  if (json.relays) {
-    result.relays = {};
-    for (const [pubkey, relays] of Object.entries(json.relays)) {
-      if (typeof pubkey === "string" && Array.isArray(relays)) {
-        result.relays[pubkey] = relays.filter((relay) => typeof relay === "string");
-      }
-    }
-  }
-  return result;
+async function isValid(pubkey, nip05) {
+  let res = await queryProfile(nip05);
+  return res ? res.pubkey === pubkey : false;
 }
 
 // nip10.ts
@@ -17629,28 +19475,23 @@ __export(nip44_exports, {
 
 
 var decoder = new TextDecoder();
-var u = {
-  minPlaintextSize: 1,
-  maxPlaintextSize: 65535,
-  utf8Encode: utils/* utf8ToBytes */.iY,
-  utf8Decode(bytes) {
+var _u = class {
+  static utf8Decode(bytes) {
     return decoder.decode(bytes);
-  },
-  getConversationKey(privkeyA, pubkeyB) {
+  }
+  static getConversationKey(privkeyA, pubkeyB) {
     const sharedX = secp256k1.getSharedSecret(privkeyA, "02" + pubkeyB).subarray(1, 33);
     return (0,hkdf/* extract */.Kl)(esm_sha256/* sha256 */.J, sharedX, "nip44-v2");
-  },
-  getMessageKeys(conversationKey, nonce) {
-    (0,esm_utils/* ensureBytes */.ql)(conversationKey, 32);
-    (0,esm_utils/* ensureBytes */.ql)(nonce, 32);
+  }
+  static getMessageKeys(conversationKey, nonce) {
     const keys = (0,hkdf/* expand */.jn)(esm_sha256/* sha256 */.J, conversationKey, nonce, 76);
     return {
       chacha_key: keys.subarray(0, 32),
       chacha_nonce: keys.subarray(32, 44),
       hmac_key: keys.subarray(44, 76)
     };
-  },
-  calcPaddedLen(len) {
+  }
+  static calcPaddedLen(len) {
     if (!Number.isSafeInteger(len) || len < 1)
       throw new Error("expected positive integer");
     if (len <= 32)
@@ -17658,35 +19499,35 @@ var u = {
     const nextPower = 1 << Math.floor(Math.log2(len - 1)) + 1;
     const chunk = nextPower <= 256 ? 32 : nextPower / 8;
     return chunk * (Math.floor((len - 1) / chunk) + 1);
-  },
-  writeU16BE(num) {
-    if (!Number.isSafeInteger(num) || num < u.minPlaintextSize || num > u.maxPlaintextSize)
+  }
+  static writeU16BE(num) {
+    if (!Number.isSafeInteger(num) || num < _u.minPlaintextSize || num > _u.maxPlaintextSize)
       throw new Error("invalid plaintext size: must be between 1 and 65535 bytes");
     const arr = new Uint8Array(2);
     new DataView(arr.buffer).setUint16(0, num, false);
     return arr;
-  },
-  pad(plaintext) {
-    const unpadded = u.utf8Encode(plaintext);
+  }
+  static pad(plaintext) {
+    const unpadded = _u.utf8Encode(plaintext);
     const unpaddedLen = unpadded.length;
-    const prefix = u.writeU16BE(unpaddedLen);
-    const suffix = new Uint8Array(u.calcPaddedLen(unpaddedLen) - unpaddedLen);
+    const prefix = _u.writeU16BE(unpaddedLen);
+    const suffix = new Uint8Array(_u.calcPaddedLen(unpaddedLen) - unpaddedLen);
     return (0,utils/* concatBytes */.eV)(prefix, unpadded, suffix);
-  },
-  unpad(padded) {
+  }
+  static unpad(padded) {
     const unpaddedLen = new DataView(padded.buffer).getUint16(0);
     const unpadded = padded.subarray(2, 2 + unpaddedLen);
-    if (unpaddedLen < u.minPlaintextSize || unpaddedLen > u.maxPlaintextSize || unpadded.length !== unpaddedLen || padded.length !== 2 + u.calcPaddedLen(unpaddedLen))
+    if (unpaddedLen < _u.minPlaintextSize || unpaddedLen > _u.maxPlaintextSize || unpadded.length !== unpaddedLen || padded.length !== 2 + _u.calcPaddedLen(unpaddedLen))
       throw new Error("invalid padding");
-    return u.utf8Decode(unpadded);
-  },
-  hmacAad(key, message, aad) {
+    return _u.utf8Decode(unpadded);
+  }
+  static hmacAad(key, message, aad) {
     if (aad.length !== 32)
       throw new Error("AAD associated data must be 32 bytes");
     const combined = (0,utils/* concatBytes */.eV)(aad, message);
     return (0,esm_hmac/* hmac */.b)(esm_sha256/* sha256 */.J, key, combined);
-  },
-  decodePayload(payload) {
+  }
+  static decodePayload(payload) {
     if (typeof payload !== "string")
       throw new Error("payload must be a valid string");
     const plen = payload.length;
@@ -17713,27 +19554,29 @@ var u = {
     };
   }
 };
-function encrypt2(plaintext, conversationKey, nonce = (0,utils/* randomBytes */.O6)(32)) {
-  const { chacha_key, chacha_nonce, hmac_key } = u.getMessageKeys(conversationKey, nonce);
-  const padded = u.pad(plaintext);
-  const ciphertext = (0,chacha/* chacha20 */.a0)(chacha_key, chacha_nonce, padded);
-  const mac = u.hmacAad(hmac_key, ciphertext, nonce);
-  return esm/* base64 */.US.encode((0,utils/* concatBytes */.eV)(new Uint8Array([2]), nonce, ciphertext, mac));
-}
-function decrypt2(payload, conversationKey) {
-  const { nonce, ciphertext, mac } = u.decodePayload(payload);
-  const { chacha_key, chacha_nonce, hmac_key } = u.getMessageKeys(conversationKey, nonce);
-  const calculatedMac = u.hmacAad(hmac_key, ciphertext, nonce);
-  if (!(0,esm_utils/* equalBytes */.Wd)(calculatedMac, mac))
-    throw new Error("invalid MAC");
-  const padded = (0,chacha/* chacha20 */.a0)(chacha_key, chacha_nonce, ciphertext);
-  return u.unpad(padded);
-}
-var v2 = {
-  utils: u,
-  encrypt: encrypt2,
-  decrypt: decrypt2
+var u = _u;
+__publicField(u, "minPlaintextSize", 1);
+__publicField(u, "maxPlaintextSize", 65535);
+__publicField(u, "utf8Encode", utils/* utf8ToBytes */.iY);
+var v2 = class {
+  static encrypt(plaintext, conversationKey, nonce = (0,utils/* randomBytes */.O6)(32)) {
+    const { chacha_key, chacha_nonce, hmac_key } = u.getMessageKeys(conversationKey, nonce);
+    const padded = u.pad(plaintext);
+    const ciphertext = chacha20(chacha_key, chacha_nonce, padded);
+    const mac = u.hmacAad(hmac_key, ciphertext, nonce);
+    return esm/* base64 */.US.encode((0,utils/* concatBytes */.eV)(new Uint8Array([2]), nonce, ciphertext, mac));
+  }
+  static decrypt(payload, conversationKey) {
+    const { nonce, ciphertext, mac } = u.decodePayload(payload);
+    const { chacha_key, chacha_nonce, hmac_key } = u.getMessageKeys(conversationKey, nonce);
+    const calculatedMac = u.hmacAad(hmac_key, ciphertext, nonce);
+    if (!utils_equalBytes(calculatedMac, mac))
+      throw new Error("invalid MAC");
+    const padded = chacha20(chacha_key, chacha_nonce, ciphertext);
+    return u.unpad(padded);
+  }
 };
+__publicField(v2, "utils", u);
 var nip44_default = { v2 };
 
 // nip47.ts
@@ -17759,7 +19602,7 @@ async function makeNwcRequestEvent(pubkey, secretKey, invoice) {
       invoice
     }
   };
-  const encryptedContent = await encrypt(secretKey, pubkey, JSON.stringify(content));
+  const encryptedContent = await esm_encrypt(secretKey, pubkey, JSON.stringify(content));
   const eventTemplate = {
     kind: NWCWalletRequest,
     created_at: Math.round(Date.now() / 1e3),
@@ -18007,17 +19850,28 @@ const common_crypto = __webpack_require__(1354);
 
 window.relays = {
   default: [
-    "wss://relay.tagayasu.xyz",
-    "wss://relay.damus.io",
-    "wss://nos.lol",
-    "wss://nostr.mom",
-    "wss://nostr.oxtr.dev",
-    "wss://relay.nostr.band",
-    "wss://offchain.pub",
-    "wss://purplerelay.com",
-    "wss://nostr.bitcoiner.social"
+    "wss://relay.tagayasu.xyz/",
+    "wss://relay.damus.io/",
+    "wss://nos.lol/",
+    "wss://nostr.mom/",
+    "wss://nostr.oxtr.dev/",
+    "wss://relay.nostr.band/",
+    "wss://offchain.pub/",
+    "wss://purplerelay.com/",
+    "wss://nostr.bitcoiner.social/",
+    "wss://thecitadel.nostr1.com/",
+    "wss://nostr.wine/",
+    "wss://nostr.land/",
   ],
-  active: []
+  active: [],
+  recommended: [
+    "wss://relay.tagayasu.xyz/",
+    "wss://relay.damus.io/",
+    "wss://thecitadel.nostr1.com/",
+    "wss://nos.lol/",
+    "wss://nostr.wine/",
+    "wss://nostr.land/",
+  ]
 }
 window.relays.active = window.relays.default;
 
@@ -18034,7 +19888,6 @@ function shortHash(input, length = 64) {
 // Swaps between connected / disconnected
 async function toggleConnect() {
   if (window.nip07signer) {
-    $(".connect-wallet").text("Connect");
     await disconnectNostr();
     return ensureReadonlyConnected().then(() => {
       window.dispatchEvent(new Event(Wallet.WALLET_DISCONNECTED_EVENT));
@@ -18204,7 +20057,9 @@ function atagFor(title, hexpubkey) {
 }
 
 async function encryptSelf(text) {
-  if (!!window.nostr && !!window.nostr.nip04) {
+  if (!!window.nostr?.nip44) {
+    return window.nostr.nip44.encrypt(window.nostrUser.hexpubkey, text);
+  } else if (!!window.nostr?.nip04) {
     return window.nostr.nip04.encrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
     return Promise.resolve(common_crypto.AES.encrypt(text, window.sessionStorage.privateKey).toString());
@@ -18214,31 +20069,15 @@ async function encryptSelf(text) {
 }
 
 async function decryptSelf(text) {
-  if (!!window.nostr && !!window.nostr.nip04) {
+  if (!!window.nostr?.nip44) {
+    return window.nostr.nip44.decrypt(window.nostrUser.hexpubkey, text);
+  } else if (!!window.nostr?.nip04) {
     return window.nostr.nip04.decrypt(window.nostrUser.hexpubkey, text);
   } else if (!!window.sessionStorage.privateKey) {
     return Promise.resolve(common_crypto.AES.decrypt(text, window.sessionStorage.privateKey).toString(common_crypto.enc.Utf8));
   } else {
     return Promise.reject("Did not find any encryption compatible wallet");
   }
-}
-
-async function encryptNote(title, content) {
-  const titleLength = title.length;
-  const body = `${titleLength}:${title}${content}`;
-  return await encryptSelf(body);
-}
-
-async function decryptNote(cyphertext) {
-  const body = await decryptSelf(cyphertext);
-  const titleLength = parseInt(body.slice(0, body.indexOf(":")));
-
-  const titleOffset = body.indexOf(":") + 1;
-  const contentOffset = titleOffset + titleLength;
-
-  const title = body.slice(titleOffset, contentOffset);
-  const content = body.slice(contentOffset);
-  return { title, content };
 }
 
 function npubToHexpubkey(npub) {
@@ -18263,19 +20102,19 @@ function noteFilterFromIdentifier(explicitIdentifier) {
     if (!explicitIdentifier) {
         return {
             authors: [hexpubkey],
-            kinds: [30023],
+            kinds: [30023, 31234],
             "#d": [dtagFor("homepage")]
         };
     }
 
     const potentialFilter = filterFromId(explicitIdentifier);
-    if (!potentialFilter.kinds) { potentialFilter.kinds = [30023]; }
+    if (!potentialFilter.kinds || potentialFilter.kinds == [30023]) { potentialFilter.kinds = [30023, 31234]; }
     if (!!potentialFilter["#d"]) { return potentialFilter; }
     if (!hexpubkey) { return null; }
 
     return {
         authors: [hexpubkey],
-        kinds: [30023],
+        kinds: [30023, 31234],
         "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
     };
 }
@@ -18410,7 +20249,7 @@ function showPending(message) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
 
 
 class MarkdownRenderer {
@@ -18500,27 +20339,25 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Note: () => (/* binding */ Note)
 /* harmony export */ });
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
 
 
 class Note {
     static async fromNostrEvent(event) {
-        const note = new Note();
-        note.id = event.id;
-        note.nostrEvent = event;
-        note.title = event.tags.find(t => t[0] == "title")[1];
-        note.private = !!event.tags.find(t => t[0] == "private");
-        note.content = event.content;
-        note.originalContent = event.content;
-        note.authorPubkey = event.pubkey;
-        note.createdAt = event.created_at;
-        note.onRelays = [];
+        const nostrEvent =
+            event.kind === 31234
+                ? JSON.parse(await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(event.content))
+                : event.rawEvent();
 
-        if (note.private) {
-            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptNote */ .fD)(note.content);
-            note.title = title;
-            note.content = content;
-        }
+        const note = new Note();
+        note.id = nostrEvent.id;
+        note.nostrEvent = nostrEvent;
+        note.title = nostrEvent.tags.find(t => t[0] == "title")[1];
+        note.private = event.kind === 31234;
+        note.content = nostrEvent.content;
+        note.authorPubkey = nostrEvent.pubkey;
+        note.createdAt = nostrEvent.created_at ?? event.created_at;
+        note.onRelays = [];
 
         return note;
     }
@@ -18529,7 +20366,6 @@ class Note {
         const note = new Note();
         note.title = title;
         note.content = content;
-        note.originalContent = content;
         note.private = false;
         note.onRelays = [];
         return note;
@@ -18547,8 +20383,8 @@ class Note {
         return {
             id: this.id,
             private: this.private,
-            title: this.private ? 'private' : this.title,
-            content: this.originalContent,
+            title: this.title,
+            content: this.content,
             pubkey: this.authorPubkey,
             createdAt: this.createdAt,
         };
@@ -18559,17 +20395,10 @@ class Note {
         note.id = plain.id;
         note.private = plain.private;
         note.authorPubkey = plain.pubkey;
-        note.originalContent = plain.content;
         note.content = plain.content;
         note.title = plain.title;
         note.createdAt = plain.createdAt;
         note.onRelays = [];
-
-        if (note.private) {
-            const { title, content } = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptNote */ .fD)(note.content);
-            note.title = title;
-            note.content = content;
-        }
 
         return note;
     }
@@ -18583,7 +20412,7 @@ class Note {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
 /* harmony import */ var _note_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3797);
 
 
@@ -18654,11 +20483,9 @@ window.PageContext = PageContext;
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6213);
-/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2483);
-/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(2171);
-/* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3894);
-
+/* harmony import */ var _common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2171);
+/* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3894);
 
 
 
@@ -18671,6 +20498,7 @@ class Preferences {
 
     static DEFAULTS = {
         spellCheckEnabled: false,
+        aggressiveDelete: true,
     }
     current = Preferences.DEFAULTS;
 
@@ -18694,12 +20522,12 @@ class Preferences {
             kinds: [Preferences.KIND],
             "#d": [Preferences.D_TAG],
         };
-        _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filter).then(async (event) => {
+        _relay_js__WEBPACK_IMPORTED_MODULE_1__/* .Relay */ .Z.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 const parsed = JSON.parse(await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(event.content));
                 this.current = Object.assign({ ...Preferences.DEFAULTS }, parsed);
-                window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
             }
+            window.dispatchEvent(new Event(Preferences.PREFERENCES_CHANGED_EVENT));
         });
     }
 
@@ -18710,8 +20538,8 @@ class Preferences {
                 ["published_at", Math.floor(Date.now() / 1000).toString()]
             ];
             const content = await (0,_common__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(this.current));
-            _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.publish(Preferences.KIND, content, tags).then((saveEvent) => {
-                (0,_error_js__WEBPACK_IMPORTED_MODULE_3__/* .showNotice */ .s6)("Your preferences have been saved.");
+            _relay_js__WEBPACK_IMPORTED_MODULE_1__/* .Relay */ .Z.instance.buildAndPublish(Preferences.KIND, content, tags).then((saveEvent) => {
+                (0,_error_js__WEBPACK_IMPORTED_MODULE_2__/* .showNotice */ .s6)("Your preferences have been saved.");
             });
         });
     }
@@ -18732,7 +20560,7 @@ window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, async function (e) {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Z: () => (/* binding */ Relay)
 /* harmony export */ });
-/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(2483);
+/* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(468);
 
 
 /**
@@ -18760,7 +20588,7 @@ class Relay {
         return new Promise((resolve, reject) => {
             const cached = this.readByFilter(filters);
             if (cached.size > 0) {
-                callback([...cached][0]);
+                resolve(this.latest(cached));
             } else {
                 window.ndk.fetchEvent(filters).then((event) => {
                     this.write(event);
@@ -18799,9 +20627,23 @@ class Relay {
         return subscription;
     }
 
+    // Build & Publishes a note to all relays, and adds it to the local cache as well
+    async buildAndPublish(kind, content, tags, hexpubkey) {
+        const event = this.buildEvent(kind, content, tags, hexpubkey);
+        return await this.publish(event);
+    }
+
     // Publishes a note to all relays, and adds it to the local cache as well
-    // Once the event has been published to external relays, the callback is called with the saved nostr event
-    async publish(kind, content, tags, hexpubkey) {
+    async publish(event) {
+        if (event.kind !== Relay.DELETE_EVENT_KIND) {
+            this.write(event);
+        }
+
+        return event.publish().then(_relaySet => event);
+    }
+
+    // Builds an unsigned NDKEvent
+    buildEvent(kind, content, tags, hexpubkey) {
         if (hexpubkey && hexpubkey !== window.ndk.activeUser?.hexpubkey) {
             throw new Error('NDK is configured with an unexpected pubkey');
         }
@@ -18810,12 +20652,10 @@ class Relay {
         event.kind = kind;
         event.content = content;
         event.tags = tags;
+        event.pubkey = window.ndk.activeUser?.hexpubkey;
+        event.id = event.getEventHash();
 
-        if (kind !== Relay.DELETE_EVENT_KIND) {
-            this.write(event);
-        }
-
-        return event.publish().then(_relaySet => event);
+        return event;
     }
 
     // Publishes a kind 5 (delete request) event to relays,
@@ -18831,7 +20671,7 @@ class Relay {
             }
         });
 
-        return this.publish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
+        return this.buildAndPublish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
     }
 
     write(note) {
@@ -18853,19 +20693,29 @@ class Relay {
         });
     }
 
+    // Returns true if the relay could be connected to within 1 second.
+    async getRelayStatus(url) {
+        window.ndk.pool.addRelay(new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKRelay */ .FR(url), false);
+        const relay = window.ndk.pool.relays.get(url);
+        try { await relay.connect(5000, false); } catch {}
+        return relay.connectivity.status === 1;
+    }
+
     // Tries to load events from the cache using the filter. Not all possible
     // filters are supported. The expectation is to have:
-    // - hexpubkey
-    // - kind
-    // - ONE of "#d" or other tag in INDEXED_TAGS
+    // - EXACTLY ONE hexpubkey
+    // - ONE OR MORE kind
+    // - EXACTLY ONE of:
+    //   - "#d" tag
+    //   - other tag in INDEXED_TAGS
     //
-    // Each of these filter should in turn have only ONE value
+    // Performance: there will be one index lookup PER kind.
     // 
     // Example structure of nostr filter:
     // {
     //   #d: ['value'],
     //   authors: ['hexpubkey'],
-    //   kinds: [30023]
+    //   kinds: [30023, 31234]
     // }
     readByFilter(filter) {
         const supportedTags = ['#d', ...Relay.INDEXED_TAGS.map(t => `#${t}`)];
@@ -18876,20 +20726,21 @@ class Relay {
 
         const tagToUse = tagsGiven[0];
 
-        if (filter.authors.length > 1 || filter.kinds.length > 1 || filter[tagToUse].length > 1) {
+        if (filter.authors.length > 1 || filter[tagToUse].length > 1) {
             return new Set();
         }
 
-        const kind = filter.kinds[0];
         const hexpubkey = filter.authors[0];
         const tagKind = tagToUse.slice(1);
         const tagValue = filter[tagToUse][0];
 
-        if (tagToUse === '#d') {
-            return this.readPrimaryIndex(kind, hexpubkey, tagValue);
-        }
-
-        return this.readTagIndex(kind, hexpubkey, tagKind, tagValue);
+        return filter.kinds.reduce((acc, kind) => {
+            const result = tagToUse === '#d'
+                ? this.readPrimaryIndex(kind, hexpubkey, tagValue)
+                : this.readTagIndex(kind, hexpubkey, tagKind, tagValue);
+            for (const item of result) { acc.add(item); }
+            return acc;
+        }, new Set());
     }
 
     readPrimaryIndex(kind, hexpubkey, dTag) {
@@ -18911,8 +20762,113 @@ class Relay {
     tagIndexKey(kind, hexpubkey, tagKind, tagValue) {
         return `${kind}:${hexpubkey}:${tagKind}/${tagValue}`;
     }
+
+    latest(eventSet) {
+        let result = undefined;
+        for (const event of eventSet) {
+            if (!result || event.created_at > result.created_at) {
+                result = event;
+            }
+        }
+        return result;
+    }
 }
 window.Relay = Relay;
+
+
+/***/ }),
+
+/***/ 188:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   f: () => (/* binding */ RelayConfig)
+/* harmony export */ });
+class RelayConfig {
+    static RELAY_LIST_KIND = 10002;
+    static BLOSSOM_LIST_KIND = 10063;
+    static RELAY_TAG = 'r';
+    static BLOSSOM_TAG = 'server';
+
+    constructor(hexpubkey, kind, tag) {
+        this.hexpubkey = hexpubkey;
+        this.kind = kind;
+        this.tag = tag;
+    }
+
+    static forRelays(hexpubkey) {
+        return new RelayConfig(hexpubkey, RelayConfig.RELAY_LIST_KIND, RelayConfig.RELAY_TAG);
+    }
+
+    static forBlossom(hexpubkey) {
+        return new RelayConfig(hexpubkey, RelayConfig.BLOSSOM_LIST_KIND, RelayConfig.BLOSSOM_TAG);
+    }
+
+    // Each relay in the list has the form:
+    // { url, mode }
+    // where mode is one of ["read", "write", "both"]
+    async getRelayList() {
+        const filters = {
+            authors: [this.hexpubkey],
+            kinds: [this.kind]
+        };
+        return Relay.instance.fetchEvent(filters).then(async (event) => {
+            if (!!event) {
+                return event.tags.filter(t => t[0] === this.tag).map(t => {
+                    return {
+                        url: t[1],
+                        mode: t[2] ?? 'both',
+                    };
+                });
+            } else {
+                return [];
+            }
+        });
+    }
+
+    // Returns a list of all relays the user uses, regardless of if they are read or write
+    async getRelayUrls() {
+        return this.getRelayList().then(list => list.map(r => r.url));
+    }
+
+    async addRelay(url) {
+        const existingList = await this.getRelayList();
+
+        if (existingList.some(r => r.url === url)) {
+            return Promise.resolve(true);
+        }
+
+        const newList = [...existingList, {
+            url,
+            mode: 'both',
+        }];
+
+        return this.saveRelays(newList);
+    }
+
+    async removeRelay(url) {
+        const existingList = await this.getRelayList();
+        const newList = existingList.filter(t => t.url !== url);
+
+        if (existingList == newList) {
+            return Promise.resolve(true);
+        }
+
+        return this.saveRelays(newList);
+    }
+
+    // Relay list must be of the form described above for `getRelayList`
+    async saveRelays(relayList) {
+        const tags = relayList.map(r => {
+            return r.mode === 'both'
+                ? [this.tag, r.url]
+                : [this.tag, r.url, r.mode];
+        });
+
+        return Relay.instance.buildAndPublish(this.kind, '', tags, this.hexpubkey);
+    }
+}
 
 
 /***/ }),
@@ -19023,8 +20979,8 @@ window.Router = Router;
 // ESM COMPAT FLAG
 __webpack_require__.r(__webpack_exports__);
 
-// EXTERNAL MODULE: ./src/common.js + 13 modules
-var common = __webpack_require__(6213);
+// EXTERNAL MODULE: ./src/common.js + 20 modules
+var common = __webpack_require__(308);
 // EXTERNAL MODULE: ./src/error.js
 var error = __webpack_require__(2171);
 // EXTERNAL MODULE: ./src/nostr.js
@@ -19047,9 +21003,18 @@ class Database {
     notes = {};
     noteTitleTrie = new Trie();
 
+    // Drafts are stored as a wrapper note with an encrypted note inside.
+    // Therefore the ID of the wrapper note will not match the actual inner note
+    // To support looking up a note by the wrapper ID, we keep a map of wrapper -> inner IDs
+    draftIdMap = {};
+
     static instance = new Database();
     constructor() {
         if (!!Database.instance) { throw new Error('Use singleton instance'); }
+    }
+
+    getNote(id) {
+        return this.notes[id] ?? this.notes[this.draftIdMap[id]];
     }
 
     clear() {
@@ -19078,8 +21043,11 @@ class Database {
     }
 
     async addFromNostrEvent(event) {
-        this.addNote(await src_note.Note.fromNostrEvent(event));
+        const note = await src_note.Note.fromNostrEvent(event);
+        if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
+        this.addNote(note);
         this.pushStateToLocalStorage(window.nostrUser.npub);
+        return note;
     }
 
     addNote(note) {
@@ -19126,7 +21094,10 @@ window.addEventListener(wallet.Wallet.WALLET_CONNECTED_EVENT, function (e) {
 
 // EXTERNAL MODULE: ./src/relay.js
 var relay = __webpack_require__(3894);
+// EXTERNAL MODULE: ./src/relay_config.js
+var relay_config = __webpack_require__(188);
 ;// CONCATENATED MODULE: ./src/ui.js
+
 
 
 
@@ -19178,12 +21149,12 @@ function restoreAutoSave() {
 }
 
 // Connect UI button
-function connectWalletApp() {
+function connectWallet() {
     (0,common/* toggleConnect */.Ti)().then(() => {
         if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
     })
 }
-window.connectWalletApp = connectWalletApp;
+window.connectWallet = connectWallet;
 
 function showMyNotes() {
     $("#notes-list").empty();
@@ -19196,6 +21167,21 @@ function showMyNotes() {
 }
 window.showMyNotes = showMyNotes;
 
+function showSettings() {
+    window.settingsModal = new bootstrap.Modal('#settingsModal', {});
+    window.settingsModal.show();
+    renderRelays();
+}
+window.showSettings = showSettings;
+
+function openSettings(pageName) {
+    $('.settings-list-item').removeClass('active');
+    $(`#settings-${pageName}`).addClass('active');
+    $('.settings-page').hide();
+    $(`#settings-page-${pageName}`).show();
+}
+window.openSettings = openSettings;
+
 function showPublishModal() {
     window.publishModal = new bootstrap.Modal('#publish-modal', {});
     window.publishModal.show();
@@ -19204,7 +21190,7 @@ window.showPublishModal = showPublishModal;
 
 async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
-    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023] }
+    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023, 31234] }
 
     const subscription = await relay/* Relay */.Z.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
@@ -19220,7 +21206,7 @@ async function fetchNotes() {
         let foundNew = false;
         subscription.eventsPerRelay.forEach((eventIds, relay) => {
             for (const eventId of eventIds) {
-                const note = Database.instance.notes[eventId];
+                const note = Database.instance.getNote(eventId);
                 if (note && !note.onRelays.includes(relay)) {
                     note.onRelays.push(relay);
                     foundNew = true;
@@ -19245,8 +21231,8 @@ function loadNote() {
         relay/* Relay */.Z.instance.fetchEvent(filter).then(async (event) => {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
-                    await Database.instance.addFromNostrEvent(event);
-                    editNote(event.id);
+                    const note = await Database.instance.addFromNostrEvent(event);
+                    editNote(note.id);
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
@@ -19283,7 +21269,7 @@ function searchNotes() {
 
     let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
-        const note = Database.instance.notes[noteId];
+        const note = Database.instance.getNote(noteId);
         if (!note) { return; }
         if (notesDisplayed > 20) { return; }
         let noteRelays = "";
@@ -19304,7 +21290,7 @@ window.searchNotes = searchNotes;
 window.tooltipList = [];
 
 async function editNote(noteId) {
-    PageContext.instance.setNote(Database.instance.notes[noteId]);
+    PageContext.instance.setNote(Database.instance.getNote(noteId));
 }
 window.editNote = editNote
 
@@ -19326,13 +21312,19 @@ function deleteNote() {
 
         const noteId = PageContext.instance.note.id;
 
+        // If aggressiveDelete mode is enabled,
         // Save a new version with removed content to encourage clients not to show old versions of the note
         // Then, publish a kind-5 delete request to purge the event entirely
         window.MDEditor.value('');
-        publishNote('Your note has been deleted').then(() => {
+        if (Preferences.instance.current.aggressiveDelete) {
+            publishNote('Your note has been deleted').then(() => {
+                $("#note-title").val("");
+                relay/* Relay */.Z.instance.del(noteId);
+            });
+        } else {
             $("#note-title").val("");
             relay/* Relay */.Z.instance.del(noteId);
-        });
+        }
     });
 }
 window.deleteNote = deleteNote;
@@ -19352,23 +21344,9 @@ function saveNote() {
 window.saveNote = saveNote;
 
 async function publishNote(message) {
-    return (0,common/* ensureConnected */.zs)().then(() => {
-        const title = $("#note-title").val();
-        if ((0,common/* dtagFor */.oF)(title) == "tagayasu-") {
-            (0,error/* showError */.x2)("Title cannot be empty");
-            return;
-        }
-
-        const tags = [
-            ["d", (0,common/* dtagFor */.oF)(title)],
-            ["title", title],
-            ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ];
-        MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-            tags.push(["a", backref]);
-        });
-
-        return relay/* Relay */.Z.instance.publish(30023, window.MDEditor.value(), tags).then(async (saveEvent) => {
+    return (0,common/* ensureConnected */.zs)().then(async () => {
+        const event = buildNoteFromEditor();
+        return relay/* Relay */.Z.instance.publish(event).then(async (saveEvent) => {
             (0,error/* showNotice */.s6)(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         });
@@ -19379,26 +21357,43 @@ function savePrivateNote() {
     (0,error/* showPending */.Si)("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     (0,common/* ensureConnected */.zs)().then(async () => {
-        const title = $("#note-title").val();
-        if ((0,common/* dtagFor */.oF)(title) == "tagayasu-") {
-            (0,error/* showError */.x2)("Title cannot be empty");
-            return;
-        }
-
-        const content = await (0,common/* encryptNote */.r0)(title, window.MDEditor.value());
+        const event = buildNoteFromEditor();
+        const payload = await (0,common/* encryptSelf */.DE)(JSON.stringify(event.rawEvent()));
         const tags = [
-            ["d", (0,common/* dtagFor */.oF)(title)],
-            ["title", "DRAFT"],
-            ["private", "true"],
-            ["published_at", Math.floor(Date.now() / 1000).toString()]
-        ]
-        relay/* Relay */.Z.instance.publish(30023, content, tags).then(async (saveEvent) => {
-            ;(0,error/* showNotice */.s6)("Your note has been saved privately.");
+            ['d', event.tags.find((t) => t[0] === 'd')[1]],
+            ['k', event.kind.toString()],
+        ];
+        const draftEvent = relay/* Relay */.Z.instance.buildEvent(31234, payload, tags);
+        relay/* Relay */.Z.instance.publish(draftEvent).then(async (saveEvent) => {
+            (0,error/* showNotice */.s6)("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
 window.savePrivateNote = savePrivateNote;
+
+function buildNoteFromEditor() {
+    const title = $("#note-title").val();
+    const dtag = (0,common/* dtagFor */.oF)(title);
+    if (dtag == "tagayasu-") {
+        (0,error/* showError */.x2)("Title cannot be empty");
+        return;
+    }
+
+    const kind = 30023;
+    const content = window.MDEditor.value();
+    const tags = [
+        ["d", dtag],
+        ["title", title],
+        ["published_at", Math.floor(Date.now() / 1000).toString()]
+    ];
+
+    MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
+        tags.push(["a", backref]);
+    });
+
+    return relay/* Relay */.Z.instance.buildEvent(kind, content, tags);
+}
 
 async function viewPublishedNote() {
     window.location.href = window.router.urlFor(Router.BROWSER, PageContext.instance.note.handle);
@@ -19406,11 +21401,10 @@ async function viewPublishedNote() {
 window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
-    $("#help-npub").html(window.nostrUser.npub);
+    setAvatarOnConnected();
 });
 
 window.addEventListener(Wallet.WALLET_CONNECTION_CHANGED, function(e) {
-    renderConnectButtons({ hover: false });
     updateOwnerOnly();
 });
 
@@ -19433,13 +21427,6 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
 
 $('#myNotesModal').on('shown.bs.modal', function () {
     $('#note-search-box').focus();
-});
-
-$(".connect-wallet").mouseenter(function() {
-    renderConnectButtons({ hover: true });
-});
-$(".connect-wallet").mouseleave(function() {
-    renderConnectButtons({ hover: false });
 });
 
 async function uploadFile() {
@@ -19481,7 +21468,11 @@ function createMDE() {
         title: "Upload image",
         action: async (editor) => {
             const result = await uploadFile();
-            editor.codemirror.replaceSelection(`![](${result.downloadUrls[0]} "blossom://${result.hash}")`);
+            if (result.downloadUrls.length > 0) {
+                editor.codemirror.replaceSelection(`![](${result.downloadUrls[0]} "blossom://${result.hash}")`);
+            } else {
+                (0,error/* showError */.x2)('No file servers accepted your upload');
+            }
         }
     };
 
@@ -19499,14 +21490,33 @@ function createMDE() {
     });
 }
 
-function renderConnectButtons({ hover }) {
+async function setAvatarOnConnected() {
     $(".connect-wallet").each(function(_i, _obj) {
-      $(this).width("auto");
-      if (!window.nip07signer) { return; } // Only show disconnect hover text if connected
-      const width = $(this).width();
-      $(this).text(hover ? "🔴 Disconnect" : npubPreview());
-      $(this).width(hover ? `${width}px` : "auto");
+        $(this).hide();
     });
+
+    $(".avatar").each(function(_i, _obj) {
+        $(this).show();
+        $(this).html(`<i class="fa fa-user"></i>`);
+    });
+    $(".npub").each(function(_i, _obj) {
+        $(this).text(window.nostrUser.npub);
+    });
+
+    const profile = await window.ndk.activeUser.fetchProfile();
+    const url = profile?.image;
+    if (url) {
+      $(".avatar").each(function(_i, _obj) {
+        $(this).html(`<img src='${url}' />`);
+      });
+    }
+
+    const name=profile?.name
+    if (name) {
+      $(".username").each(function(_i, _obj) {
+          $(this).text(name);
+      });
+    }
 }
 
 function npubPreview() {
@@ -19539,7 +21549,7 @@ async function loadBackrefs() {
 
     const filters = {
         authors: [hexpubkey],
-        kinds: [30023],
+        kinds: [30023, 31234],
         "#a": [(0,common/* atagFor */.Mf)(title, hexpubkey)]
     };
     relay/* Relay */.Z.instance.fetchEvents(filters).then((events) => {
@@ -19594,6 +21604,9 @@ $("#toast").on("click", function () {
 
 window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
     createMDE();
+    const prefs = Preferences.instance.current;
+    $('#editor-prefs-spellcheck')[0].checked = prefs.spellCheckEnabled;
+    $('#editor-prefs-aggressive-delete')[0].checked = prefs.aggressiveDelete;
 });
 
 function confirmAction(question) {
@@ -19616,6 +21629,138 @@ function confirmAction(question) {
     });
 }
 window.confirmAction = confirmAction;
+
+function savePreferences() {
+    Preferences.instance.set({
+        spellCheckEnabled: $('#editor-prefs-spellcheck')[0].checked,
+        aggressiveDelete: $('#editor-prefs-aggressive-delete')[0].checked,
+    });
+}
+window.savePreferences = savePreferences;
+
+function renderRelays() {
+    const relayConfig = relay_config/* RelayConfig */.f.forRelays(window.nostrUser.hexpubkey);
+    relayConfig.getRelayUrls().then(urls => {
+        renderRelayTable('my-relays', urls, 'trash', 'removeRelay');
+    });
+    renderRelayTable('recommended-relays', window.relays.recommended, 'plus', 'addRelay');
+
+    const blossomConfig = relay_config/* RelayConfig */.f.forBlossom(window.nostrUser.hexpubkey);
+    blossomConfig.getRelayUrls().then(urls => {
+        renderRelayTable('my-file-servers', urls, 'trash', 'removeBlossomServer');
+    });
+}
+
+function renderRelayTable(domId, urls, actionIcon, actionFnName) {
+    const updateRelayStatus = async (id, url) => {
+        const statusProvider = url.startsWith('wss')
+            ? relay/* Relay */.Z.instance.getRelayStatus
+            : Blossom.instance.getServerStatus;
+        const status = await statusProvider(url)
+            ? 'online'
+            : 'offline';
+        $(`#relay-status-${domId}-${id}`).html(`<div class='${status}'></div> ${status}`);
+    };
+
+    let result = '';
+    let id = 0;
+    result += `
+      <table class='table table-sm relay-table'>
+        <thead>
+          <tr>
+            <th scope='col'>Address</th>
+            <th scope='col'>Status</th>
+            <th scope='col'>&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    urls.forEach(url => {
+        updateRelayStatus(id, url);
+        const relayHost = (new URL(url)).host;
+        result += `
+          <tr>
+            <td>${relayHost}</td>
+            <td id='relay-status-${domId}-${id}'><div class="unknown"></div> connecting...</td>
+            <td><i class="fa fa-${actionIcon}" style="cursor:pointer" onclick="${actionFnName}('${url}')"></i></td>
+          </tr>
+        `;
+        id += 1;
+    });
+
+    result += `
+        </tbody>
+      </table>
+    `;
+
+    $(`#${domId}`).html(result);
+}
+
+async function addRelay(url) {
+    (0,error/* showPending */.Si)('adding relay...');
+    const relayConfig = relay_config/* RelayConfig */.f.forRelays(window.nostrUser.hexpubkey);
+    relayConfig.addRelay(url).then(() => {
+        (0,error/* showNotice */.s6)('relays updated');
+        renderRelays();
+    });
+}
+window.addRelay = addRelay;
+
+function addRelayFromInput() {
+    try {
+        const url = new URL($('#new-relay-url')[0].value);
+
+        if (url.protocol !== 'wss:') {
+            return (0,error/* showError */.x2)('URL must start with wss://');
+        }
+
+        addRelay(url.toString());
+    } catch {
+        (0,error/* showError */.x2)('invalid URL');
+    }
+}
+window.addRelayFromInput = addRelayFromInput;
+
+function removeRelay(url) {
+    (0,error/* showPending */.Si)('removing relay...');
+    const relayConfig = relay_config/* RelayConfig */.f.forRelays(window.nostrUser.hexpubkey);
+    relayConfig.removeRelay(url).then(() => {
+        (0,error/* showNotice */.s6)('relays updated');
+        renderRelays();
+    });
+}
+window.removeRelay = removeRelay;
+
+function addBlossomServerFromInput() {
+    try {
+        const url = new URL($('#new-file-server-url')[0].value);
+
+        if (url.protocol !== 'https:') {
+            return (0,error/* showError */.x2)('URL must start with https://');
+        }
+
+        (0,error/* showPending */.Si)('adding blossom server...');
+        const relayConfig = relay_config/* RelayConfig */.f.forBlossom(window.nostrUser.hexpubkey);
+        relayConfig.addRelay(url.toString()).then(() => {
+            (0,error/* showNotice */.s6)('blossom servers updated');
+            renderRelays();
+        });
+    } catch {
+        (0,error/* showError */.x2)('invalid URL');
+    }
+}
+window.addBlossomServerFromInput = addBlossomServerFromInput;
+
+function removeBlossomServer(url) {
+    (0,error/* showPending */.Si)('removing blossom server...');
+    const relayConfig = relay_config/* RelayConfig */.f.forBlossom(window.nostrUser.hexpubkey);
+    relayConfig.removeRelay(url).then(() => {
+        (0,error/* showNotice */.s6)('blossom servers updated');
+        renderRelays();
+    });
+}
+window.removeBlossomServer = removeBlossomServer;
 
 
 /***/ }),
@@ -19654,970 +21799,6 @@ window.addEventListener(Wallet.WALLET_DISCONNECTED_EVENT, function(e) {
 /***/ (() => {
 
 /* (ignored) */
-
-/***/ }),
-
-/***/ 282:
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-
-// EXPORTS
-__webpack_require__.d(__webpack_exports__, {
-  a0: () => (/* binding */ chacha20)
-});
-
-// UNUSED EXPORTS: _poly1305_aead, chacha12, chacha20orig, chacha20poly1305, chacha8, hchacha, xchacha20, xchacha20poly1305
-
-// EXTERNAL MODULE: ./node_modules/@noble/ciphers/esm/utils.js
-var utils = __webpack_require__(4207);
-;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/_assert.js
-function number(n) {
-    if (!Number.isSafeInteger(n) || n < 0)
-        throw new Error(`Wrong positive integer: ${n}`);
-}
-function bool(b) {
-    if (typeof b !== 'boolean')
-        throw new Error(`Expected boolean, not ${b}`);
-}
-function bytes(b, ...lengths) {
-    if (!(b instanceof Uint8Array))
-        throw new Error('Expected Uint8Array');
-    if (lengths.length > 0 && !lengths.includes(b.length))
-        throw new Error(`Expected Uint8Array of length ${lengths}, not of length=${b.length}`);
-}
-function hash(hash) {
-    if (typeof hash !== 'function' || typeof hash.create !== 'function')
-        throw new Error('hash must be wrapped by utils.wrapConstructor');
-    number(hash.outputLen);
-    number(hash.blockLen);
-}
-function exists(instance, checkFinished = true) {
-    if (instance.destroyed)
-        throw new Error('Hash instance has been destroyed');
-    if (checkFinished && instance.finished)
-        throw new Error('Hash#digest() has already been called');
-}
-function output(out, instance) {
-    bytes(out);
-    const min = instance.outputLen;
-    if (out.length < min) {
-        throw new Error(`digestInto() expects output buffer of length at least ${min}`);
-    }
-}
-
-const assert = { number, bool, bytes, hash, exists, output };
-/* harmony default export */ const _assert = (assert);
-//# sourceMappingURL=_assert.js.map
-;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/_poly1305.js
-
-
-// Poly1305 is a fast and parallel secret-key message-authentication code.
-// https://cr.yp.to/mac.html, https://cr.yp.to/mac/poly1305-20050329.pdf
-// https://datatracker.ietf.org/doc/html/rfc8439
-// Based on Public Domain poly1305-donna https://github.com/floodyberry/poly1305-donna
-const u8to16 = (a, i) => (a[i++] & 0xff) | ((a[i++] & 0xff) << 8);
-class Poly1305 {
-    constructor(key) {
-        this.blockLen = 16;
-        this.outputLen = 16;
-        this.buffer = new Uint8Array(16);
-        this.r = new Uint16Array(10);
-        this.h = new Uint16Array(10);
-        this.pad = new Uint16Array(8);
-        this.pos = 0;
-        this.finished = false;
-        key = (0,utils/* toBytes */.O0)(key);
-        (0,utils/* ensureBytes */.ql)(key, 32);
-        const t0 = u8to16(key, 0);
-        const t1 = u8to16(key, 2);
-        const t2 = u8to16(key, 4);
-        const t3 = u8to16(key, 6);
-        const t4 = u8to16(key, 8);
-        const t5 = u8to16(key, 10);
-        const t6 = u8to16(key, 12);
-        const t7 = u8to16(key, 14);
-        // https://github.com/floodyberry/poly1305-donna/blob/e6ad6e091d30d7f4ec2d4f978be1fcfcbce72781/poly1305-donna-16.h#L47
-        this.r[0] = t0 & 0x1fff;
-        this.r[1] = ((t0 >>> 13) | (t1 << 3)) & 0x1fff;
-        this.r[2] = ((t1 >>> 10) | (t2 << 6)) & 0x1f03;
-        this.r[3] = ((t2 >>> 7) | (t3 << 9)) & 0x1fff;
-        this.r[4] = ((t3 >>> 4) | (t4 << 12)) & 0x00ff;
-        this.r[5] = (t4 >>> 1) & 0x1ffe;
-        this.r[6] = ((t4 >>> 14) | (t5 << 2)) & 0x1fff;
-        this.r[7] = ((t5 >>> 11) | (t6 << 5)) & 0x1f81;
-        this.r[8] = ((t6 >>> 8) | (t7 << 8)) & 0x1fff;
-        this.r[9] = (t7 >>> 5) & 0x007f;
-        for (let i = 0; i < 8; i++)
-            this.pad[i] = u8to16(key, 16 + 2 * i);
-    }
-    process(data, offset, isLast = false) {
-        const hibit = isLast ? 0 : 1 << 11;
-        const { h, r } = this;
-        const r0 = r[0];
-        const r1 = r[1];
-        const r2 = r[2];
-        const r3 = r[3];
-        const r4 = r[4];
-        const r5 = r[5];
-        const r6 = r[6];
-        const r7 = r[7];
-        const r8 = r[8];
-        const r9 = r[9];
-        const t0 = u8to16(data, offset + 0);
-        const t1 = u8to16(data, offset + 2);
-        const t2 = u8to16(data, offset + 4);
-        const t3 = u8to16(data, offset + 6);
-        const t4 = u8to16(data, offset + 8);
-        const t5 = u8to16(data, offset + 10);
-        const t6 = u8to16(data, offset + 12);
-        const t7 = u8to16(data, offset + 14);
-        let h0 = h[0] + (t0 & 0x1fff);
-        let h1 = h[1] + (((t0 >>> 13) | (t1 << 3)) & 0x1fff);
-        let h2 = h[2] + (((t1 >>> 10) | (t2 << 6)) & 0x1fff);
-        let h3 = h[3] + (((t2 >>> 7) | (t3 << 9)) & 0x1fff);
-        let h4 = h[4] + (((t3 >>> 4) | (t4 << 12)) & 0x1fff);
-        let h5 = h[5] + ((t4 >>> 1) & 0x1fff);
-        let h6 = h[6] + (((t4 >>> 14) | (t5 << 2)) & 0x1fff);
-        let h7 = h[7] + (((t5 >>> 11) | (t6 << 5)) & 0x1fff);
-        let h8 = h[8] + (((t6 >>> 8) | (t7 << 8)) & 0x1fff);
-        let h9 = h[9] + ((t7 >>> 5) | hibit);
-        let c = 0;
-        let d0 = c + h0 * r0 + h1 * (5 * r9) + h2 * (5 * r8) + h3 * (5 * r7) + h4 * (5 * r6);
-        c = d0 >>> 13;
-        d0 &= 0x1fff;
-        d0 += h5 * (5 * r5) + h6 * (5 * r4) + h7 * (5 * r3) + h8 * (5 * r2) + h9 * (5 * r1);
-        c += d0 >>> 13;
-        d0 &= 0x1fff;
-        let d1 = c + h0 * r1 + h1 * r0 + h2 * (5 * r9) + h3 * (5 * r8) + h4 * (5 * r7);
-        c = d1 >>> 13;
-        d1 &= 0x1fff;
-        d1 += h5 * (5 * r6) + h6 * (5 * r5) + h7 * (5 * r4) + h8 * (5 * r3) + h9 * (5 * r2);
-        c += d1 >>> 13;
-        d1 &= 0x1fff;
-        let d2 = c + h0 * r2 + h1 * r1 + h2 * r0 + h3 * (5 * r9) + h4 * (5 * r8);
-        c = d2 >>> 13;
-        d2 &= 0x1fff;
-        d2 += h5 * (5 * r7) + h6 * (5 * r6) + h7 * (5 * r5) + h8 * (5 * r4) + h9 * (5 * r3);
-        c += d2 >>> 13;
-        d2 &= 0x1fff;
-        let d3 = c + h0 * r3 + h1 * r2 + h2 * r1 + h3 * r0 + h4 * (5 * r9);
-        c = d3 >>> 13;
-        d3 &= 0x1fff;
-        d3 += h5 * (5 * r8) + h6 * (5 * r7) + h7 * (5 * r6) + h8 * (5 * r5) + h9 * (5 * r4);
-        c += d3 >>> 13;
-        d3 &= 0x1fff;
-        let d4 = c + h0 * r4 + h1 * r3 + h2 * r2 + h3 * r1 + h4 * r0;
-        c = d4 >>> 13;
-        d4 &= 0x1fff;
-        d4 += h5 * (5 * r9) + h6 * (5 * r8) + h7 * (5 * r7) + h8 * (5 * r6) + h9 * (5 * r5);
-        c += d4 >>> 13;
-        d4 &= 0x1fff;
-        let d5 = c + h0 * r5 + h1 * r4 + h2 * r3 + h3 * r2 + h4 * r1;
-        c = d5 >>> 13;
-        d5 &= 0x1fff;
-        d5 += h5 * r0 + h6 * (5 * r9) + h7 * (5 * r8) + h8 * (5 * r7) + h9 * (5 * r6);
-        c += d5 >>> 13;
-        d5 &= 0x1fff;
-        let d6 = c + h0 * r6 + h1 * r5 + h2 * r4 + h3 * r3 + h4 * r2;
-        c = d6 >>> 13;
-        d6 &= 0x1fff;
-        d6 += h5 * r1 + h6 * r0 + h7 * (5 * r9) + h8 * (5 * r8) + h9 * (5 * r7);
-        c += d6 >>> 13;
-        d6 &= 0x1fff;
-        let d7 = c + h0 * r7 + h1 * r6 + h2 * r5 + h3 * r4 + h4 * r3;
-        c = d7 >>> 13;
-        d7 &= 0x1fff;
-        d7 += h5 * r2 + h6 * r1 + h7 * r0 + h8 * (5 * r9) + h9 * (5 * r8);
-        c += d7 >>> 13;
-        d7 &= 0x1fff;
-        let d8 = c + h0 * r8 + h1 * r7 + h2 * r6 + h3 * r5 + h4 * r4;
-        c = d8 >>> 13;
-        d8 &= 0x1fff;
-        d8 += h5 * r3 + h6 * r2 + h7 * r1 + h8 * r0 + h9 * (5 * r9);
-        c += d8 >>> 13;
-        d8 &= 0x1fff;
-        let d9 = c + h0 * r9 + h1 * r8 + h2 * r7 + h3 * r6 + h4 * r5;
-        c = d9 >>> 13;
-        d9 &= 0x1fff;
-        d9 += h5 * r4 + h6 * r3 + h7 * r2 + h8 * r1 + h9 * r0;
-        c += d9 >>> 13;
-        d9 &= 0x1fff;
-        c = ((c << 2) + c) | 0;
-        c = (c + d0) | 0;
-        d0 = c & 0x1fff;
-        c = c >>> 13;
-        d1 += c;
-        h[0] = d0;
-        h[1] = d1;
-        h[2] = d2;
-        h[3] = d3;
-        h[4] = d4;
-        h[5] = d5;
-        h[6] = d6;
-        h[7] = d7;
-        h[8] = d8;
-        h[9] = d9;
-    }
-    finalize() {
-        const { h, pad } = this;
-        const g = new Uint16Array(10);
-        let c = h[1] >>> 13;
-        h[1] &= 0x1fff;
-        for (let i = 2; i < 10; i++) {
-            h[i] += c;
-            c = h[i] >>> 13;
-            h[i] &= 0x1fff;
-        }
-        h[0] += c * 5;
-        c = h[0] >>> 13;
-        h[0] &= 0x1fff;
-        h[1] += c;
-        c = h[1] >>> 13;
-        h[1] &= 0x1fff;
-        h[2] += c;
-        g[0] = h[0] + 5;
-        c = g[0] >>> 13;
-        g[0] &= 0x1fff;
-        for (let i = 1; i < 10; i++) {
-            g[i] = h[i] + c;
-            c = g[i] >>> 13;
-            g[i] &= 0x1fff;
-        }
-        g[9] -= 1 << 13;
-        let mask = (c ^ 1) - 1;
-        for (let i = 0; i < 10; i++)
-            g[i] &= mask;
-        mask = ~mask;
-        for (let i = 0; i < 10; i++)
-            h[i] = (h[i] & mask) | g[i];
-        h[0] = (h[0] | (h[1] << 13)) & 0xffff;
-        h[1] = ((h[1] >>> 3) | (h[2] << 10)) & 0xffff;
-        h[2] = ((h[2] >>> 6) | (h[3] << 7)) & 0xffff;
-        h[3] = ((h[3] >>> 9) | (h[4] << 4)) & 0xffff;
-        h[4] = ((h[4] >>> 12) | (h[5] << 1) | (h[6] << 14)) & 0xffff;
-        h[5] = ((h[6] >>> 2) | (h[7] << 11)) & 0xffff;
-        h[6] = ((h[7] >>> 5) | (h[8] << 8)) & 0xffff;
-        h[7] = ((h[8] >>> 8) | (h[9] << 5)) & 0xffff;
-        let f = h[0] + pad[0];
-        h[0] = f & 0xffff;
-        for (let i = 1; i < 8; i++) {
-            f = (((h[i] + pad[i]) | 0) + (f >>> 16)) | 0;
-            h[i] = f & 0xffff;
-        }
-    }
-    update(data) {
-        _assert.exists(this);
-        const { buffer, blockLen } = this;
-        data = (0,utils/* toBytes */.O0)(data);
-        const len = data.length;
-        for (let pos = 0; pos < len;) {
-            const take = Math.min(blockLen - this.pos, len - pos);
-            // Fast path: we have at least one block in input
-            if (take === blockLen) {
-                for (; blockLen <= len - pos; pos += blockLen)
-                    this.process(data, pos);
-                continue;
-            }
-            buffer.set(data.subarray(pos, pos + take), this.pos);
-            this.pos += take;
-            pos += take;
-            if (this.pos === blockLen) {
-                this.process(buffer, 0, false);
-                this.pos = 0;
-            }
-        }
-        return this;
-    }
-    destroy() {
-        this.h.fill(0);
-        this.r.fill(0);
-        this.buffer.fill(0);
-        this.pad.fill(0);
-    }
-    digestInto(out) {
-        _assert.exists(this);
-        _assert.output(out, this);
-        this.finished = true;
-        const { buffer, h } = this;
-        let { pos } = this;
-        if (pos) {
-            buffer[pos++] = 1;
-            // buffer.subarray(pos).fill(0);
-            for (; pos < 16; pos++)
-                buffer[pos] = 0;
-            this.process(buffer, 0, true);
-        }
-        this.finalize();
-        let opos = 0;
-        for (let i = 0; i < 8; i++) {
-            out[opos++] = h[i] >>> 0;
-            out[opos++] = h[i] >>> 8;
-        }
-        return out;
-    }
-    digest() {
-        const { buffer, outputLen } = this;
-        this.digestInto(buffer);
-        const res = buffer.slice(0, outputLen);
-        this.destroy();
-        return res;
-    }
-}
-function wrapConstructorWithKey(hashCons) {
-    const hashC = (msg, key) => hashCons(key).update((0,utils/* toBytes */.O0)(msg)).digest();
-    const tmp = hashCons(new Uint8Array(32));
-    hashC.outputLen = tmp.outputLen;
-    hashC.blockLen = tmp.blockLen;
-    hashC.create = (key) => hashCons(key);
-    return hashC;
-}
-const _poly1305_poly1305 = wrapConstructorWithKey((key) => new Poly1305(key));
-//# sourceMappingURL=_poly1305.js.map
-;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/_salsa.js
-// Basic utils for salsa-like ciphers
-// Check out _micro.ts for descriptive documentation.
-
-
-/*
-RFC8439 requires multi-step cipher stream, where
-authKey starts with counter: 0, actual msg with counter: 1.
-
-For this, we need a way to re-use nonce / counter:
-
-    const counter = new Uint8Array(4);
-    chacha(..., counter, ...); // counter is now 1
-    chacha(..., counter, ...); // counter is now 2
-
-This is complicated:
-
-- Original papers don't allow mutating counters
-- Counter overflow is undefined: https://mailarchive.ietf.org/arch/msg/cfrg/gsOnTJzcbgG6OqD8Sc0GO5aR_tU/
-- 3rd-party library stablelib implementation uses an approach where you can provide
-  nonce and counter instead of just nonce - and it will re-use it
-- We could have did something similar, but ChaCha has different counter position
-  (counter | nonce), which is not composable with XChaCha, because full counter
-  is (nonce16 | counter | nonce16). Stablelib doesn't support in-place counter for XChaCha.
-- We could separate nonce & counter and provide separate API for counter re-use, but
-  there are different counter sizes depending on an algorithm.
-- Salsa & ChaCha also differ in structures of key / sigma:
-
-    salsa:     c0 | k(4) | c1 | nonce(2) | ctr(2) | c2 | k(4) | c4
-    chacha:    c(4) | k(8) | ctr(1) | nonce(3)
-    chachaDJB: c(4) | k(8) | ctr(2) | nonce(2)
-- Creating function such as `setSalsaState(key, nonce, sigma, data)` won't work,
-  because we can't re-use counter array
-- 32-bit nonce is `2 ** 32 * 64` = 256GB with 32-bit counter
-- JS does not allow UintArrays bigger than 4GB, so supporting 64-bit counters doesn't matter
-
-Structure is as following:
-
-key=16 -> sigma16, k=key|key
-key=32 -> sigma32, k=key
-
-nonces:
-salsa20:      8   (8-byte counter)
-chacha20djb:  8   (8-byte counter)
-chacha20tls:  12  (4-byte counter)
-xsalsa:       24  (16 -> hsalsa, 8 -> old nonce)
-xchacha:      24  (16 -> hchacha, 8 -> old nonce)
-
-https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha#appendix-A.2
-Use the subkey and remaining 8 byte nonce with ChaCha20 as normal
-(prefixed by 4 NUL bytes, since [RFC8439] specifies a 12-byte nonce).
-*/
-const sigma16 = (0,utils/* utf8ToBytes */.iY)('expand 16-byte k');
-const sigma32 = (0,utils/* utf8ToBytes */.iY)('expand 32-byte k');
-const sigma16_32 = (0,utils/* u32 */.Jq)(sigma16);
-const sigma32_32 = (0,utils/* u32 */.Jq)(sigma32);
-// Is byte array aligned to 4 byte offset (u32)?
-const isAligned32 = (b) => !(b.byteOffset % 4);
-const salsaBasic = (opts) => {
-    const { core, rounds, counterRight, counterLen, allow128bitKeys, extendNonceFn, blockLen } = (0,utils/* checkOpts */.U5)({ rounds: 20, counterRight: false, counterLen: 8, allow128bitKeys: true, blockLen: 64 }, opts);
-    _assert.number(counterLen);
-    _assert.number(rounds);
-    _assert.number(blockLen);
-    _assert.bool(counterRight);
-    _assert.bool(allow128bitKeys);
-    const blockLen32 = blockLen / 4;
-    if (blockLen % 4 !== 0)
-        throw new Error('Salsa/ChaCha: blockLen must be aligned to 4 bytes');
-    return (key, nonce, data, output, counter = 0) => {
-        _assert.bytes(key);
-        _assert.bytes(nonce);
-        _assert.bytes(data);
-        if (!output)
-            output = new Uint8Array(data.length);
-        _assert.bytes(output);
-        _assert.number(counter);
-        // > new Uint32Array([2**32])
-        // Uint32Array(1) [ 0 ]
-        // > new Uint32Array([2**32-1])
-        // Uint32Array(1) [ 4294967295 ]
-        if (counter < 0 || counter >= 2 ** 32 - 1)
-            throw new Error('Salsa/ChaCha: counter overflow');
-        if (output.length < data.length) {
-            throw new Error(`Salsa/ChaCha: output (${output.length}) is shorter than data (${data.length})`);
-        }
-        const toClean = [];
-        let k, sigma;
-        // Handle 128 byte keys
-        if (key.length === 32) {
-            k = key;
-            sigma = sigma32_32;
-        }
-        else if (key.length === 16 && allow128bitKeys) {
-            k = new Uint8Array(32);
-            k.set(key);
-            k.set(key, 16);
-            sigma = sigma16_32;
-            toClean.push(k);
-        }
-        else
-            throw new Error(`Salsa/ChaCha: invalid 32-byte key, got length=${key.length}`);
-        // Handle extended nonce (HChaCha/HSalsa)
-        if (extendNonceFn) {
-            if (nonce.length <= 16)
-                throw new Error(`Salsa/ChaCha: extended nonce must be bigger than 16 bytes`);
-            k = extendNonceFn(sigma, k, nonce.subarray(0, 16), new Uint8Array(32));
-            toClean.push(k);
-            nonce = nonce.subarray(16);
-        }
-        // Handle nonce counter
-        const nonceLen = 16 - counterLen;
-        if (nonce.length !== nonceLen)
-            throw new Error(`Salsa/ChaCha: nonce must be ${nonceLen} or 16 bytes`);
-        // Pad counter when nonce is 64 bit
-        if (nonceLen !== 12) {
-            const nc = new Uint8Array(12);
-            nc.set(nonce, counterRight ? 0 : 12 - nonce.length);
-            toClean.push((nonce = nc));
-        }
-        // Counter positions
-        const block = new Uint8Array(blockLen);
-        // Cast to Uint32Array for speed
-        const b32 = (0,utils/* u32 */.Jq)(block);
-        const k32 = (0,utils/* u32 */.Jq)(k);
-        const n32 = (0,utils/* u32 */.Jq)(nonce);
-        // Make sure that buffers aligned to 4 bytes
-        const d32 = isAligned32(data) && (0,utils/* u32 */.Jq)(data);
-        const o32 = isAligned32(output) && (0,utils/* u32 */.Jq)(output);
-        toClean.push(b32);
-        const len = data.length;
-        for (let pos = 0, ctr = counter; pos < len; ctr++) {
-            core(sigma, k32, n32, b32, ctr, rounds);
-            if (ctr >= 2 ** 32 - 1)
-                throw new Error('Salsa/ChaCha: counter overflow');
-            const take = Math.min(blockLen, len - pos);
-            // full block && aligned to 4 bytes
-            if (take === blockLen && o32 && d32) {
-                const pos32 = pos / 4;
-                if (pos % 4 !== 0)
-                    throw new Error('Salsa/ChaCha: invalid block position');
-                for (let j = 0; j < blockLen32; j++)
-                    o32[pos32 + j] = d32[pos32 + j] ^ b32[j];
-                pos += blockLen;
-                continue;
-            }
-            for (let j = 0; j < take; j++)
-                output[pos + j] = data[pos + j] ^ block[j];
-            pos += take;
-        }
-        for (let i = 0; i < toClean.length; i++)
-            toClean[i].fill(0);
-        return output;
-    };
-};
-//# sourceMappingURL=_salsa.js.map
-;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/chacha.js
-
-
-
-// ChaCha20 stream cipher was released in 2008. ChaCha aims to increase
-// the diffusion per round, but had slightly less cryptanalysis.
-// https://cr.yp.to/chacha.html, http://cr.yp.to/chacha/chacha-20080128.pdf
-// Left rotate for uint32
-const rotl = (a, b) => (a << b) | (a >>> (32 - b));
-/**
- * ChaCha core function.
- */
-// prettier-ignore
-function chachaCore(c, k, n, out, cnt, rounds = 20) {
-    let y00 = c[0], y01 = c[1], y02 = c[2], y03 = c[3]; // "expa"   "nd 3"  "2-by"  "te k"
-    let y04 = k[0], y05 = k[1], y06 = k[2], y07 = k[3]; // Key      Key     Key     Key
-    let y08 = k[4], y09 = k[5], y10 = k[6], y11 = k[7]; // Key      Key     Key     Key
-    let y12 = cnt, y13 = n[0], y14 = n[1], y15 = n[2]; // Counter  Counter	Nonce   Nonce
-    // Save state to temporary variables
-    let x00 = y00, x01 = y01, x02 = y02, x03 = y03, x04 = y04, x05 = y05, x06 = y06, x07 = y07, x08 = y08, x09 = y09, x10 = y10, x11 = y11, x12 = y12, x13 = y13, x14 = y14, x15 = y15;
-    // Main loop
-    for (let i = 0; i < rounds; i += 2) {
-        x00 = (x00 + x04) | 0;
-        x12 = rotl(x12 ^ x00, 16);
-        x08 = (x08 + x12) | 0;
-        x04 = rotl(x04 ^ x08, 12);
-        x00 = (x00 + x04) | 0;
-        x12 = rotl(x12 ^ x00, 8);
-        x08 = (x08 + x12) | 0;
-        x04 = rotl(x04 ^ x08, 7);
-        x01 = (x01 + x05) | 0;
-        x13 = rotl(x13 ^ x01, 16);
-        x09 = (x09 + x13) | 0;
-        x05 = rotl(x05 ^ x09, 12);
-        x01 = (x01 + x05) | 0;
-        x13 = rotl(x13 ^ x01, 8);
-        x09 = (x09 + x13) | 0;
-        x05 = rotl(x05 ^ x09, 7);
-        x02 = (x02 + x06) | 0;
-        x14 = rotl(x14 ^ x02, 16);
-        x10 = (x10 + x14) | 0;
-        x06 = rotl(x06 ^ x10, 12);
-        x02 = (x02 + x06) | 0;
-        x14 = rotl(x14 ^ x02, 8);
-        x10 = (x10 + x14) | 0;
-        x06 = rotl(x06 ^ x10, 7);
-        x03 = (x03 + x07) | 0;
-        x15 = rotl(x15 ^ x03, 16);
-        x11 = (x11 + x15) | 0;
-        x07 = rotl(x07 ^ x11, 12);
-        x03 = (x03 + x07) | 0;
-        x15 = rotl(x15 ^ x03, 8);
-        x11 = (x11 + x15) | 0;
-        x07 = rotl(x07 ^ x11, 7);
-        x00 = (x00 + x05) | 0;
-        x15 = rotl(x15 ^ x00, 16);
-        x10 = (x10 + x15) | 0;
-        x05 = rotl(x05 ^ x10, 12);
-        x00 = (x00 + x05) | 0;
-        x15 = rotl(x15 ^ x00, 8);
-        x10 = (x10 + x15) | 0;
-        x05 = rotl(x05 ^ x10, 7);
-        x01 = (x01 + x06) | 0;
-        x12 = rotl(x12 ^ x01, 16);
-        x11 = (x11 + x12) | 0;
-        x06 = rotl(x06 ^ x11, 12);
-        x01 = (x01 + x06) | 0;
-        x12 = rotl(x12 ^ x01, 8);
-        x11 = (x11 + x12) | 0;
-        x06 = rotl(x06 ^ x11, 7);
-        x02 = (x02 + x07) | 0;
-        x13 = rotl(x13 ^ x02, 16);
-        x08 = (x08 + x13) | 0;
-        x07 = rotl(x07 ^ x08, 12);
-        x02 = (x02 + x07) | 0;
-        x13 = rotl(x13 ^ x02, 8);
-        x08 = (x08 + x13) | 0;
-        x07 = rotl(x07 ^ x08, 7);
-        x03 = (x03 + x04) | 0;
-        x14 = rotl(x14 ^ x03, 16);
-        x09 = (x09 + x14) | 0;
-        x04 = rotl(x04 ^ x09, 12);
-        x03 = (x03 + x04) | 0;
-        x14 = rotl(x14 ^ x03, 8);
-        x09 = (x09 + x14) | 0;
-        x04 = rotl(x04 ^ x09, 7);
-    }
-    // Write output
-    let oi = 0;
-    out[oi++] = (y00 + x00) | 0;
-    out[oi++] = (y01 + x01) | 0;
-    out[oi++] = (y02 + x02) | 0;
-    out[oi++] = (y03 + x03) | 0;
-    out[oi++] = (y04 + x04) | 0;
-    out[oi++] = (y05 + x05) | 0;
-    out[oi++] = (y06 + x06) | 0;
-    out[oi++] = (y07 + x07) | 0;
-    out[oi++] = (y08 + x08) | 0;
-    out[oi++] = (y09 + x09) | 0;
-    out[oi++] = (y10 + x10) | 0;
-    out[oi++] = (y11 + x11) | 0;
-    out[oi++] = (y12 + x12) | 0;
-    out[oi++] = (y13 + x13) | 0;
-    out[oi++] = (y14 + x14) | 0;
-    out[oi++] = (y15 + x15) | 0;
-}
-/**
- * hchacha helper method, used primarily in xchacha, to hash
- * key and nonce into key' and nonce'.
- * Same as chachaCore, but there doesn't seem to be a way to move the block
- * out without 25% performance hit.
- */
-// prettier-ignore
-function hchacha(c, key, src, out) {
-    const k32 = (0,utils/* u32 */.Jq)(key);
-    const i32 = (0,utils/* u32 */.Jq)(src);
-    const o32 = (0,utils/* u32 */.Jq)(out);
-    let x00 = c[0], x01 = c[1], x02 = c[2], x03 = c[3];
-    let x04 = k32[0], x05 = k32[1], x06 = k32[2], x07 = k32[3];
-    let x08 = k32[4], x09 = k32[5], x10 = k32[6], x11 = k32[7];
-    let x12 = i32[0], x13 = i32[1], x14 = i32[2], x15 = i32[3];
-    for (let i = 0; i < 20; i += 2) {
-        x00 = (x00 + x04) | 0;
-        x12 = rotl(x12 ^ x00, 16);
-        x08 = (x08 + x12) | 0;
-        x04 = rotl(x04 ^ x08, 12);
-        x00 = (x00 + x04) | 0;
-        x12 = rotl(x12 ^ x00, 8);
-        x08 = (x08 + x12) | 0;
-        x04 = rotl(x04 ^ x08, 7);
-        x01 = (x01 + x05) | 0;
-        x13 = rotl(x13 ^ x01, 16);
-        x09 = (x09 + x13) | 0;
-        x05 = rotl(x05 ^ x09, 12);
-        x01 = (x01 + x05) | 0;
-        x13 = rotl(x13 ^ x01, 8);
-        x09 = (x09 + x13) | 0;
-        x05 = rotl(x05 ^ x09, 7);
-        x02 = (x02 + x06) | 0;
-        x14 = rotl(x14 ^ x02, 16);
-        x10 = (x10 + x14) | 0;
-        x06 = rotl(x06 ^ x10, 12);
-        x02 = (x02 + x06) | 0;
-        x14 = rotl(x14 ^ x02, 8);
-        x10 = (x10 + x14) | 0;
-        x06 = rotl(x06 ^ x10, 7);
-        x03 = (x03 + x07) | 0;
-        x15 = rotl(x15 ^ x03, 16);
-        x11 = (x11 + x15) | 0;
-        x07 = rotl(x07 ^ x11, 12);
-        x03 = (x03 + x07) | 0;
-        x15 = rotl(x15 ^ x03, 8);
-        x11 = (x11 + x15) | 0;
-        x07 = rotl(x07 ^ x11, 7);
-        x00 = (x00 + x05) | 0;
-        x15 = rotl(x15 ^ x00, 16);
-        x10 = (x10 + x15) | 0;
-        x05 = rotl(x05 ^ x10, 12);
-        x00 = (x00 + x05) | 0;
-        x15 = rotl(x15 ^ x00, 8);
-        x10 = (x10 + x15) | 0;
-        x05 = rotl(x05 ^ x10, 7);
-        x01 = (x01 + x06) | 0;
-        x12 = rotl(x12 ^ x01, 16);
-        x11 = (x11 + x12) | 0;
-        x06 = rotl(x06 ^ x11, 12);
-        x01 = (x01 + x06) | 0;
-        x12 = rotl(x12 ^ x01, 8);
-        x11 = (x11 + x12) | 0;
-        x06 = rotl(x06 ^ x11, 7);
-        x02 = (x02 + x07) | 0;
-        x13 = rotl(x13 ^ x02, 16);
-        x08 = (x08 + x13) | 0;
-        x07 = rotl(x07 ^ x08, 12);
-        x02 = (x02 + x07) | 0;
-        x13 = rotl(x13 ^ x02, 8);
-        x08 = (x08 + x13) | 0;
-        x07 = rotl(x07 ^ x08, 7);
-        x03 = (x03 + x04) | 0;
-        x14 = rotl(x14 ^ x03, 16);
-        x09 = (x09 + x14) | 0;
-        x04 = rotl(x04 ^ x09, 12);
-        x03 = (x03 + x04) | 0;
-        x14 = rotl(x14 ^ x03, 8);
-        x09 = (x09 + x14) | 0;
-        x04 = rotl(x04 ^ x09, 7);
-    }
-    o32[0] = x00;
-    o32[1] = x01;
-    o32[2] = x02;
-    o32[3] = x03;
-    o32[4] = x12;
-    o32[5] = x13;
-    o32[6] = x14;
-    o32[7] = x15;
-    return out;
-}
-/**
- * Original, non-RFC chacha20 from DJB. 8-byte nonce, 8-byte counter.
- */
-const chacha20orig = /* @__PURE__ */ salsaBasic({
-    core: chachaCore,
-    counterRight: false,
-    counterLen: 8,
-});
-/**
- * ChaCha stream cipher. Conforms to RFC 8439 (IETF, TLS). 12-byte nonce, 4-byte counter.
- * With 12-byte nonce, it's not safe to use fill it with random (CSPRNG), due to collision chance.
- */
-const chacha20 = /* @__PURE__ */ salsaBasic({
-    core: chachaCore,
-    counterRight: false,
-    counterLen: 4,
-    allow128bitKeys: false,
-});
-/**
- * XChaCha eXtended-nonce ChaCha. 24-byte nonce.
- * With 24-byte nonce, it's safe to use fill it with random (CSPRNG).
- * https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha
- */
-const xchacha20 = /* @__PURE__ */ salsaBasic({
-    core: chachaCore,
-    counterRight: false,
-    counterLen: 8,
-    extendNonceFn: hchacha,
-    allow128bitKeys: false,
-});
-/**
- * Reduced 8-round chacha, described in original paper.
- */
-const chacha8 = /* @__PURE__ */ salsaBasic({
-    core: chachaCore,
-    counterRight: false,
-    counterLen: 4,
-    rounds: 8,
-});
-/**
- * Reduced 12-round chacha, described in original paper.
- */
-const chacha12 = /* @__PURE__ */ salsaBasic({
-    core: chachaCore,
-    counterRight: false,
-    counterLen: 4,
-    rounds: 12,
-});
-const ZERO = /* @__PURE__ */ new Uint8Array(16);
-// Pad to digest size with zeros
-const updatePadded = (h, msg) => {
-    h.update(msg);
-    const left = msg.length % 16;
-    if (left)
-        h.update(ZERO.subarray(left));
-};
-const computeTag = (fn, key, nonce, data, AAD) => {
-    const authKey = fn(key, nonce, new Uint8Array(32));
-    const h = poly1305.create(authKey);
-    if (AAD)
-        updatePadded(h, AAD);
-    updatePadded(h, data);
-    const num = new Uint8Array(16);
-    const view = createView(num);
-    setBigUint64(view, 0, BigInt(AAD ? AAD.length : 0), true);
-    setBigUint64(view, 8, BigInt(data.length), true);
-    h.update(num);
-    const res = h.digest();
-    authKey.fill(0);
-    return res;
-};
-/**
- * AEAD algorithm from RFC 8439.
- * Salsa20 and chacha (RFC 8439) use poly1305 differently.
- * We could have composed them similar to:
- * https://github.com/paulmillr/scure-base/blob/b266c73dde977b1dd7ef40ef7a23cc15aab526b3/index.ts#L250
- * But it's hard because of authKey:
- * In salsa20, authKey changes position in salsa stream.
- * In chacha, authKey can't be computed inside computeTag, it modifies the counter.
- */
-const _poly1305_aead = (xorStream) => (key, nonce, AAD) => {
-    const tagLength = 16;
-    ensureBytes(key, 32);
-    ensureBytes(nonce);
-    return {
-        tagLength,
-        encrypt: (plaintext, output) => {
-            const plength = plaintext.length;
-            const clength = plength + tagLength;
-            if (output) {
-                ensureBytes(output, clength);
-            }
-            else {
-                output = new Uint8Array(clength);
-            }
-            xorStream(key, nonce, plaintext, output, 1);
-            const tag = computeTag(xorStream, key, nonce, output.subarray(0, -tagLength), AAD);
-            output.set(tag, plength); // append tag
-            return output;
-        },
-        decrypt: (ciphertext, output) => {
-            const clength = ciphertext.length;
-            const plength = clength - tagLength;
-            if (clength < tagLength)
-                throw new Error(`encrypted data must be at least ${tagLength} bytes`);
-            if (output) {
-                ensureBytes(output, plength);
-            }
-            else {
-                output = new Uint8Array(plength);
-            }
-            const data = ciphertext.subarray(0, -tagLength);
-            const passedTag = ciphertext.subarray(-tagLength);
-            const tag = computeTag(xorStream, key, nonce, data, AAD);
-            if (!equalBytes(passedTag, tag))
-                throw new Error('invalid tag');
-            xorStream(key, nonce, data, output, 1);
-            return output;
-        },
-    };
-};
-/**
- * ChaCha20-Poly1305 from RFC 8439.
- * With 12-byte nonce, it's not safe to use fill it with random (CSPRNG), due to collision chance.
- */
-const chacha20poly1305 = /* @__PURE__ */ (/* unused pure expression or super */ null && (_poly1305_aead(chacha20)));
-/**
- * XChaCha20-Poly1305 extended-nonce chacha.
- * https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha
- * With 24-byte nonce, it's safe to use fill it with random (CSPRNG).
- */
-const xchacha20poly1305 = /* @__PURE__ */ (/* unused pure expression or super */ null && (_poly1305_aead(xchacha20)));
-//# sourceMappingURL=chacha.js.map
-
-/***/ }),
-
-/***/ 4207:
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   Jq: () => (/* binding */ u32),
-/* harmony export */   O0: () => (/* binding */ toBytes),
-/* harmony export */   U5: () => (/* binding */ checkOpts),
-/* harmony export */   Wd: () => (/* binding */ equalBytes),
-/* harmony export */   iY: () => (/* binding */ utf8ToBytes),
-/* harmony export */   ql: () => (/* binding */ ensureBytes)
-/* harmony export */ });
-/* unused harmony exports u8, u16, createView, isLE, bytesToHex, hexToBytes, nextTick, asyncLoop, bytesToUtf8, concatBytes, Hash, setBigUint64 */
-/*! noble-ciphers - MIT License (c) 2023 Paul Miller (paulmillr.com) */
-const u8a = (a) => a instanceof Uint8Array;
-// Cast array to different type
-const u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
-const u16 = (arr) => new Uint16Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 2));
-const u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
-// Cast array to view
-const createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
-// big-endian hardware is rare. Just in case someone still decides to run ciphers:
-// early-throw an error because we don't support BE yet.
-const isLE = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
-if (!isLE)
-    throw new Error('Non little-endian hardware is not supported');
-const hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
-/**
- * @example bytesToHex(Uint8Array.from([0xca, 0xfe, 0x01, 0x23])) // 'cafe0123'
- */
-function bytesToHex(bytes) {
-    if (!u8a(bytes))
-        throw new Error('Uint8Array expected');
-    // pre-caching improves the speed 6x
-    let hex = '';
-    for (let i = 0; i < bytes.length; i++) {
-        hex += hexes[bytes[i]];
-    }
-    return hex;
-}
-/**
- * @example hexToBytes('cafe0123') // Uint8Array.from([0xca, 0xfe, 0x01, 0x23])
- */
-function hexToBytes(hex) {
-    if (typeof hex !== 'string')
-        throw new Error('hex string expected, got ' + typeof hex);
-    const len = hex.length;
-    if (len % 2)
-        throw new Error('padded hex string expected, got unpadded hex of length ' + len);
-    const array = new Uint8Array(len / 2);
-    for (let i = 0; i < array.length; i++) {
-        const j = i * 2;
-        const hexByte = hex.slice(j, j + 2);
-        const byte = Number.parseInt(hexByte, 16);
-        if (Number.isNaN(byte) || byte < 0)
-            throw new Error('Invalid byte sequence');
-        array[i] = byte;
-    }
-    return array;
-}
-// There is no setImmediate in browser and setTimeout is slow.
-// call of async fn will return Promise, which will be fullfiled only on
-// next scheduler queue processing step and this is exactly what we need.
-const nextTick = async () => { };
-// Returns control to thread each 'tick' ms to avoid blocking
-async function asyncLoop(iters, tick, cb) {
-    let ts = Date.now();
-    for (let i = 0; i < iters; i++) {
-        cb(i);
-        // Date.now() is not monotonic, so in case if clock goes backwards we return return control too
-        const diff = Date.now() - ts;
-        if (diff >= 0 && diff < tick)
-            continue;
-        await nextTick();
-        ts += diff;
-    }
-}
-/**
- * @example utf8ToBytes('abc') // new Uint8Array([97, 98, 99])
- */
-function utf8ToBytes(str) {
-    if (typeof str !== 'string')
-        throw new Error(`utf8ToBytes expected string, got ${typeof str}`);
-    return new Uint8Array(new TextEncoder().encode(str)); // https://bugzil.la/1681809
-}
-function bytesToUtf8(bytes) {
-    return new TextDecoder().decode(bytes);
-}
-/**
- * Normalizes (non-hex) string or Uint8Array to Uint8Array.
- * Warning: when Uint8Array is passed, it would NOT get copied.
- * Keep in mind for future mutable operations.
- */
-function toBytes(data) {
-    if (typeof data === 'string')
-        data = utf8ToBytes(data);
-    if (!u8a(data))
-        throw new Error(`expected Uint8Array, got ${typeof data}`);
-    return data;
-}
-/**
- * Copies several Uint8Arrays into one.
- */
-function concatBytes(...arrays) {
-    const r = new Uint8Array(arrays.reduce((sum, a) => sum + a.length, 0));
-    let pad = 0; // walk through each item, ensure they have proper type
-    arrays.forEach((a) => {
-        if (!u8a(a))
-            throw new Error('Uint8Array expected');
-        r.set(a, pad);
-        pad += a.length;
-    });
-    return r;
-}
-// Check if object doens't have custom constructor (like Uint8Array/Array)
-const isPlainObject = (obj) => Object.prototype.toString.call(obj) === '[object Object]' && obj.constructor === Object;
-function checkOpts(defaults, opts) {
-    if (opts !== undefined && (typeof opts !== 'object' || !isPlainObject(opts)))
-        throw new Error('options must be object or undefined');
-    const merged = Object.assign(defaults, opts);
-    return merged;
-}
-function ensureBytes(b, len) {
-    if (!(b instanceof Uint8Array))
-        throw new Error('Uint8Array expected');
-    if (typeof len === 'number')
-        if (b.length !== len)
-            throw new Error(`Uint8Array length ${len} expected`);
-}
-// Constant-time equality
-function equalBytes(a, b) {
-    // Should not happen
-    if (a.length !== b.length)
-        throw new Error('equalBytes: Different size of Uint8Arrays');
-    let isSame = true;
-    for (let i = 0; i < a.length; i++)
-        isSame && (isSame = a[i] === b[i]); // Lets hope JIT won't optimize away.
-    return isSame;
-}
-// For runtime check if class implements interface
-class Hash {
-}
-// Polyfill for Safari 14
-function setBigUint64(view, byteOffset, value, isLE) {
-    if (typeof view.setBigUint64 === 'function')
-        return view.setBigUint64(byteOffset, value, isLE);
-    const _32n = BigInt(32);
-    const _u32_max = BigInt(0xffffffff);
-    const wh = Number((value >> _32n) & _u32_max);
-    const wl = Number(value & _u32_max);
-    const h = isLE ? 4 : 0;
-    const l = isLE ? 0 : 4;
-    view.setUint32(byteOffset + h, wh, isLE);
-    view.setUint32(byteOffset + l, wl, isLE);
-}
-//# sourceMappingURL=utils.js.map
 
 /***/ }),
 
@@ -21300,7 +22481,7 @@ function randomBytes(bytesLength = 32) {
 
 /***/ }),
 
-/***/ 2483:
+/***/ 468:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -21310,10 +22491,11 @@ __webpack_require__.d(__webpack_exports__, {
   _C: () => (/* binding */ NDKEvent),
   fJ: () => (/* binding */ NDKNip07Signer),
   Gg: () => (/* binding */ NDKPrivateKeySigner),
+  FR: () => (/* binding */ NDKRelay),
   ZP: () => (/* binding */ NDK)
 });
 
-// UNUSED EXPORTS: BECH32_REGEX, NDKAppHandlerEvent, NDKArticle, NDKClassified, NDKDVMJobFeedback, NDKDVMJobResult, NDKDVMRequest, NDKDvmJobFeedbackStatus, NDKHighlight, NDKKind, NDKList, NDKListKinds, NDKNip46Backend, NDKNip46Signer, NDKNostrRpc, NDKNwc, NDKRelay, NDKRelayAuthPolicies, NDKRelayList, NDKRelaySet, NDKRelayStatus, NDKRepost, NDKSimpleGroup, NDKSubscription, NDKSubscriptionCacheUsage, NDKSubscriptionReceipt, NDKSubscriptionStart, NDKSubscriptionTier, NDKTranscriptionDVM, NDKUser, NDKVideo, NDKZap, NIP33_A_REGEX, PublishError, calculateGroupableId, calculateTermDurationInSeconds, compareFilter, defaultOpts, deserialize, dvmSchedule, eventHasETagMarkers, eventIsPartOfThread, eventIsReply, eventReplies, eventThreadIds, eventThreads, eventsBySameAuthor, filterFromId, generateSubId, getEventReplyIds, getReplyTag, getRootEventId, getRootTag, isEventOriginalPost, isNip33AValue, mergeFilters, newAmount, parseTagToSubscriptionAmount, pinEvent, possibleIntervalFrequencies, profileFromEvent, queryFullyFilled, relaysFromBech32, serialize, serializeProfile, zapInvoiceFromEvent
+// UNUSED EXPORTS: BECH32_REGEX, NDKAppHandlerEvent, NDKArticle, NDKClassified, NDKDVMJobFeedback, NDKDVMJobResult, NDKDVMRequest, NDKDvmJobFeedbackStatus, NDKHighlight, NDKKind, NDKList, NDKListKinds, NDKNip46Backend, NDKNip46Signer, NDKNostrRpc, NDKNwc, NDKRelayAuthPolicies, NDKRelayList, NDKRelaySet, NDKRelayStatus, NDKRepost, NDKSimpleGroup, NDKSubscription, NDKSubscriptionCacheUsage, NDKSubscriptionReceipt, NDKSubscriptionStart, NDKSubscriptionTier, NDKTranscriptionDVM, NDKUser, NDKVideo, NDKZap, NIP33_A_REGEX, PublishError, calculateGroupableId, calculateTermDurationInSeconds, compareFilter, defaultOpts, deserialize, dvmSchedule, eventHasETagMarkers, eventIsPartOfThread, eventIsReply, eventReplies, eventThreadIds, eventThreads, eventsBySameAuthor, filterFromId, generateSubId, getEventReplyIds, getReplyTag, getRootEventId, getRootTag, isEventOriginalPost, isNip33AValue, mergeFilters, newAmount, parseTagToSubscriptionAmount, pinEvent, possibleIntervalFrequencies, profileFromEvent, queryFullyFilled, relaysFromBech32, serialize, serializeProfile, zapInvoiceFromEvent
 
 // NAMESPACE OBJECT: ./node_modules/@nostr-dev-kit/ndk/node_modules/nostr-tools/node_modules/@noble/curves/esm/abstract/utils.js
 var utils_namespaceObject = {};
@@ -21491,7 +22673,7 @@ function utils_concatBytes(...arrays) {
     });
     return r;
 }
-function equalBytes(b1, b2) {
+function utils_equalBytes(b1, b2) {
     // We don't care about timing attacks here
     if (b1.length !== b2.length)
         return false;
@@ -26382,7 +27564,7 @@ function abstract_utils_concatBytes(...arrays) {
     });
     return r;
 }
-function utils_equalBytes(b1, b2) {
+function abstract_utils_equalBytes(b1, b2) {
     // We don't care about timing attacks here
     if (b1.length !== b2.length)
         return false;
@@ -28802,10 +29984,938 @@ class HDKey {
     }
 }
 //# sourceMappingURL=index.js.map
-// EXTERNAL MODULE: ./node_modules/@noble/ciphers/esm/chacha.js + 3 modules
-var chacha = __webpack_require__(282);
-// EXTERNAL MODULE: ./node_modules/@noble/ciphers/esm/utils.js
-var esm_utils = __webpack_require__(4207);
+;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/utils.js
+/*! noble-ciphers - MIT License (c) 2023 Paul Miller (paulmillr.com) */
+const esm_utils_u8a = (a) => a instanceof Uint8Array;
+// Cast array to different type
+const u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+const u16 = (arr) => new Uint16Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 2));
+const u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
+// Cast array to view
+const utils_createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+// big-endian hardware is rare. Just in case someone still decides to run ciphers:
+// early-throw an error because we don't support BE yet.
+const isLE = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
+if (!isLE)
+    throw new Error('Non little-endian hardware is not supported');
+const esm_utils_hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+/**
+ * @example bytesToHex(Uint8Array.from([0xca, 0xfe, 0x01, 0x23])) // 'cafe0123'
+ */
+function esm_utils_bytesToHex(bytes) {
+    if (!esm_utils_u8a(bytes))
+        throw new Error('Uint8Array expected');
+    // pre-caching improves the speed 6x
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+        hex += esm_utils_hexes[bytes[i]];
+    }
+    return hex;
+}
+/**
+ * @example hexToBytes('cafe0123') // Uint8Array.from([0xca, 0xfe, 0x01, 0x23])
+ */
+function esm_utils_hexToBytes(hex) {
+    if (typeof hex !== 'string')
+        throw new Error('hex string expected, got ' + typeof hex);
+    const len = hex.length;
+    if (len % 2)
+        throw new Error('padded hex string expected, got unpadded hex of length ' + len);
+    const array = new Uint8Array(len / 2);
+    for (let i = 0; i < array.length; i++) {
+        const j = i * 2;
+        const hexByte = hex.slice(j, j + 2);
+        const byte = Number.parseInt(hexByte, 16);
+        if (Number.isNaN(byte) || byte < 0)
+            throw new Error('Invalid byte sequence');
+        array[i] = byte;
+    }
+    return array;
+}
+// There is no setImmediate in browser and setTimeout is slow.
+// call of async fn will return Promise, which will be fullfiled only on
+// next scheduler queue processing step and this is exactly what we need.
+const nextTick = async () => { };
+// Returns control to thread each 'tick' ms to avoid blocking
+async function utils_asyncLoop(iters, tick, cb) {
+    let ts = Date.now();
+    for (let i = 0; i < iters; i++) {
+        cb(i);
+        // Date.now() is not monotonic, so in case if clock goes backwards we return return control too
+        const diff = Date.now() - ts;
+        if (diff >= 0 && diff < tick)
+            continue;
+        await nextTick();
+        ts += diff;
+    }
+}
+/**
+ * @example utf8ToBytes('abc') // new Uint8Array([97, 98, 99])
+ */
+function esm_utils_utf8ToBytes(str) {
+    if (typeof str !== 'string')
+        throw new Error(`utf8ToBytes expected string, got ${typeof str}`);
+    return new Uint8Array(new TextEncoder().encode(str)); // https://bugzil.la/1681809
+}
+function bytesToUtf8(bytes) {
+    return new TextDecoder().decode(bytes);
+}
+/**
+ * Normalizes (non-hex) string or Uint8Array to Uint8Array.
+ * Warning: when Uint8Array is passed, it would NOT get copied.
+ * Keep in mind for future mutable operations.
+ */
+function toBytes(data) {
+    if (typeof data === 'string')
+        data = esm_utils_utf8ToBytes(data);
+    if (!esm_utils_u8a(data))
+        throw new Error(`expected Uint8Array, got ${typeof data}`);
+    return data;
+}
+/**
+ * Copies several Uint8Arrays into one.
+ */
+function esm_utils_concatBytes(...arrays) {
+    const r = new Uint8Array(arrays.reduce((sum, a) => sum + a.length, 0));
+    let pad = 0; // walk through each item, ensure they have proper type
+    arrays.forEach((a) => {
+        if (!esm_utils_u8a(a))
+            throw new Error('Uint8Array expected');
+        r.set(a, pad);
+        pad += a.length;
+    });
+    return r;
+}
+// Check if object doens't have custom constructor (like Uint8Array/Array)
+const isPlainObject = (obj) => Object.prototype.toString.call(obj) === '[object Object]' && obj.constructor === Object;
+function checkOpts(defaults, opts) {
+    if (opts !== undefined && (typeof opts !== 'object' || !isPlainObject(opts)))
+        throw new Error('options must be object or undefined');
+    const merged = Object.assign(defaults, opts);
+    return merged;
+}
+function esm_utils_ensureBytes(b, len) {
+    if (!(b instanceof Uint8Array))
+        throw new Error('Uint8Array expected');
+    if (typeof len === 'number')
+        if (b.length !== len)
+            throw new Error(`Uint8Array length ${len} expected`);
+}
+// Constant-time equality
+function esm_utils_equalBytes(a, b) {
+    // Should not happen
+    if (a.length !== b.length)
+        throw new Error('equalBytes: Different size of Uint8Arrays');
+    let isSame = true;
+    for (let i = 0; i < a.length; i++)
+        isSame && (isSame = a[i] === b[i]); // Lets hope JIT won't optimize away.
+    return isSame;
+}
+// For runtime check if class implements interface
+class Hash {
+}
+// Polyfill for Safari 14
+function utils_setBigUint64(view, byteOffset, value, isLE) {
+    if (typeof view.setBigUint64 === 'function')
+        return view.setBigUint64(byteOffset, value, isLE);
+    const _32n = BigInt(32);
+    const _u32_max = BigInt(0xffffffff);
+    const wh = Number((value >> _32n) & _u32_max);
+    const wl = Number(value & _u32_max);
+    const h = isLE ? 4 : 0;
+    const l = isLE ? 0 : 4;
+    view.setUint32(byteOffset + h, wh, isLE);
+    view.setUint32(byteOffset + l, wl, isLE);
+}
+//# sourceMappingURL=utils.js.map
+;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/_assert.js
+function number(n) {
+    if (!Number.isSafeInteger(n) || n < 0)
+        throw new Error(`Wrong positive integer: ${n}`);
+}
+function bool(b) {
+    if (typeof b !== 'boolean')
+        throw new Error(`Expected boolean, not ${b}`);
+}
+function bytes(b, ...lengths) {
+    if (!(b instanceof Uint8Array))
+        throw new Error('Expected Uint8Array');
+    if (lengths.length > 0 && !lengths.includes(b.length))
+        throw new Error(`Expected Uint8Array of length ${lengths}, not of length=${b.length}`);
+}
+function hash(hash) {
+    if (typeof hash !== 'function' || typeof hash.create !== 'function')
+        throw new Error('hash must be wrapped by utils.wrapConstructor');
+    number(hash.outputLen);
+    number(hash.blockLen);
+}
+function exists(instance, checkFinished = true) {
+    if (instance.destroyed)
+        throw new Error('Hash instance has been destroyed');
+    if (checkFinished && instance.finished)
+        throw new Error('Hash#digest() has already been called');
+}
+function output(out, instance) {
+    bytes(out);
+    const min = instance.outputLen;
+    if (out.length < min) {
+        throw new Error(`digestInto() expects output buffer of length at least ${min}`);
+    }
+}
+
+const assert = { number, bool, bytes, hash, exists, output };
+/* harmony default export */ const esm_assert = (assert);
+//# sourceMappingURL=_assert.js.map
+;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/_poly1305.js
+
+
+// Poly1305 is a fast and parallel secret-key message-authentication code.
+// https://cr.yp.to/mac.html, https://cr.yp.to/mac/poly1305-20050329.pdf
+// https://datatracker.ietf.org/doc/html/rfc8439
+// Based on Public Domain poly1305-donna https://github.com/floodyberry/poly1305-donna
+const u8to16 = (a, i) => (a[i++] & 0xff) | ((a[i++] & 0xff) << 8);
+class Poly1305 {
+    constructor(key) {
+        this.blockLen = 16;
+        this.outputLen = 16;
+        this.buffer = new Uint8Array(16);
+        this.r = new Uint16Array(10);
+        this.h = new Uint16Array(10);
+        this.pad = new Uint16Array(8);
+        this.pos = 0;
+        this.finished = false;
+        key = toBytes(key);
+        esm_utils_ensureBytes(key, 32);
+        const t0 = u8to16(key, 0);
+        const t1 = u8to16(key, 2);
+        const t2 = u8to16(key, 4);
+        const t3 = u8to16(key, 6);
+        const t4 = u8to16(key, 8);
+        const t5 = u8to16(key, 10);
+        const t6 = u8to16(key, 12);
+        const t7 = u8to16(key, 14);
+        // https://github.com/floodyberry/poly1305-donna/blob/e6ad6e091d30d7f4ec2d4f978be1fcfcbce72781/poly1305-donna-16.h#L47
+        this.r[0] = t0 & 0x1fff;
+        this.r[1] = ((t0 >>> 13) | (t1 << 3)) & 0x1fff;
+        this.r[2] = ((t1 >>> 10) | (t2 << 6)) & 0x1f03;
+        this.r[3] = ((t2 >>> 7) | (t3 << 9)) & 0x1fff;
+        this.r[4] = ((t3 >>> 4) | (t4 << 12)) & 0x00ff;
+        this.r[5] = (t4 >>> 1) & 0x1ffe;
+        this.r[6] = ((t4 >>> 14) | (t5 << 2)) & 0x1fff;
+        this.r[7] = ((t5 >>> 11) | (t6 << 5)) & 0x1f81;
+        this.r[8] = ((t6 >>> 8) | (t7 << 8)) & 0x1fff;
+        this.r[9] = (t7 >>> 5) & 0x007f;
+        for (let i = 0; i < 8; i++)
+            this.pad[i] = u8to16(key, 16 + 2 * i);
+    }
+    process(data, offset, isLast = false) {
+        const hibit = isLast ? 0 : 1 << 11;
+        const { h, r } = this;
+        const r0 = r[0];
+        const r1 = r[1];
+        const r2 = r[2];
+        const r3 = r[3];
+        const r4 = r[4];
+        const r5 = r[5];
+        const r6 = r[6];
+        const r7 = r[7];
+        const r8 = r[8];
+        const r9 = r[9];
+        const t0 = u8to16(data, offset + 0);
+        const t1 = u8to16(data, offset + 2);
+        const t2 = u8to16(data, offset + 4);
+        const t3 = u8to16(data, offset + 6);
+        const t4 = u8to16(data, offset + 8);
+        const t5 = u8to16(data, offset + 10);
+        const t6 = u8to16(data, offset + 12);
+        const t7 = u8to16(data, offset + 14);
+        let h0 = h[0] + (t0 & 0x1fff);
+        let h1 = h[1] + (((t0 >>> 13) | (t1 << 3)) & 0x1fff);
+        let h2 = h[2] + (((t1 >>> 10) | (t2 << 6)) & 0x1fff);
+        let h3 = h[3] + (((t2 >>> 7) | (t3 << 9)) & 0x1fff);
+        let h4 = h[4] + (((t3 >>> 4) | (t4 << 12)) & 0x1fff);
+        let h5 = h[5] + ((t4 >>> 1) & 0x1fff);
+        let h6 = h[6] + (((t4 >>> 14) | (t5 << 2)) & 0x1fff);
+        let h7 = h[7] + (((t5 >>> 11) | (t6 << 5)) & 0x1fff);
+        let h8 = h[8] + (((t6 >>> 8) | (t7 << 8)) & 0x1fff);
+        let h9 = h[9] + ((t7 >>> 5) | hibit);
+        let c = 0;
+        let d0 = c + h0 * r0 + h1 * (5 * r9) + h2 * (5 * r8) + h3 * (5 * r7) + h4 * (5 * r6);
+        c = d0 >>> 13;
+        d0 &= 0x1fff;
+        d0 += h5 * (5 * r5) + h6 * (5 * r4) + h7 * (5 * r3) + h8 * (5 * r2) + h9 * (5 * r1);
+        c += d0 >>> 13;
+        d0 &= 0x1fff;
+        let d1 = c + h0 * r1 + h1 * r0 + h2 * (5 * r9) + h3 * (5 * r8) + h4 * (5 * r7);
+        c = d1 >>> 13;
+        d1 &= 0x1fff;
+        d1 += h5 * (5 * r6) + h6 * (5 * r5) + h7 * (5 * r4) + h8 * (5 * r3) + h9 * (5 * r2);
+        c += d1 >>> 13;
+        d1 &= 0x1fff;
+        let d2 = c + h0 * r2 + h1 * r1 + h2 * r0 + h3 * (5 * r9) + h4 * (5 * r8);
+        c = d2 >>> 13;
+        d2 &= 0x1fff;
+        d2 += h5 * (5 * r7) + h6 * (5 * r6) + h7 * (5 * r5) + h8 * (5 * r4) + h9 * (5 * r3);
+        c += d2 >>> 13;
+        d2 &= 0x1fff;
+        let d3 = c + h0 * r3 + h1 * r2 + h2 * r1 + h3 * r0 + h4 * (5 * r9);
+        c = d3 >>> 13;
+        d3 &= 0x1fff;
+        d3 += h5 * (5 * r8) + h6 * (5 * r7) + h7 * (5 * r6) + h8 * (5 * r5) + h9 * (5 * r4);
+        c += d3 >>> 13;
+        d3 &= 0x1fff;
+        let d4 = c + h0 * r4 + h1 * r3 + h2 * r2 + h3 * r1 + h4 * r0;
+        c = d4 >>> 13;
+        d4 &= 0x1fff;
+        d4 += h5 * (5 * r9) + h6 * (5 * r8) + h7 * (5 * r7) + h8 * (5 * r6) + h9 * (5 * r5);
+        c += d4 >>> 13;
+        d4 &= 0x1fff;
+        let d5 = c + h0 * r5 + h1 * r4 + h2 * r3 + h3 * r2 + h4 * r1;
+        c = d5 >>> 13;
+        d5 &= 0x1fff;
+        d5 += h5 * r0 + h6 * (5 * r9) + h7 * (5 * r8) + h8 * (5 * r7) + h9 * (5 * r6);
+        c += d5 >>> 13;
+        d5 &= 0x1fff;
+        let d6 = c + h0 * r6 + h1 * r5 + h2 * r4 + h3 * r3 + h4 * r2;
+        c = d6 >>> 13;
+        d6 &= 0x1fff;
+        d6 += h5 * r1 + h6 * r0 + h7 * (5 * r9) + h8 * (5 * r8) + h9 * (5 * r7);
+        c += d6 >>> 13;
+        d6 &= 0x1fff;
+        let d7 = c + h0 * r7 + h1 * r6 + h2 * r5 + h3 * r4 + h4 * r3;
+        c = d7 >>> 13;
+        d7 &= 0x1fff;
+        d7 += h5 * r2 + h6 * r1 + h7 * r0 + h8 * (5 * r9) + h9 * (5 * r8);
+        c += d7 >>> 13;
+        d7 &= 0x1fff;
+        let d8 = c + h0 * r8 + h1 * r7 + h2 * r6 + h3 * r5 + h4 * r4;
+        c = d8 >>> 13;
+        d8 &= 0x1fff;
+        d8 += h5 * r3 + h6 * r2 + h7 * r1 + h8 * r0 + h9 * (5 * r9);
+        c += d8 >>> 13;
+        d8 &= 0x1fff;
+        let d9 = c + h0 * r9 + h1 * r8 + h2 * r7 + h3 * r6 + h4 * r5;
+        c = d9 >>> 13;
+        d9 &= 0x1fff;
+        d9 += h5 * r4 + h6 * r3 + h7 * r2 + h8 * r1 + h9 * r0;
+        c += d9 >>> 13;
+        d9 &= 0x1fff;
+        c = ((c << 2) + c) | 0;
+        c = (c + d0) | 0;
+        d0 = c & 0x1fff;
+        c = c >>> 13;
+        d1 += c;
+        h[0] = d0;
+        h[1] = d1;
+        h[2] = d2;
+        h[3] = d3;
+        h[4] = d4;
+        h[5] = d5;
+        h[6] = d6;
+        h[7] = d7;
+        h[8] = d8;
+        h[9] = d9;
+    }
+    finalize() {
+        const { h, pad } = this;
+        const g = new Uint16Array(10);
+        let c = h[1] >>> 13;
+        h[1] &= 0x1fff;
+        for (let i = 2; i < 10; i++) {
+            h[i] += c;
+            c = h[i] >>> 13;
+            h[i] &= 0x1fff;
+        }
+        h[0] += c * 5;
+        c = h[0] >>> 13;
+        h[0] &= 0x1fff;
+        h[1] += c;
+        c = h[1] >>> 13;
+        h[1] &= 0x1fff;
+        h[2] += c;
+        g[0] = h[0] + 5;
+        c = g[0] >>> 13;
+        g[0] &= 0x1fff;
+        for (let i = 1; i < 10; i++) {
+            g[i] = h[i] + c;
+            c = g[i] >>> 13;
+            g[i] &= 0x1fff;
+        }
+        g[9] -= 1 << 13;
+        let mask = (c ^ 1) - 1;
+        for (let i = 0; i < 10; i++)
+            g[i] &= mask;
+        mask = ~mask;
+        for (let i = 0; i < 10; i++)
+            h[i] = (h[i] & mask) | g[i];
+        h[0] = (h[0] | (h[1] << 13)) & 0xffff;
+        h[1] = ((h[1] >>> 3) | (h[2] << 10)) & 0xffff;
+        h[2] = ((h[2] >>> 6) | (h[3] << 7)) & 0xffff;
+        h[3] = ((h[3] >>> 9) | (h[4] << 4)) & 0xffff;
+        h[4] = ((h[4] >>> 12) | (h[5] << 1) | (h[6] << 14)) & 0xffff;
+        h[5] = ((h[6] >>> 2) | (h[7] << 11)) & 0xffff;
+        h[6] = ((h[7] >>> 5) | (h[8] << 8)) & 0xffff;
+        h[7] = ((h[8] >>> 8) | (h[9] << 5)) & 0xffff;
+        let f = h[0] + pad[0];
+        h[0] = f & 0xffff;
+        for (let i = 1; i < 8; i++) {
+            f = (((h[i] + pad[i]) | 0) + (f >>> 16)) | 0;
+            h[i] = f & 0xffff;
+        }
+    }
+    update(data) {
+        esm_assert.exists(this);
+        const { buffer, blockLen } = this;
+        data = toBytes(data);
+        const len = data.length;
+        for (let pos = 0; pos < len;) {
+            const take = Math.min(blockLen - this.pos, len - pos);
+            // Fast path: we have at least one block in input
+            if (take === blockLen) {
+                for (; blockLen <= len - pos; pos += blockLen)
+                    this.process(data, pos);
+                continue;
+            }
+            buffer.set(data.subarray(pos, pos + take), this.pos);
+            this.pos += take;
+            pos += take;
+            if (this.pos === blockLen) {
+                this.process(buffer, 0, false);
+                this.pos = 0;
+            }
+        }
+        return this;
+    }
+    destroy() {
+        this.h.fill(0);
+        this.r.fill(0);
+        this.buffer.fill(0);
+        this.pad.fill(0);
+    }
+    digestInto(out) {
+        esm_assert.exists(this);
+        esm_assert.output(out, this);
+        this.finished = true;
+        const { buffer, h } = this;
+        let { pos } = this;
+        if (pos) {
+            buffer[pos++] = 1;
+            // buffer.subarray(pos).fill(0);
+            for (; pos < 16; pos++)
+                buffer[pos] = 0;
+            this.process(buffer, 0, true);
+        }
+        this.finalize();
+        let opos = 0;
+        for (let i = 0; i < 8; i++) {
+            out[opos++] = h[i] >>> 0;
+            out[opos++] = h[i] >>> 8;
+        }
+        return out;
+    }
+    digest() {
+        const { buffer, outputLen } = this;
+        this.digestInto(buffer);
+        const res = buffer.slice(0, outputLen);
+        this.destroy();
+        return res;
+    }
+}
+function wrapConstructorWithKey(hashCons) {
+    const hashC = (msg, key) => hashCons(key).update(toBytes(msg)).digest();
+    const tmp = hashCons(new Uint8Array(32));
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = (key) => hashCons(key);
+    return hashC;
+}
+const _poly1305_poly1305 = wrapConstructorWithKey((key) => new Poly1305(key));
+//# sourceMappingURL=_poly1305.js.map
+;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/_salsa.js
+// Basic utils for salsa-like ciphers
+// Check out _micro.ts for descriptive documentation.
+
+
+/*
+RFC8439 requires multi-step cipher stream, where
+authKey starts with counter: 0, actual msg with counter: 1.
+
+For this, we need a way to re-use nonce / counter:
+
+    const counter = new Uint8Array(4);
+    chacha(..., counter, ...); // counter is now 1
+    chacha(..., counter, ...); // counter is now 2
+
+This is complicated:
+
+- Original papers don't allow mutating counters
+- Counter overflow is undefined: https://mailarchive.ietf.org/arch/msg/cfrg/gsOnTJzcbgG6OqD8Sc0GO5aR_tU/
+- 3rd-party library stablelib implementation uses an approach where you can provide
+  nonce and counter instead of just nonce - and it will re-use it
+- We could have did something similar, but ChaCha has different counter position
+  (counter | nonce), which is not composable with XChaCha, because full counter
+  is (nonce16 | counter | nonce16). Stablelib doesn't support in-place counter for XChaCha.
+- We could separate nonce & counter and provide separate API for counter re-use, but
+  there are different counter sizes depending on an algorithm.
+- Salsa & ChaCha also differ in structures of key / sigma:
+
+    salsa:     c0 | k(4) | c1 | nonce(2) | ctr(2) | c2 | k(4) | c4
+    chacha:    c(4) | k(8) | ctr(1) | nonce(3)
+    chachaDJB: c(4) | k(8) | ctr(2) | nonce(2)
+- Creating function such as `setSalsaState(key, nonce, sigma, data)` won't work,
+  because we can't re-use counter array
+- 32-bit nonce is `2 ** 32 * 64` = 256GB with 32-bit counter
+- JS does not allow UintArrays bigger than 4GB, so supporting 64-bit counters doesn't matter
+
+Structure is as following:
+
+key=16 -> sigma16, k=key|key
+key=32 -> sigma32, k=key
+
+nonces:
+salsa20:      8   (8-byte counter)
+chacha20djb:  8   (8-byte counter)
+chacha20tls:  12  (4-byte counter)
+xsalsa:       24  (16 -> hsalsa, 8 -> old nonce)
+xchacha:      24  (16 -> hchacha, 8 -> old nonce)
+
+https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha#appendix-A.2
+Use the subkey and remaining 8 byte nonce with ChaCha20 as normal
+(prefixed by 4 NUL bytes, since [RFC8439] specifies a 12-byte nonce).
+*/
+const sigma16 = esm_utils_utf8ToBytes('expand 16-byte k');
+const sigma32 = esm_utils_utf8ToBytes('expand 32-byte k');
+const sigma16_32 = u32(sigma16);
+const sigma32_32 = u32(sigma32);
+// Is byte array aligned to 4 byte offset (u32)?
+const isAligned32 = (b) => !(b.byteOffset % 4);
+const salsaBasic = (opts) => {
+    const { core, rounds, counterRight, counterLen, allow128bitKeys, extendNonceFn, blockLen } = checkOpts({ rounds: 20, counterRight: false, counterLen: 8, allow128bitKeys: true, blockLen: 64 }, opts);
+    esm_assert.number(counterLen);
+    esm_assert.number(rounds);
+    esm_assert.number(blockLen);
+    esm_assert.bool(counterRight);
+    esm_assert.bool(allow128bitKeys);
+    const blockLen32 = blockLen / 4;
+    if (blockLen % 4 !== 0)
+        throw new Error('Salsa/ChaCha: blockLen must be aligned to 4 bytes');
+    return (key, nonce, data, output, counter = 0) => {
+        esm_assert.bytes(key);
+        esm_assert.bytes(nonce);
+        esm_assert.bytes(data);
+        if (!output)
+            output = new Uint8Array(data.length);
+        esm_assert.bytes(output);
+        esm_assert.number(counter);
+        // > new Uint32Array([2**32])
+        // Uint32Array(1) [ 0 ]
+        // > new Uint32Array([2**32-1])
+        // Uint32Array(1) [ 4294967295 ]
+        if (counter < 0 || counter >= 2 ** 32 - 1)
+            throw new Error('Salsa/ChaCha: counter overflow');
+        if (output.length < data.length) {
+            throw new Error(`Salsa/ChaCha: output (${output.length}) is shorter than data (${data.length})`);
+        }
+        const toClean = [];
+        let k, sigma;
+        // Handle 128 byte keys
+        if (key.length === 32) {
+            k = key;
+            sigma = sigma32_32;
+        }
+        else if (key.length === 16 && allow128bitKeys) {
+            k = new Uint8Array(32);
+            k.set(key);
+            k.set(key, 16);
+            sigma = sigma16_32;
+            toClean.push(k);
+        }
+        else
+            throw new Error(`Salsa/ChaCha: invalid 32-byte key, got length=${key.length}`);
+        // Handle extended nonce (HChaCha/HSalsa)
+        if (extendNonceFn) {
+            if (nonce.length <= 16)
+                throw new Error(`Salsa/ChaCha: extended nonce must be bigger than 16 bytes`);
+            k = extendNonceFn(sigma, k, nonce.subarray(0, 16), new Uint8Array(32));
+            toClean.push(k);
+            nonce = nonce.subarray(16);
+        }
+        // Handle nonce counter
+        const nonceLen = 16 - counterLen;
+        if (nonce.length !== nonceLen)
+            throw new Error(`Salsa/ChaCha: nonce must be ${nonceLen} or 16 bytes`);
+        // Pad counter when nonce is 64 bit
+        if (nonceLen !== 12) {
+            const nc = new Uint8Array(12);
+            nc.set(nonce, counterRight ? 0 : 12 - nonce.length);
+            toClean.push((nonce = nc));
+        }
+        // Counter positions
+        const block = new Uint8Array(blockLen);
+        // Cast to Uint32Array for speed
+        const b32 = u32(block);
+        const k32 = u32(k);
+        const n32 = u32(nonce);
+        // Make sure that buffers aligned to 4 bytes
+        const d32 = isAligned32(data) && u32(data);
+        const o32 = isAligned32(output) && u32(output);
+        toClean.push(b32);
+        const len = data.length;
+        for (let pos = 0, ctr = counter; pos < len; ctr++) {
+            core(sigma, k32, n32, b32, ctr, rounds);
+            if (ctr >= 2 ** 32 - 1)
+                throw new Error('Salsa/ChaCha: counter overflow');
+            const take = Math.min(blockLen, len - pos);
+            // full block && aligned to 4 bytes
+            if (take === blockLen && o32 && d32) {
+                const pos32 = pos / 4;
+                if (pos % 4 !== 0)
+                    throw new Error('Salsa/ChaCha: invalid block position');
+                for (let j = 0; j < blockLen32; j++)
+                    o32[pos32 + j] = d32[pos32 + j] ^ b32[j];
+                pos += blockLen;
+                continue;
+            }
+            for (let j = 0; j < take; j++)
+                output[pos + j] = data[pos + j] ^ block[j];
+            pos += take;
+        }
+        for (let i = 0; i < toClean.length; i++)
+            toClean[i].fill(0);
+        return output;
+    };
+};
+//# sourceMappingURL=_salsa.js.map
+;// CONCATENATED MODULE: ./node_modules/@noble/ciphers/esm/chacha.js
+
+
+
+// ChaCha20 stream cipher was released in 2008. ChaCha aims to increase
+// the diffusion per round, but had slightly less cryptanalysis.
+// https://cr.yp.to/chacha.html, http://cr.yp.to/chacha/chacha-20080128.pdf
+// Left rotate for uint32
+const chacha_rotl = (a, b) => (a << b) | (a >>> (32 - b));
+/**
+ * ChaCha core function.
+ */
+// prettier-ignore
+function chachaCore(c, k, n, out, cnt, rounds = 20) {
+    let y00 = c[0], y01 = c[1], y02 = c[2], y03 = c[3]; // "expa"   "nd 3"  "2-by"  "te k"
+    let y04 = k[0], y05 = k[1], y06 = k[2], y07 = k[3]; // Key      Key     Key     Key
+    let y08 = k[4], y09 = k[5], y10 = k[6], y11 = k[7]; // Key      Key     Key     Key
+    let y12 = cnt, y13 = n[0], y14 = n[1], y15 = n[2]; // Counter  Counter	Nonce   Nonce
+    // Save state to temporary variables
+    let x00 = y00, x01 = y01, x02 = y02, x03 = y03, x04 = y04, x05 = y05, x06 = y06, x07 = y07, x08 = y08, x09 = y09, x10 = y10, x11 = y11, x12 = y12, x13 = y13, x14 = y14, x15 = y15;
+    // Main loop
+    for (let i = 0; i < rounds; i += 2) {
+        x00 = (x00 + x04) | 0;
+        x12 = chacha_rotl(x12 ^ x00, 16);
+        x08 = (x08 + x12) | 0;
+        x04 = chacha_rotl(x04 ^ x08, 12);
+        x00 = (x00 + x04) | 0;
+        x12 = chacha_rotl(x12 ^ x00, 8);
+        x08 = (x08 + x12) | 0;
+        x04 = chacha_rotl(x04 ^ x08, 7);
+        x01 = (x01 + x05) | 0;
+        x13 = chacha_rotl(x13 ^ x01, 16);
+        x09 = (x09 + x13) | 0;
+        x05 = chacha_rotl(x05 ^ x09, 12);
+        x01 = (x01 + x05) | 0;
+        x13 = chacha_rotl(x13 ^ x01, 8);
+        x09 = (x09 + x13) | 0;
+        x05 = chacha_rotl(x05 ^ x09, 7);
+        x02 = (x02 + x06) | 0;
+        x14 = chacha_rotl(x14 ^ x02, 16);
+        x10 = (x10 + x14) | 0;
+        x06 = chacha_rotl(x06 ^ x10, 12);
+        x02 = (x02 + x06) | 0;
+        x14 = chacha_rotl(x14 ^ x02, 8);
+        x10 = (x10 + x14) | 0;
+        x06 = chacha_rotl(x06 ^ x10, 7);
+        x03 = (x03 + x07) | 0;
+        x15 = chacha_rotl(x15 ^ x03, 16);
+        x11 = (x11 + x15) | 0;
+        x07 = chacha_rotl(x07 ^ x11, 12);
+        x03 = (x03 + x07) | 0;
+        x15 = chacha_rotl(x15 ^ x03, 8);
+        x11 = (x11 + x15) | 0;
+        x07 = chacha_rotl(x07 ^ x11, 7);
+        x00 = (x00 + x05) | 0;
+        x15 = chacha_rotl(x15 ^ x00, 16);
+        x10 = (x10 + x15) | 0;
+        x05 = chacha_rotl(x05 ^ x10, 12);
+        x00 = (x00 + x05) | 0;
+        x15 = chacha_rotl(x15 ^ x00, 8);
+        x10 = (x10 + x15) | 0;
+        x05 = chacha_rotl(x05 ^ x10, 7);
+        x01 = (x01 + x06) | 0;
+        x12 = chacha_rotl(x12 ^ x01, 16);
+        x11 = (x11 + x12) | 0;
+        x06 = chacha_rotl(x06 ^ x11, 12);
+        x01 = (x01 + x06) | 0;
+        x12 = chacha_rotl(x12 ^ x01, 8);
+        x11 = (x11 + x12) | 0;
+        x06 = chacha_rotl(x06 ^ x11, 7);
+        x02 = (x02 + x07) | 0;
+        x13 = chacha_rotl(x13 ^ x02, 16);
+        x08 = (x08 + x13) | 0;
+        x07 = chacha_rotl(x07 ^ x08, 12);
+        x02 = (x02 + x07) | 0;
+        x13 = chacha_rotl(x13 ^ x02, 8);
+        x08 = (x08 + x13) | 0;
+        x07 = chacha_rotl(x07 ^ x08, 7);
+        x03 = (x03 + x04) | 0;
+        x14 = chacha_rotl(x14 ^ x03, 16);
+        x09 = (x09 + x14) | 0;
+        x04 = chacha_rotl(x04 ^ x09, 12);
+        x03 = (x03 + x04) | 0;
+        x14 = chacha_rotl(x14 ^ x03, 8);
+        x09 = (x09 + x14) | 0;
+        x04 = chacha_rotl(x04 ^ x09, 7);
+    }
+    // Write output
+    let oi = 0;
+    out[oi++] = (y00 + x00) | 0;
+    out[oi++] = (y01 + x01) | 0;
+    out[oi++] = (y02 + x02) | 0;
+    out[oi++] = (y03 + x03) | 0;
+    out[oi++] = (y04 + x04) | 0;
+    out[oi++] = (y05 + x05) | 0;
+    out[oi++] = (y06 + x06) | 0;
+    out[oi++] = (y07 + x07) | 0;
+    out[oi++] = (y08 + x08) | 0;
+    out[oi++] = (y09 + x09) | 0;
+    out[oi++] = (y10 + x10) | 0;
+    out[oi++] = (y11 + x11) | 0;
+    out[oi++] = (y12 + x12) | 0;
+    out[oi++] = (y13 + x13) | 0;
+    out[oi++] = (y14 + x14) | 0;
+    out[oi++] = (y15 + x15) | 0;
+}
+/**
+ * hchacha helper method, used primarily in xchacha, to hash
+ * key and nonce into key' and nonce'.
+ * Same as chachaCore, but there doesn't seem to be a way to move the block
+ * out without 25% performance hit.
+ */
+// prettier-ignore
+function hchacha(c, key, src, out) {
+    const k32 = u32(key);
+    const i32 = u32(src);
+    const o32 = u32(out);
+    let x00 = c[0], x01 = c[1], x02 = c[2], x03 = c[3];
+    let x04 = k32[0], x05 = k32[1], x06 = k32[2], x07 = k32[3];
+    let x08 = k32[4], x09 = k32[5], x10 = k32[6], x11 = k32[7];
+    let x12 = i32[0], x13 = i32[1], x14 = i32[2], x15 = i32[3];
+    for (let i = 0; i < 20; i += 2) {
+        x00 = (x00 + x04) | 0;
+        x12 = chacha_rotl(x12 ^ x00, 16);
+        x08 = (x08 + x12) | 0;
+        x04 = chacha_rotl(x04 ^ x08, 12);
+        x00 = (x00 + x04) | 0;
+        x12 = chacha_rotl(x12 ^ x00, 8);
+        x08 = (x08 + x12) | 0;
+        x04 = chacha_rotl(x04 ^ x08, 7);
+        x01 = (x01 + x05) | 0;
+        x13 = chacha_rotl(x13 ^ x01, 16);
+        x09 = (x09 + x13) | 0;
+        x05 = chacha_rotl(x05 ^ x09, 12);
+        x01 = (x01 + x05) | 0;
+        x13 = chacha_rotl(x13 ^ x01, 8);
+        x09 = (x09 + x13) | 0;
+        x05 = chacha_rotl(x05 ^ x09, 7);
+        x02 = (x02 + x06) | 0;
+        x14 = chacha_rotl(x14 ^ x02, 16);
+        x10 = (x10 + x14) | 0;
+        x06 = chacha_rotl(x06 ^ x10, 12);
+        x02 = (x02 + x06) | 0;
+        x14 = chacha_rotl(x14 ^ x02, 8);
+        x10 = (x10 + x14) | 0;
+        x06 = chacha_rotl(x06 ^ x10, 7);
+        x03 = (x03 + x07) | 0;
+        x15 = chacha_rotl(x15 ^ x03, 16);
+        x11 = (x11 + x15) | 0;
+        x07 = chacha_rotl(x07 ^ x11, 12);
+        x03 = (x03 + x07) | 0;
+        x15 = chacha_rotl(x15 ^ x03, 8);
+        x11 = (x11 + x15) | 0;
+        x07 = chacha_rotl(x07 ^ x11, 7);
+        x00 = (x00 + x05) | 0;
+        x15 = chacha_rotl(x15 ^ x00, 16);
+        x10 = (x10 + x15) | 0;
+        x05 = chacha_rotl(x05 ^ x10, 12);
+        x00 = (x00 + x05) | 0;
+        x15 = chacha_rotl(x15 ^ x00, 8);
+        x10 = (x10 + x15) | 0;
+        x05 = chacha_rotl(x05 ^ x10, 7);
+        x01 = (x01 + x06) | 0;
+        x12 = chacha_rotl(x12 ^ x01, 16);
+        x11 = (x11 + x12) | 0;
+        x06 = chacha_rotl(x06 ^ x11, 12);
+        x01 = (x01 + x06) | 0;
+        x12 = chacha_rotl(x12 ^ x01, 8);
+        x11 = (x11 + x12) | 0;
+        x06 = chacha_rotl(x06 ^ x11, 7);
+        x02 = (x02 + x07) | 0;
+        x13 = chacha_rotl(x13 ^ x02, 16);
+        x08 = (x08 + x13) | 0;
+        x07 = chacha_rotl(x07 ^ x08, 12);
+        x02 = (x02 + x07) | 0;
+        x13 = chacha_rotl(x13 ^ x02, 8);
+        x08 = (x08 + x13) | 0;
+        x07 = chacha_rotl(x07 ^ x08, 7);
+        x03 = (x03 + x04) | 0;
+        x14 = chacha_rotl(x14 ^ x03, 16);
+        x09 = (x09 + x14) | 0;
+        x04 = chacha_rotl(x04 ^ x09, 12);
+        x03 = (x03 + x04) | 0;
+        x14 = chacha_rotl(x14 ^ x03, 8);
+        x09 = (x09 + x14) | 0;
+        x04 = chacha_rotl(x04 ^ x09, 7);
+    }
+    o32[0] = x00;
+    o32[1] = x01;
+    o32[2] = x02;
+    o32[3] = x03;
+    o32[4] = x12;
+    o32[5] = x13;
+    o32[6] = x14;
+    o32[7] = x15;
+    return out;
+}
+/**
+ * Original, non-RFC chacha20 from DJB. 8-byte nonce, 8-byte counter.
+ */
+const chacha20orig = /* @__PURE__ */ salsaBasic({
+    core: chachaCore,
+    counterRight: false,
+    counterLen: 8,
+});
+/**
+ * ChaCha stream cipher. Conforms to RFC 8439 (IETF, TLS). 12-byte nonce, 4-byte counter.
+ * With 12-byte nonce, it's not safe to use fill it with random (CSPRNG), due to collision chance.
+ */
+const chacha20 = /* @__PURE__ */ salsaBasic({
+    core: chachaCore,
+    counterRight: false,
+    counterLen: 4,
+    allow128bitKeys: false,
+});
+/**
+ * XChaCha eXtended-nonce ChaCha. 24-byte nonce.
+ * With 24-byte nonce, it's safe to use fill it with random (CSPRNG).
+ * https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha
+ */
+const xchacha20 = /* @__PURE__ */ salsaBasic({
+    core: chachaCore,
+    counterRight: false,
+    counterLen: 8,
+    extendNonceFn: hchacha,
+    allow128bitKeys: false,
+});
+/**
+ * Reduced 8-round chacha, described in original paper.
+ */
+const chacha8 = /* @__PURE__ */ salsaBasic({
+    core: chachaCore,
+    counterRight: false,
+    counterLen: 4,
+    rounds: 8,
+});
+/**
+ * Reduced 12-round chacha, described in original paper.
+ */
+const chacha12 = /* @__PURE__ */ salsaBasic({
+    core: chachaCore,
+    counterRight: false,
+    counterLen: 4,
+    rounds: 12,
+});
+const ZERO = /* @__PURE__ */ new Uint8Array(16);
+// Pad to digest size with zeros
+const updatePadded = (h, msg) => {
+    h.update(msg);
+    const left = msg.length % 16;
+    if (left)
+        h.update(ZERO.subarray(left));
+};
+const computeTag = (fn, key, nonce, data, AAD) => {
+    const authKey = fn(key, nonce, new Uint8Array(32));
+    const h = poly1305.create(authKey);
+    if (AAD)
+        updatePadded(h, AAD);
+    updatePadded(h, data);
+    const num = new Uint8Array(16);
+    const view = createView(num);
+    setBigUint64(view, 0, BigInt(AAD ? AAD.length : 0), true);
+    setBigUint64(view, 8, BigInt(data.length), true);
+    h.update(num);
+    const res = h.digest();
+    authKey.fill(0);
+    return res;
+};
+/**
+ * AEAD algorithm from RFC 8439.
+ * Salsa20 and chacha (RFC 8439) use poly1305 differently.
+ * We could have composed them similar to:
+ * https://github.com/paulmillr/scure-base/blob/b266c73dde977b1dd7ef40ef7a23cc15aab526b3/index.ts#L250
+ * But it's hard because of authKey:
+ * In salsa20, authKey changes position in salsa stream.
+ * In chacha, authKey can't be computed inside computeTag, it modifies the counter.
+ */
+const _poly1305_aead = (xorStream) => (key, nonce, AAD) => {
+    const tagLength = 16;
+    ensureBytes(key, 32);
+    ensureBytes(nonce);
+    return {
+        tagLength,
+        encrypt: (plaintext, output) => {
+            const plength = plaintext.length;
+            const clength = plength + tagLength;
+            if (output) {
+                ensureBytes(output, clength);
+            }
+            else {
+                output = new Uint8Array(clength);
+            }
+            xorStream(key, nonce, plaintext, output, 1);
+            const tag = computeTag(xorStream, key, nonce, output.subarray(0, -tagLength), AAD);
+            output.set(tag, plength); // append tag
+            return output;
+        },
+        decrypt: (ciphertext, output) => {
+            const clength = ciphertext.length;
+            const plength = clength - tagLength;
+            if (clength < tagLength)
+                throw new Error(`encrypted data must be at least ${tagLength} bytes`);
+            if (output) {
+                ensureBytes(output, plength);
+            }
+            else {
+                output = new Uint8Array(plength);
+            }
+            const data = ciphertext.subarray(0, -tagLength);
+            const passedTag = ciphertext.subarray(-tagLength);
+            const tag = computeTag(xorStream, key, nonce, data, AAD);
+            if (!equalBytes(passedTag, tag))
+                throw new Error('invalid tag');
+            xorStream(key, nonce, data, output, 1);
+            return output;
+        },
+    };
+};
+/**
+ * ChaCha20-Poly1305 from RFC 8439.
+ * With 12-byte nonce, it's not safe to use fill it with random (CSPRNG), due to collision chance.
+ */
+const chacha20poly1305 = /* @__PURE__ */ (/* unused pure expression or super */ null && (_poly1305_aead(chacha20)));
+/**
+ * XChaCha20-Poly1305 extended-nonce chacha.
+ * https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha
+ * With 24-byte nonce, it's safe to use fill it with random (CSPRNG).
+ */
+const xchacha20poly1305 = /* @__PURE__ */ (/* unused pure expression or super */ null && (_poly1305_aead(xchacha20)));
+//# sourceMappingURL=chacha.js.map
 // EXTERNAL MODULE: ./node_modules/@noble/hashes/esm/hkdf.js
 var hkdf = __webpack_require__(7518);
 ;// CONCATENATED MODULE: ./node_modules/@nostr-dev-kit/ndk/node_modules/nostr-tools/lib/esm/index.js
@@ -30563,7 +32673,7 @@ var nip44_exports = {};
 __export(nip44_exports, {
   decrypt: () => decrypt2,
   encrypt: () => encrypt2,
-  utils: () => lib_esm_utils
+  utils: () => esm_utils
 });
 
 
@@ -30573,7 +32683,7 @@ __export(nip44_exports, {
 
 
 
-var lib_esm_utils = {
+var esm_utils = {
   v2: {
     maxPlaintextSize: 65536 - 128,
     minCiphertextSize: 100,
@@ -30602,9 +32712,9 @@ var lib_esm_utils = {
     pad(unpadded) {
       const unpaddedB = utf8Encoder.encode(unpadded);
       const len = unpaddedB.length;
-      if (len < 1 || len >= lib_esm_utils.v2.maxPlaintextSize)
+      if (len < 1 || len >= esm_utils.v2.maxPlaintextSize)
         throw new Error("invalid plaintext length: must be between 1b and 64KB");
-      const paddedLen = lib_esm_utils.v2.calcPadding(len);
+      const paddedLen = esm_utils.v2.calcPadding(len);
       const zeros = new Uint8Array(paddedLen - len);
       const lenBuf = new Uint8Array(2);
       new DataView(lenBuf.buffer).setUint16(0, len);
@@ -30613,7 +32723,7 @@ var lib_esm_utils = {
     unpad(padded) {
       const unpaddedLen = new DataView(padded.buffer).getUint16(0);
       const unpadded = padded.subarray(2, 2 + unpaddedLen);
-      if (unpaddedLen === 0 || unpadded.length !== unpaddedLen || padded.length !== 2 + lib_esm_utils.v2.calcPadding(unpaddedLen))
+      if (unpaddedLen === 0 || unpadded.length !== unpaddedLen || padded.length !== 2 + esm_utils.v2.calcPadding(unpaddedLen))
         throw new Error("invalid padding");
       return utf8Decoder.decode(unpadded);
     }
@@ -30624,16 +32734,16 @@ function encrypt2(key, plaintext, options = {}) {
   if (version !== 2)
     throw new Error("unknown encryption version " + version);
   const salt = options.salt ?? (0,utils/* randomBytes */.O6)(32);
-  (0,esm_utils/* ensureBytes */.ql)(salt, 32);
-  const keys = lib_esm_utils.v2.getMessageKeys(key, salt);
-  const padded = lib_esm_utils.v2.pad(plaintext);
-  const ciphertext = (0,chacha/* chacha20 */.a0)(keys.encryption, keys.nonce, padded);
+  esm_utils_ensureBytes(salt, 32);
+  const keys = esm_utils.v2.getMessageKeys(key, salt);
+  const padded = esm_utils.v2.pad(plaintext);
+  const ciphertext = chacha20(keys.encryption, keys.nonce, padded);
   const mac = (0,hmac/* hmac */.b)(esm_sha256/* sha256 */.J, keys.auth, ciphertext);
   return esm/* base64 */.US.encode((0,utils/* concatBytes */.eV)(new Uint8Array([version]), salt, ciphertext, mac));
 }
 function decrypt2(key, ciphertext) {
-  const u = lib_esm_utils.v2;
-  (0,esm_utils/* ensureBytes */.ql)(key, 32);
+  const u = esm_utils.v2;
+  esm_utils_ensureBytes(key, 32);
   const clen = ciphertext.length;
   if (clen < u.minCiphertextSize || clen >= u.maxCiphertextSize)
     throw new Error("invalid ciphertext length: " + clen);
@@ -30653,9 +32763,9 @@ function decrypt2(key, ciphertext) {
   const mac = data.subarray(-32);
   const keys = u.getMessageKeys(key, salt);
   const calculatedMac = (0,hmac/* hmac */.b)(esm_sha256/* sha256 */.J, keys.auth, ciphertext_);
-  if (!(0,esm_utils/* equalBytes */.Wd)(calculatedMac, mac))
+  if (!esm_utils_equalBytes(calculatedMac, mac))
     throw new Error("invalid MAC");
-  const padded = (0,chacha/* chacha20 */.a0)(keys.encryption, keys.nonce, ciphertext_);
+  const padded = chacha20(keys.encryption, keys.nonce, ciphertext_);
   return u.unpad(padded);
 }
 
@@ -30884,11 +32994,11 @@ var lib = __webpack_require__(8669);
 // EXTERNAL MODULE: ./node_modules/debug/src/browser.js
 var browser = __webpack_require__(1227);
 ;// CONCATENATED MODULE: ./node_modules/@nostr-dev-kit/ndk/node_modules/@noble/curves/node_modules/@noble/hashes/esm/_assert.js
-function number(n) {
+function _assert_number(n) {
     if (!Number.isSafeInteger(n) || n < 0)
         throw new Error(`positive integer expected, not ${n}`);
 }
-function bool(b) {
+function _assert_bool(b) {
     if (typeof b !== 'boolean')
         throw new Error(`boolean expected, not ${b}`);
 }
@@ -30897,7 +33007,7 @@ function _assert_isBytes(a) {
     return (a instanceof Uint8Array ||
         (a != null && typeof a === 'object' && a.constructor.name === 'Uint8Array'));
 }
-function bytes(b, ...lengths) {
+function _assert_bytes(b, ...lengths) {
     if (!_assert_isBytes(b))
         throw new Error('Uint8Array expected');
     if (lengths.length > 0 && !lengths.includes(b.length))
@@ -30906,25 +33016,25 @@ function bytes(b, ...lengths) {
 function _assert_hash(h) {
     if (typeof h !== 'function' || typeof h.create !== 'function')
         throw new Error('Hash should be wrapped by utils.wrapConstructor');
-    number(h.outputLen);
-    number(h.blockLen);
+    _assert_number(h.outputLen);
+    _assert_number(h.blockLen);
 }
-function exists(instance, checkFinished = true) {
+function _assert_exists(instance, checkFinished = true) {
     if (instance.destroyed)
         throw new Error('Hash instance has been destroyed');
     if (checkFinished && instance.finished)
         throw new Error('Hash#digest() has already been called');
 }
-function output(out, instance) {
-    bytes(out);
+function _assert_output(out, instance) {
+    _assert_bytes(out);
     const min = instance.outputLen;
     if (out.length < min) {
         throw new Error(`digestInto() expects output buffer of length at least ${min}`);
     }
 }
 
-const assert = { number, bool, bytes, hash: _assert_hash, exists, output };
-/* harmony default export */ const esm_assert = ((/* unused pure expression or super */ null && (assert)));
+const _assert_assert = { number: _assert_number, bool: _assert_bool, bytes: _assert_bytes, hash: _assert_hash, exists: _assert_exists, output: _assert_output };
+/* harmony default export */ const hashes_esm_assert = ((/* unused pure expression or super */ null && (_assert_assert)));
 //# sourceMappingURL=_assert.js.map
 ;// CONCATENATED MODULE: ./node_modules/@nostr-dev-kit/ndk/node_modules/@noble/curves/node_modules/@noble/hashes/esm/crypto.js
 const crypto_crypto = typeof globalThis === 'object' && 'crypto' in globalThis ? globalThis.crypto : undefined;
@@ -30946,22 +33056,22 @@ function utils_isBytes(a) {
         (a != null && typeof a === 'object' && a.constructor.name === 'Uint8Array'));
 }
 // Cast array to different type
-const u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
-const u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
+const utils_u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+const utils_u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
 // Cast array to view
-const utils_createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+const esm_utils_createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
 // The rotate right (circular right shift) operation for uint32
 const rotr = (word, shift) => (word << (32 - shift)) | (word >>> shift);
 // The rotate left (circular left shift) operation for uint32
 const utils_rotl = (word, shift) => (word << shift) | ((word >>> (32 - shift)) >>> 0);
-const isLE = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
+const utils_isLE = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
 // The byte swap operation for uint32
 const byteSwap = (word) => ((word << 24) & 0xff000000) |
     ((word << 8) & 0xff0000) |
     ((word >>> 8) & 0xff00) |
     ((word >>> 24) & 0xff);
 // Conditionally byte swap if on a big-endian platform
-const byteSwapIfBE = (/* unused pure expression or super */ null && (isLE ? (n) => n : (n) => byteSwap(n)));
+const byteSwapIfBE = (/* unused pure expression or super */ null && (utils_isLE ? (n) => n : (n) => byteSwap(n)));
 // In place byte swap for Uint32Array
 function byteSwap32(arr) {
     for (let i = 0; i < arr.length; i++) {
@@ -30969,16 +33079,16 @@ function byteSwap32(arr) {
     }
 }
 // Array where index 0xf0 (240) is mapped to string 'f0'
-const esm_utils_hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+const hashes_esm_utils_hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
 /**
  * @example bytesToHex(Uint8Array.from([0xca, 0xfe, 0x01, 0x23])) // 'cafe0123'
  */
-function esm_utils_bytesToHex(bytes) {
+function hashes_esm_utils_bytesToHex(bytes) {
     abytes(bytes);
     // pre-caching improves the speed 6x
     let hex = '';
     for (let i = 0; i < bytes.length; i++) {
-        hex += esm_utils_hexes[bytes[i]];
+        hex += hashes_esm_utils_hexes[bytes[i]];
     }
     return hex;
 }
@@ -30996,7 +33106,7 @@ function asciiToBase16(char) {
 /**
  * @example hexToBytes('cafe0123') // Uint8Array.from([0xca, 0xfe, 0x01, 0x23])
  */
-function esm_utils_hexToBytes(hex) {
+function hashes_esm_utils_hexToBytes(hex) {
     if (typeof hex !== 'string')
         throw new Error('hex string expected, got ' + typeof hex);
     const hl = hex.length;
@@ -31018,9 +33128,9 @@ function esm_utils_hexToBytes(hex) {
 // There is no setImmediate in browser and setTimeout is slow.
 // call of async fn will return Promise, which will be fullfiled only on
 // next scheduler queue processing step and this is exactly what we need.
-const nextTick = async () => { };
+const utils_nextTick = async () => { };
 // Returns control to thread each 'tick' ms to avoid blocking
-async function utils_asyncLoop(iters, tick, cb) {
+async function esm_utils_asyncLoop(iters, tick, cb) {
     let ts = Date.now();
     for (let i = 0; i < iters; i++) {
         cb(i);
@@ -31028,14 +33138,14 @@ async function utils_asyncLoop(iters, tick, cb) {
         const diff = Date.now() - ts;
         if (diff >= 0 && diff < tick)
             continue;
-        await nextTick();
+        await utils_nextTick();
         ts += diff;
     }
 }
 /**
  * @example utf8ToBytes('abc') // new Uint8Array([97, 98, 99])
  */
-function esm_utils_utf8ToBytes(str) {
+function hashes_esm_utils_utf8ToBytes(str) {
     if (typeof str !== 'string')
         throw new Error(`utf8ToBytes expected string, got ${typeof str}`);
     return new Uint8Array(new TextEncoder().encode(str)); // https://bugzil.la/1681809
@@ -31045,20 +33155,20 @@ function esm_utils_utf8ToBytes(str) {
  * Warning: when Uint8Array is passed, it would NOT get copied.
  * Keep in mind for future mutable operations.
  */
-function toBytes(data) {
+function utils_toBytes(data) {
     if (typeof data === 'string')
-        data = esm_utils_utf8ToBytes(data);
-    bytes(data);
+        data = hashes_esm_utils_utf8ToBytes(data);
+    _assert_bytes(data);
     return data;
 }
 /**
  * Copies several Uint8Arrays into one.
  */
-function esm_utils_concatBytes(...arrays) {
+function hashes_esm_utils_concatBytes(...arrays) {
     let sum = 0;
     for (let i = 0; i < arrays.length; i++) {
         const a = arrays[i];
-        bytes(a);
+        _assert_bytes(a);
         sum += a.length;
     }
     const res = new Uint8Array(sum);
@@ -31070,21 +33180,21 @@ function esm_utils_concatBytes(...arrays) {
     return res;
 }
 // For runtime check if class implements interface
-class Hash {
+class utils_Hash {
     // Safe version that clones internal state
     clone() {
         return this._cloneInto();
     }
 }
 const toStr = {}.toString;
-function checkOpts(defaults, opts) {
+function utils_checkOpts(defaults, opts) {
     if (opts !== undefined && toStr.call(opts) !== '[object Object]')
         throw new Error('Options should be object or undefined');
     const merged = Object.assign(defaults, opts);
     return merged;
 }
 function utils_wrapConstructor(hashCons) {
-    const hashC = (msg) => hashCons().update(toBytes(msg)).digest();
+    const hashC = (msg) => hashCons().update(utils_toBytes(msg)).digest();
     const tmp = hashCons();
     hashC.outputLen = tmp.outputLen;
     hashC.blockLen = tmp.blockLen;
@@ -31092,7 +33202,7 @@ function utils_wrapConstructor(hashCons) {
     return hashC;
 }
 function wrapConstructorWithOpts(hashCons) {
-    const hashC = (msg, opts) => hashCons(opts).update(toBytes(msg)).digest();
+    const hashC = (msg, opts) => hashCons(opts).update(utils_toBytes(msg)).digest();
     const tmp = hashCons({});
     hashC.outputLen = tmp.outputLen;
     hashC.blockLen = tmp.blockLen;
@@ -31100,7 +33210,7 @@ function wrapConstructorWithOpts(hashCons) {
     return hashC;
 }
 function wrapXOFConstructorWithOpts(hashCons) {
-    const hashC = (msg, opts) => hashCons(opts).update(toBytes(msg)).digest();
+    const hashC = (msg, opts) => hashCons(opts).update(utils_toBytes(msg)).digest();
     const tmp = hashCons({});
     hashC.outputLen = tmp.outputLen;
     hashC.blockLen = tmp.blockLen;
@@ -31121,7 +33231,7 @@ function utils_randomBytes(bytesLength = 32) {
 
 
 // Polyfill for Safari 14
-function setBigUint64(view, byteOffset, value, isLE) {
+function _md_setBigUint64(view, byteOffset, value, isLE) {
     if (typeof view.setBigUint64 === 'function')
         return view.setBigUint64(byteOffset, value, isLE);
     const _32n = BigInt(32);
@@ -31141,7 +33251,7 @@ const Maj = (a, b, c) => (a & b) ^ (a & c) ^ (b & c);
  * Merkle-Damgard hash construction base class.
  * Could be used to create MD5, RIPEMD, SHA1, SHA2.
  */
-class HashMD extends Hash {
+class HashMD extends utils_Hash {
     constructor(blockLen, outputLen, padOffset, isLE) {
         super();
         this.blockLen = blockLen;
@@ -31153,18 +33263,18 @@ class HashMD extends Hash {
         this.pos = 0;
         this.destroyed = false;
         this.buffer = new Uint8Array(blockLen);
-        this.view = utils_createView(this.buffer);
+        this.view = esm_utils_createView(this.buffer);
     }
     update(data) {
-        exists(this);
+        _assert_exists(this);
         const { view, buffer, blockLen } = this;
-        data = toBytes(data);
+        data = utils_toBytes(data);
         const len = data.length;
         for (let pos = 0; pos < len;) {
             const take = Math.min(blockLen - this.pos, len - pos);
             // Fast path: we have at least one block in input, cast it to view and process
             if (take === blockLen) {
-                const dataView = utils_createView(data);
+                const dataView = esm_utils_createView(data);
                 for (; blockLen <= len - pos; pos += blockLen)
                     this.process(dataView, pos);
                 continue;
@@ -31182,8 +33292,8 @@ class HashMD extends Hash {
         return this;
     }
     digestInto(out) {
-        exists(this);
-        output(out, this);
+        _assert_exists(this);
+        _assert_output(out, this);
         this.finished = true;
         // Padding
         // We can avoid allocation of buffer for padding completely if it
@@ -31205,9 +33315,9 @@ class HashMD extends Hash {
         // Note: sha512 requires length to be 128bit integer, but length in JS will overflow before that
         // You need to write around 2 exabytes (u64_max / 8 / (1024**6)) for this to happen.
         // So we just write lowest 64 bits of that value.
-        setBigUint64(view, blockLen - 8, BigInt(this.length * 8), isLE);
+        _md_setBigUint64(view, blockLen - 8, BigInt(this.length * 8), isLE);
         this.process(view, 0);
-        const oview = utils_createView(out);
+        const oview = esm_utils_createView(out);
         const len = this.outputLen;
         // NOTE: we do division by 4 later, which should be fused in single op with modulo by JIT
         if (len % 4)
@@ -31507,7 +33617,7 @@ function esm_abstract_utils_concatBytes(...arrays) {
     return res;
 }
 // Compares 2 u8a-s in kinda constant time
-function abstract_utils_equalBytes(a, b) {
+function esm_abstract_utils_equalBytes(a, b) {
     if (a.length !== b.length)
         return false;
     let diff = 0;
@@ -32075,13 +34185,13 @@ function mapHashToField(key, fieldOrder, isLE = false) {
 
 
 // HMAC (RFC 2104)
-class HMAC extends Hash {
+class HMAC extends utils_Hash {
     constructor(hash, _key) {
         super();
         this.finished = false;
         this.destroyed = false;
         _assert_hash(hash);
-        const key = toBytes(_key);
+        const key = utils_toBytes(_key);
         this.iHash = hash.create();
         if (typeof this.iHash.update !== 'function')
             throw new Error('Expected instance of class which extends utils.Hash');
@@ -32103,13 +34213,13 @@ class HMAC extends Hash {
         pad.fill(0);
     }
     update(buf) {
-        exists(this);
+        _assert_exists(this);
         this.iHash.update(buf);
         return this;
     }
     digestInto(out) {
-        exists(this);
-        bytes(out, this.outputLen);
+        _assert_exists(this);
+        _assert_bytes(out, this.outputLen);
         this.finished = true;
         this.iHash.digestInto(out);
         this.oHash.update(out);
@@ -33378,7 +35488,7 @@ function esm_abstract_weierstrass_mapToCurveSimpleSWU(Fp, opts) {
 function esm_shortw_utils_getHash(hash) {
     return {
         hash,
-        hmac: (key, ...msgs) => hmac_hmac(hash, key, esm_utils_concatBytes(...msgs)),
+        hmac: (key, ...msgs) => hmac_hmac(hash, key, hashes_esm_utils_concatBytes(...msgs)),
         randomBytes: utils_randomBytes,
     };
 }
@@ -33866,7 +35976,7 @@ var NDKRelayConnectivity = class {
       setTimeout(() => this.connect(), 2e3);
       this.debug(this.relay.url, "Relay complaining?", notice);
     }
-    this.ndkRelay.emit("notice", this.relay, notice);
+    this.ndkRelay.emit("notice", notice);
   }
   /**
    * Called when the relay is unexpectedly disconnected.
@@ -33876,7 +35986,7 @@ var NDKRelayConnectivity = class {
       return;
     this.debug("Attempting to reconnect", { attempt });
     if (this.isFlapping()) {
-      this.ndkRelay.emit("flapping", this, this._connectionStats);
+      this.ndkRelay.emit("flapping", this._connectionStats);
       this._status = 5 /* FLAPPING */;
       return;
     }
@@ -33890,12 +36000,13 @@ var NDKRelayConnectivity = class {
         if (attempt < 5) {
           setTimeout(() => {
             this.handleReconnection(attempt + 1);
-          }, 1e3 * (attempt + 1) ^ 2.5);
+          }, 1e3 * (attempt + 1) ^ 4);
         } else {
           this.debug("Reconnect failed after 5 attempts");
         }
       });
     }, reconnectDelay);
+    this.ndkRelay.emit("delayed-connect", reconnectDelay);
     this.debug("Reconnecting in", reconnectDelay);
     this._connectionStats.nextReconnectAt = Date.now() + reconnectDelay;
   }
@@ -34140,11 +36251,13 @@ function filterFromId(id) {
         case "note":
           return { ids: [decoded.data] };
         case "naddr":
-          return {
+          const filter = {
             authors: [decoded.data.pubkey],
-            "#d": [decoded.data.identifier],
             kinds: [decoded.data.kind]
           };
+          if (decoded.data.identifier)
+            filter["#d"] = [decoded.data.identifier];
+          return filter;
       }
     } catch (e) {
       console.error("Error decoding", id, e);
@@ -34453,6 +36566,223 @@ var NDKRelaySubscriptions = class {
   }
 };
 
+// ../node_modules/.pnpm/normalize-url@8.0.1/node_modules/normalize-url/index.js
+var DATA_URL_DEFAULT_MIME_TYPE = "text/plain";
+var DATA_URL_DEFAULT_CHARSET = "us-ascii";
+var testParameter = (name, filters) => filters.some((filter) => filter instanceof RegExp ? filter.test(name) : filter === name);
+var supportedProtocols = /* @__PURE__ */ new Set([
+  "https:",
+  "http:",
+  "file:"
+]);
+var hasCustomProtocol = (urlString) => {
+  try {
+    const { protocol } = new URL(urlString);
+    return protocol.endsWith(":") && !protocol.includes(".") && !supportedProtocols.has(protocol);
+  } catch {
+    return false;
+  }
+};
+var normalizeDataURL = (urlString, { stripHash }) => {
+  const match = /^data:(?<type>[^,]*?),(?<data>[^#]*?)(?:#(?<hash>.*))?$/.exec(urlString);
+  if (!match) {
+    throw new Error(`Invalid URL: ${urlString}`);
+  }
+  let { type, data, hash } = match.groups;
+  const mediaType = type.split(";");
+  hash = stripHash ? "" : hash;
+  let isBase64 = false;
+  if (mediaType[mediaType.length - 1] === "base64") {
+    mediaType.pop();
+    isBase64 = true;
+  }
+  const mimeType = mediaType.shift()?.toLowerCase() ?? "";
+  const attributes = mediaType.map((attribute) => {
+    let [key, value = ""] = attribute.split("=").map((string) => string.trim());
+    if (key === "charset") {
+      value = value.toLowerCase();
+      if (value === DATA_URL_DEFAULT_CHARSET) {
+        return "";
+      }
+    }
+    return `${key}${value ? `=${value}` : ""}`;
+  }).filter(Boolean);
+  const normalizedMediaType = [
+    ...attributes
+  ];
+  if (isBase64) {
+    normalizedMediaType.push("base64");
+  }
+  if (normalizedMediaType.length > 0 || mimeType && mimeType !== DATA_URL_DEFAULT_MIME_TYPE) {
+    normalizedMediaType.unshift(mimeType);
+  }
+  return `data:${normalizedMediaType.join(";")},${isBase64 ? data.trim() : data}${hash ? `#${hash}` : ""}`;
+};
+function normalizeUrl(urlString, options) {
+  options = {
+    defaultProtocol: "http",
+    normalizeProtocol: true,
+    forceHttp: false,
+    forceHttps: false,
+    stripAuthentication: true,
+    stripHash: false,
+    stripTextFragment: true,
+    stripWWW: true,
+    removeQueryParameters: [/^utm_\w+/i],
+    removeTrailingSlash: true,
+    removeSingleSlash: true,
+    removeDirectoryIndex: false,
+    removeExplicitPort: false,
+    sortQueryParameters: true,
+    ...options
+  };
+  if (typeof options.defaultProtocol === "string" && !options.defaultProtocol.endsWith(":")) {
+    options.defaultProtocol = `${options.defaultProtocol}:`;
+  }
+  urlString = urlString.trim();
+  if (/^data:/i.test(urlString)) {
+    return normalizeDataURL(urlString, options);
+  }
+  if (hasCustomProtocol(urlString)) {
+    return urlString;
+  }
+  const hasRelativeProtocol = urlString.startsWith("//");
+  const isRelativeUrl = !hasRelativeProtocol && /^\.*\//.test(urlString);
+  if (!isRelativeUrl) {
+    urlString = urlString.replace(/^(?!(?:\w+:)?\/\/)|^\/\//, options.defaultProtocol);
+  }
+  const urlObject = new URL(urlString);
+  if (options.forceHttp && options.forceHttps) {
+    throw new Error("The `forceHttp` and `forceHttps` options cannot be used together");
+  }
+  if (options.forceHttp && urlObject.protocol === "https:") {
+    urlObject.protocol = "http:";
+  }
+  if (options.forceHttps && urlObject.protocol === "http:") {
+    urlObject.protocol = "https:";
+  }
+  if (options.stripAuthentication) {
+    urlObject.username = "";
+    urlObject.password = "";
+  }
+  if (options.stripHash) {
+    urlObject.hash = "";
+  } else if (options.stripTextFragment) {
+    urlObject.hash = urlObject.hash.replace(/#?:~:text.*?$/i, "");
+  }
+  if (urlObject.pathname) {
+    const protocolRegex = /\b[a-z][a-z\d+\-.]{1,50}:\/\//g;
+    let lastIndex = 0;
+    let result = "";
+    for (; ; ) {
+      const match = protocolRegex.exec(urlObject.pathname);
+      if (!match) {
+        break;
+      }
+      const protocol = match[0];
+      const protocolAtIndex = match.index;
+      const intermediate = urlObject.pathname.slice(lastIndex, protocolAtIndex);
+      result += intermediate.replace(/\/{2,}/g, "/");
+      result += protocol;
+      lastIndex = protocolAtIndex + protocol.length;
+    }
+    const remnant = urlObject.pathname.slice(lastIndex, urlObject.pathname.length);
+    result += remnant.replace(/\/{2,}/g, "/");
+    urlObject.pathname = result;
+  }
+  if (urlObject.pathname) {
+    try {
+      urlObject.pathname = decodeURI(urlObject.pathname);
+    } catch {
+    }
+  }
+  if (options.removeDirectoryIndex === true) {
+    options.removeDirectoryIndex = [/^index\.[a-z]+$/];
+  }
+  if (Array.isArray(options.removeDirectoryIndex) && options.removeDirectoryIndex.length > 0) {
+    let pathComponents = urlObject.pathname.split("/");
+    const lastComponent = pathComponents[pathComponents.length - 1];
+    if (testParameter(lastComponent, options.removeDirectoryIndex)) {
+      pathComponents = pathComponents.slice(0, -1);
+      urlObject.pathname = pathComponents.slice(1).join("/") + "/";
+    }
+  }
+  if (urlObject.hostname) {
+    urlObject.hostname = urlObject.hostname.replace(/\.$/, "");
+    if (options.stripWWW && /^www\.(?!www\.)[a-z\-\d]{1,63}\.[a-z.\-\d]{2,63}$/.test(urlObject.hostname)) {
+      urlObject.hostname = urlObject.hostname.replace(/^www\./, "");
+    }
+  }
+  if (Array.isArray(options.removeQueryParameters)) {
+    for (const key of [...urlObject.searchParams.keys()]) {
+      if (testParameter(key, options.removeQueryParameters)) {
+        urlObject.searchParams.delete(key);
+      }
+    }
+  }
+  if (!Array.isArray(options.keepQueryParameters) && options.removeQueryParameters === true) {
+    urlObject.search = "";
+  }
+  if (Array.isArray(options.keepQueryParameters) && options.keepQueryParameters.length > 0) {
+    for (const key of [...urlObject.searchParams.keys()]) {
+      if (!testParameter(key, options.keepQueryParameters)) {
+        urlObject.searchParams.delete(key);
+      }
+    }
+  }
+  if (options.sortQueryParameters) {
+    urlObject.searchParams.sort();
+    try {
+      urlObject.search = decodeURIComponent(urlObject.search);
+    } catch {
+    }
+  }
+  if (options.removeTrailingSlash) {
+    urlObject.pathname = urlObject.pathname.replace(/\/$/, "");
+  }
+  if (options.removeExplicitPort && urlObject.port) {
+    urlObject.port = "";
+  }
+  const oldUrlString = urlString;
+  urlString = urlObject.toString();
+  if (!options.removeSingleSlash && urlObject.pathname === "/" && !oldUrlString.endsWith("/") && urlObject.hash === "") {
+    urlString = urlString.replace(/\/$/, "");
+  }
+  if ((options.removeTrailingSlash || urlObject.pathname === "/") && urlObject.hash === "" && options.removeSingleSlash) {
+    urlString = urlString.replace(/\/$/, "");
+  }
+  if (hasRelativeProtocol && !options.normalizeProtocol) {
+    urlString = urlString.replace(/^http:\/\//, "//");
+  }
+  if (options.stripProtocol) {
+    urlString = urlString.replace(/^(?:https?:)?\/\//, "");
+  }
+  return urlString;
+}
+
+// src/utils/normalize-url.ts
+function normalizeRelayUrl(url) {
+  let r = normalizeUrl(url, {
+    stripAuthentication: false,
+    stripWWW: false,
+    stripHash: true
+  });
+  if (!r.endsWith("/")) {
+    r += "/";
+  }
+  return r;
+}
+function dist_normalize(urls) {
+  const normalized = /* @__PURE__ */ new Set();
+  for (const url of urls) {
+    try {
+      normalized.add(normalizeRelayUrl(url));
+    } catch {
+    }
+  }
+  return Array.from(normalized);
+}
+
 // src/relay/index.ts
 var NDKRelayStatus = /* @__PURE__ */ ((NDKRelayStatus2) => {
   NDKRelayStatus2[NDKRelayStatus2["CONNECTING"] = 0] = "CONNECTING";
@@ -34485,7 +36815,7 @@ var NDKRelay = class extends lib.EventEmitter {
   debug;
   constructor(url, authPolicy) {
     super();
-    this.url = url;
+    this.url = normalizeRelayUrl(url);
     this.scores = /* @__PURE__ */ new Map();
     this.debug = browser(`ndk:relay:${url}`);
     this.connectivity = new NDKRelayConnectivity(this);
@@ -34925,6 +37255,7 @@ var NDKKind = /* @__PURE__ */ ((NDKKind2) => {
   NDKKind2[NDKKind2["SimpleGroupList"] = 10009] = "SimpleGroupList";
   NDKKind2[NDKKind2["InterestList"] = 10015] = "InterestList";
   NDKKind2[NDKKind2["EmojiList"] = 10030] = "EmojiList";
+  NDKKind2[NDKKind2["BlossomList"] = 10063] = "BlossomList";
   NDKKind2[NDKKind2["NostrWaletConnectInfo"] = 13194] = "NostrWaletConnectInfo";
   NDKKind2[NDKKind2["TierList"] = 17e3] = "TierList";
   NDKKind2[NDKKind2["FollowSet"] = 3e4] = "FollowSet";
@@ -35128,7 +37459,24 @@ function eventThreads(op, events) {
   return threadEvents.sort((a, b) => a.created_at - b.created_at);
 }
 function getEventReplyIds(event) {
-  return event.getMatchingTags("e").filter((tag) => tag[3] === "reply").map((tag) => tag[1]);
+  if (hasMarkers(event, event.tagType())) {
+    let rootTag;
+    let replyTags = [];
+    event.getMatchingTags(event.tagType()).forEach((tag) => {
+      if (tag[3] === "root")
+        rootTag = tag;
+      if (tag[3] === "reply")
+        replyTags.push(tag);
+    });
+    if (replyTags.length === 0) {
+      if (rootTag) {
+        replyTags.push(rootTag);
+      }
+    }
+    return replyTags.map((tag) => tag[1]);
+  } else {
+    return event.getMatchingTags("e").map((tag) => tag[1]);
+  }
 }
 function isEventOriginalPost(event) {
   return getEventReplyIds(event).length === 0;
@@ -35173,6 +37521,8 @@ function getRootTag(event, searchTag) {
 function getReplyTag(event, searchTag) {
   searchTag ??= event.tagType();
   let replyTag = event.tags.find((tag) => tag[3] === "reply");
+  if (replyTag)
+    return replyTag;
   if (!replyTag)
     replyTag = event.tags.find((tag) => tag[3] === "root");
   if (!replyTag) {
@@ -35311,7 +37661,10 @@ function validate() {
   }
   return true;
 }
-var verifiedEvents = new dist.LRUCache({ maxSize: 1e3, entryExpirationTimeInMS: 6e4 });
+var verifiedEvents = new dist.LRUCache({
+  maxSize: 1e3,
+  entryExpirationTimeInMS: 6e4
+});
 function dist_verifySignature(persist) {
   if (typeof this.signatureVerified === "boolean")
     return this.signatureVerified;
@@ -35342,7 +37695,10 @@ function dist_verifySignature(persist) {
   }
 }
 function dist_getEventHash() {
-  const eventHash = (0,esm_sha256/* sha256 */.J)(new TextEncoder().encode(this.serialize()));
+  return getEventHashFromSerializedEvent(this.serialize());
+}
+function getEventHashFromSerializedEvent(serializedEvent) {
+  const eventHash = (0,esm_sha256/* sha256 */.J)(new TextEncoder().encode(serializedEvent));
   return (0,utils/* bytesToHex */.ci)(eventHash);
 }
 
@@ -35635,22 +37991,17 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
       const user = await this.ndk?.signer?.user();
       this.pubkey = user?.pubkey || "";
     }
-    if (!this.created_at || this.isReplaceable()) {
+    if (!this.created_at) {
       this.created_at = Math.floor(Date.now() / 1e3);
     }
-    const nostrEvent = this.rawEvent();
     const { content, tags } = await this.generateTags();
-    nostrEvent.content = content || "";
-    nostrEvent.tags = tags;
+    this.content = content || "";
+    this.tags = tags;
     try {
       this.id = this.getEventHash();
     } catch (e) {
     }
-    if (this.id)
-      nostrEvent.id = this.id;
-    if (this.sig)
-      nostrEvent.sig = this.sig;
-    return nostrEvent;
+    return this.rawEvent();
   }
   serialize = serialize.bind(this);
   getEventHash = dist_getEventHash.bind(this);
@@ -35741,6 +38092,7 @@ var NDKEvent = class _NDKEvent extends lib.EventEmitter {
       this.author = await signer.user();
     }
     const nostrEvent = await this.toNostrEvent();
+    console.log("signing", nostrEvent);
     this.sig = await signer.sign(nostrEvent);
     return this.sig;
   }
@@ -36249,12 +38601,16 @@ var NDKSubscription = class extends lib.EventEmitter {
     if (!relay)
       relay = event.relay;
     event.ndk ??= this.ndk;
+    if (!fromCache && relay) {
+      this.ndk.emit("event", event, relay);
+    }
     const eventAlreadySeen = this.eventFirstSeen.has(event.id);
     if (eventAlreadySeen) {
       const timeSinceFirstSeen = Date.now() - (this.eventFirstSeen.get(event.id) || 0);
-      if (relay)
+      if (relay) {
         relay.scoreSlowerEvent(timeSinceFirstSeen);
-      this.trackPerRelay(event, relay);
+        this.trackPerRelay(event, relay);
+      }
       this.emit("event:dup", event, relay, timeSinceFirstSeen, this);
       return;
     }
@@ -36265,10 +38621,12 @@ var NDKSubscription = class extends lib.EventEmitter {
           return;
         }
       }
-      if (!this.skipVerification) {
-        if (!event.verifySignature(true) && !this.ndk.asyncSigVerification) {
-          this.debug(`Event failed signature validation`, event);
-          return;
+      if (event.relay?.shouldValidateEvent() !== false) {
+        if (!this.skipVerification) {
+          if (!event.verifySignature(true) && !this.ndk.asyncSigVerification) {
+            this.debug(`Event failed signature validation`, event);
+            return;
+          }
         }
       }
     }
@@ -37019,6 +39377,9 @@ var NDKList = class _NDKList extends NDKEvent {
   validateTag(tagValue) {
     return true;
   }
+  getItems(type) {
+    return this.tags.filter((tag) => tag[0] === type);
+  }
   /**
    * Returns the unecrypted items in this list.
    */
@@ -37046,15 +39407,16 @@ var NDKList = class _NDKList extends NDKEvent {
    * @param relay Relay to add
    * @param mark Optional mark to add to the item
    * @param encrypted Whether to encrypt the item
+   * @param position Where to add the item in the list (top or bottom)
    */
-  async addItem(item, mark = void 0, encrypted = false) {
+  async addItem(item, mark = void 0, encrypted = false, position = "bottom") {
     if (!this.ndk)
       throw new Error("NDK instance not set");
     if (!this.ndk.signer)
       throw new Error("NDK signer not set");
     let tags;
     if (item instanceof NDKEvent) {
-      tags = item.referenceTags();
+      tags = [item.tagReference(mark)];
     } else if (item instanceof NDKUser) {
       tags = item.referenceTags();
     } else if (item instanceof NDKRelay) {
@@ -37069,13 +39431,19 @@ var NDKList = class _NDKList extends NDKEvent {
     if (encrypted) {
       const user = await this.ndk.signer.user();
       const currentList = await this.encryptedTags();
-      currentList.push(...tags);
+      if (position === "top")
+        currentList.unshift(...tags);
+      else
+        currentList.push(...tags);
       this._encryptedTags = currentList;
       this.encryptedTagsLength = this.content.length;
       this.content = JSON.stringify(currentList);
       await this.encrypt(user);
     } else {
-      this.tags.push(...tags);
+      if (position === "top")
+        this.tags.unshift(...tags);
+      else
+        this.tags.push(...tags);
     }
     this.created_at = Math.floor(Date.now() / 1e3);
     this.emit("change");
@@ -37646,223 +40014,6 @@ var NDKHighlight = class _NDKHighlight extends (/* unused pure expression or sup
   }
 };
 
-// ../node_modules/.pnpm/normalize-url@8.0.1/node_modules/normalize-url/index.js
-var DATA_URL_DEFAULT_MIME_TYPE = "text/plain";
-var DATA_URL_DEFAULT_CHARSET = "us-ascii";
-var testParameter = (name, filters) => filters.some((filter) => filter instanceof RegExp ? filter.test(name) : filter === name);
-var supportedProtocols = /* @__PURE__ */ new Set([
-  "https:",
-  "http:",
-  "file:"
-]);
-var hasCustomProtocol = (urlString) => {
-  try {
-    const { protocol } = new URL(urlString);
-    return protocol.endsWith(":") && !protocol.includes(".") && !supportedProtocols.has(protocol);
-  } catch {
-    return false;
-  }
-};
-var normalizeDataURL = (urlString, { stripHash }) => {
-  const match = /^data:(?<type>[^,]*?),(?<data>[^#]*?)(?:#(?<hash>.*))?$/.exec(urlString);
-  if (!match) {
-    throw new Error(`Invalid URL: ${urlString}`);
-  }
-  let { type, data, hash } = match.groups;
-  const mediaType = type.split(";");
-  hash = stripHash ? "" : hash;
-  let isBase64 = false;
-  if (mediaType[mediaType.length - 1] === "base64") {
-    mediaType.pop();
-    isBase64 = true;
-  }
-  const mimeType = mediaType.shift()?.toLowerCase() ?? "";
-  const attributes = mediaType.map((attribute) => {
-    let [key, value = ""] = attribute.split("=").map((string) => string.trim());
-    if (key === "charset") {
-      value = value.toLowerCase();
-      if (value === DATA_URL_DEFAULT_CHARSET) {
-        return "";
-      }
-    }
-    return `${key}${value ? `=${value}` : ""}`;
-  }).filter(Boolean);
-  const normalizedMediaType = [
-    ...attributes
-  ];
-  if (isBase64) {
-    normalizedMediaType.push("base64");
-  }
-  if (normalizedMediaType.length > 0 || mimeType && mimeType !== DATA_URL_DEFAULT_MIME_TYPE) {
-    normalizedMediaType.unshift(mimeType);
-  }
-  return `data:${normalizedMediaType.join(";")},${isBase64 ? data.trim() : data}${hash ? `#${hash}` : ""}`;
-};
-function normalizeUrl(urlString, options) {
-  options = {
-    defaultProtocol: "http",
-    normalizeProtocol: true,
-    forceHttp: false,
-    forceHttps: false,
-    stripAuthentication: true,
-    stripHash: false,
-    stripTextFragment: true,
-    stripWWW: true,
-    removeQueryParameters: [/^utm_\w+/i],
-    removeTrailingSlash: true,
-    removeSingleSlash: true,
-    removeDirectoryIndex: false,
-    removeExplicitPort: false,
-    sortQueryParameters: true,
-    ...options
-  };
-  if (typeof options.defaultProtocol === "string" && !options.defaultProtocol.endsWith(":")) {
-    options.defaultProtocol = `${options.defaultProtocol}:`;
-  }
-  urlString = urlString.trim();
-  if (/^data:/i.test(urlString)) {
-    return normalizeDataURL(urlString, options);
-  }
-  if (hasCustomProtocol(urlString)) {
-    return urlString;
-  }
-  const hasRelativeProtocol = urlString.startsWith("//");
-  const isRelativeUrl = !hasRelativeProtocol && /^\.*\//.test(urlString);
-  if (!isRelativeUrl) {
-    urlString = urlString.replace(/^(?!(?:\w+:)?\/\/)|^\/\//, options.defaultProtocol);
-  }
-  const urlObject = new URL(urlString);
-  if (options.forceHttp && options.forceHttps) {
-    throw new Error("The `forceHttp` and `forceHttps` options cannot be used together");
-  }
-  if (options.forceHttp && urlObject.protocol === "https:") {
-    urlObject.protocol = "http:";
-  }
-  if (options.forceHttps && urlObject.protocol === "http:") {
-    urlObject.protocol = "https:";
-  }
-  if (options.stripAuthentication) {
-    urlObject.username = "";
-    urlObject.password = "";
-  }
-  if (options.stripHash) {
-    urlObject.hash = "";
-  } else if (options.stripTextFragment) {
-    urlObject.hash = urlObject.hash.replace(/#?:~:text.*?$/i, "");
-  }
-  if (urlObject.pathname) {
-    const protocolRegex = /\b[a-z][a-z\d+\-.]{1,50}:\/\//g;
-    let lastIndex = 0;
-    let result = "";
-    for (; ; ) {
-      const match = protocolRegex.exec(urlObject.pathname);
-      if (!match) {
-        break;
-      }
-      const protocol = match[0];
-      const protocolAtIndex = match.index;
-      const intermediate = urlObject.pathname.slice(lastIndex, protocolAtIndex);
-      result += intermediate.replace(/\/{2,}/g, "/");
-      result += protocol;
-      lastIndex = protocolAtIndex + protocol.length;
-    }
-    const remnant = urlObject.pathname.slice(lastIndex, urlObject.pathname.length);
-    result += remnant.replace(/\/{2,}/g, "/");
-    urlObject.pathname = result;
-  }
-  if (urlObject.pathname) {
-    try {
-      urlObject.pathname = decodeURI(urlObject.pathname);
-    } catch {
-    }
-  }
-  if (options.removeDirectoryIndex === true) {
-    options.removeDirectoryIndex = [/^index\.[a-z]+$/];
-  }
-  if (Array.isArray(options.removeDirectoryIndex) && options.removeDirectoryIndex.length > 0) {
-    let pathComponents = urlObject.pathname.split("/");
-    const lastComponent = pathComponents[pathComponents.length - 1];
-    if (testParameter(lastComponent, options.removeDirectoryIndex)) {
-      pathComponents = pathComponents.slice(0, -1);
-      urlObject.pathname = pathComponents.slice(1).join("/") + "/";
-    }
-  }
-  if (urlObject.hostname) {
-    urlObject.hostname = urlObject.hostname.replace(/\.$/, "");
-    if (options.stripWWW && /^www\.(?!www\.)[a-z\-\d]{1,63}\.[a-z.\-\d]{2,63}$/.test(urlObject.hostname)) {
-      urlObject.hostname = urlObject.hostname.replace(/^www\./, "");
-    }
-  }
-  if (Array.isArray(options.removeQueryParameters)) {
-    for (const key of [...urlObject.searchParams.keys()]) {
-      if (testParameter(key, options.removeQueryParameters)) {
-        urlObject.searchParams.delete(key);
-      }
-    }
-  }
-  if (!Array.isArray(options.keepQueryParameters) && options.removeQueryParameters === true) {
-    urlObject.search = "";
-  }
-  if (Array.isArray(options.keepQueryParameters) && options.keepQueryParameters.length > 0) {
-    for (const key of [...urlObject.searchParams.keys()]) {
-      if (!testParameter(key, options.keepQueryParameters)) {
-        urlObject.searchParams.delete(key);
-      }
-    }
-  }
-  if (options.sortQueryParameters) {
-    urlObject.searchParams.sort();
-    try {
-      urlObject.search = decodeURIComponent(urlObject.search);
-    } catch {
-    }
-  }
-  if (options.removeTrailingSlash) {
-    urlObject.pathname = urlObject.pathname.replace(/\/$/, "");
-  }
-  if (options.removeExplicitPort && urlObject.port) {
-    urlObject.port = "";
-  }
-  const oldUrlString = urlString;
-  urlString = urlObject.toString();
-  if (!options.removeSingleSlash && urlObject.pathname === "/" && !oldUrlString.endsWith("/") && urlObject.hash === "") {
-    urlString = urlString.replace(/\/$/, "");
-  }
-  if ((options.removeTrailingSlash || urlObject.pathname === "/") && urlObject.hash === "" && options.removeSingleSlash) {
-    urlString = urlString.replace(/\/$/, "");
-  }
-  if (hasRelativeProtocol && !options.normalizeProtocol) {
-    urlString = urlString.replace(/^http:\/\//, "//");
-  }
-  if (options.stripProtocol) {
-    urlString = urlString.replace(/^(?:https?:)?\/\//, "");
-  }
-  return urlString;
-}
-
-// src/utils/normalize-url.ts
-function normalizeRelayUrl(url) {
-  let r = normalizeUrl(url, {
-    stripAuthentication: false,
-    stripWWW: false,
-    stripHash: true
-  });
-  if (!r.endsWith("/")) {
-    r += "/";
-  }
-  return r;
-}
-function dist_normalize(urls) {
-  const normalized = /* @__PURE__ */ new Set();
-  for (const url of urls) {
-    try {
-      normalized.add(normalizeRelayUrl(url));
-    } catch {
-    }
-  }
-  return Array.from(normalized);
-}
-
 // src/events/kinds/NDKRelayList.ts
 var READ_MARKER = "read";
 var WRITE_MARKER = "write";
@@ -37906,7 +40057,9 @@ var NDKRelayList = class _NDKRelayList extends NDKEvent {
             fromContactList.set(relayList.pubkey, list);
         }
       }
-      pubkeys = pubkeys.filter((pubkey) => !relayLists.has(pubkey) && !fromContactList.has(pubkey));
+      pubkeys = pubkeys.filter(
+        (pubkey) => !relayLists.has(pubkey) && !fromContactList.has(pubkey)
+      );
     }
     if (pubkeys.length === 0)
       return relayLists;
@@ -38286,7 +40439,7 @@ var NDKSubscriptionStart = class _NDKSubscriptionStart extends (/* unused pure e
     if (eventTag) {
       try {
         const parsedEvent = JSON.parse(eventTag);
-        return NDKSubscriptionTier.from(parsedEvent);
+        return new NDKSubscriptionTier(this.ndk, parsedEvent);
       } catch {
         this.debug("Failed to parse event tag");
       }
@@ -38434,6 +40587,44 @@ var NDKSubscriptionReceipt = class _NDKSubscriptionReceipt extends (/* unused pu
   }
 };
 
+// src/events/kinds/dvm/feedback.ts
+var NDKDvmJobFeedbackStatus = /* @__PURE__ */ ((NDKDvmJobFeedbackStatus3) => {
+  NDKDvmJobFeedbackStatus3["Processing"] = "processing";
+  NDKDvmJobFeedbackStatus3["Success"] = "success";
+  NDKDvmJobFeedbackStatus3["Scheduled"] = "scheduled";
+  NDKDvmJobFeedbackStatus3["PayReq"] = "payment_required";
+  return NDKDvmJobFeedbackStatus3;
+})(NDKDvmJobFeedbackStatus || {});
+var NDKDVMJobFeedback = class _NDKDVMJobFeedback extends (/* unused pure expression or super */ null && (NDKEvent)) {
+  constructor(ndk, event) {
+    super(ndk, event);
+    this.kind ??= 7e3 /* DVMJobFeedback */;
+  }
+  static async from(event) {
+    const e = new _NDKDVMJobFeedback(event.ndk, event.rawEvent());
+    if (e.encrypted)
+      await e.dvmDecrypt();
+    return e;
+  }
+  get status() {
+    return this.tagValue("status");
+  }
+  set status(status) {
+    this.removeTag("status");
+    if (status !== void 0) {
+      this.tags.push(["status", status]);
+    }
+  }
+  get encrypted() {
+    return !!this.getMatchingTags("encrypted")[0];
+  }
+  async dvmDecrypt() {
+    await this.decrypt();
+    const decryptedContent = JSON.parse(this.content);
+    this.tags.push(...decryptedContent);
+  }
+};
+
 // src/events/kinds/dvm/request.ts
 var NDKDVMRequest = class _NDKDVMRequest extends (/* unused pure expression or super */ null && (NDKEvent)) {
   constructor(ndk, event) {
@@ -38488,6 +40679,12 @@ var NDKDVMRequest = class _NDKDVMRequest extends (/* unused pure expression or s
   getParam(name) {
     const paramTag = this.getMatchingTags("param").find((t) => t[1] === name);
     return paramTag ? paramTag[2] : void 0;
+  }
+  createFeedback(status) {
+    const feedback = new NDKDVMJobFeedback(this.ndk);
+    feedback.tag(this, "job");
+    feedback.status = status;
+    return feedback;
   }
   /**
    * Enables job encryption for this event
@@ -38624,44 +40821,6 @@ var NDKDVMJobResult = class _NDKDVMJobResult extends (/* unused pure expression 
       return void 0;
     }
     return new NDKEvent(this.ndk, JSON.parse(tag));
-  }
-};
-
-// src/events/kinds/dvm/feedback.ts
-var NDKDvmJobFeedbackStatus = /* @__PURE__ */ ((NDKDvmJobFeedbackStatus2) => {
-  NDKDvmJobFeedbackStatus2["Processing"] = "processing";
-  NDKDvmJobFeedbackStatus2["Success"] = "success";
-  NDKDvmJobFeedbackStatus2["Scheduled"] = "scheduled";
-  NDKDvmJobFeedbackStatus2["PayReq"] = "payment_required";
-  return NDKDvmJobFeedbackStatus2;
-})(NDKDvmJobFeedbackStatus || {});
-var NDKDVMJobFeedback = class _NDKDVMJobFeedback extends (/* unused pure expression or super */ null && (NDKEvent)) {
-  constructor(ndk, event) {
-    super(ndk, event);
-    this.kind ??= 7e3 /* DVMJobFeedback */;
-  }
-  static async from(event) {
-    const e = new _NDKDVMJobFeedback(event.ndk, event.rawEvent());
-    if (e.encrypted)
-      await e.dvmDecrypt();
-    return e;
-  }
-  get status() {
-    return this.tagValue("status");
-  }
-  set status(status) {
-    this.removeTag("status");
-    if (status !== void 0) {
-      this.tags.push(["status", status]);
-    }
-  }
-  get encrypted() {
-    return !!this.getMatchingTags("encrypted")[0];
-  }
-  async dvmDecrypt() {
-    await this.decrypt();
-    const decryptedContent = JSON.parse(this.content);
-    this.tags.push(...decryptedContent);
   }
 };
 
@@ -39720,22 +41879,30 @@ function addRelays(event, relays) {
     tags.push(["relays", ...relays]);
   return tags;
 }
-async function dvmSchedule(event, dvm, relays, encrypted = true, waitForConfirmationForMs) {
-  if (!event.ndk)
+async function dvmSchedule(events, dvm, relays, encrypted = true, waitForConfirmationForMs) {
+  if (!(events instanceof Array)) {
+    events = [events];
+  }
+  const ndk = events[0].ndk;
+  if (!ndk)
     throw new Error("NDK not set");
-  if (!event.sig)
-    throw new Error("Event not signed");
-  if (!event.created_at)
-    throw new Error("Event has no date");
-  if (!dvm)
-    throw new Error("No DVM specified");
-  if (event.created_at <= Date.now() / 1e3)
-    throw new Error("Event needs to be in the future");
-  const scheduleEvent = new NDKDVMRequest(event.ndk, {
+  for (const event of events) {
+    if (!event.sig)
+      throw new Error("Event not signed");
+    if (!event.created_at)
+      throw new Error("Event has no date");
+    if (!dvm)
+      throw new Error("No DVM specified");
+    if (event.created_at <= Date.now() / 1e3)
+      throw new Error("Event needs to be in the future");
+  }
+  const scheduleEvent = new NDKDVMRequest(ndk, {
     kind: 5905 /* DVMEventSchedule */
   });
-  scheduleEvent.addInput(JSON.stringify(event.rawEvent()), "text");
-  scheduleEvent.tags.push(...addRelays(event, relays));
+  for (const event of events) {
+    scheduleEvent.addInput(JSON.stringify(event.rawEvent()), "text");
+  }
+  scheduleEvent.tags.push(...addRelays(events[0], relays));
   if (encrypted) {
     await scheduleEvent.encryption(dvm);
   } else {
@@ -39744,7 +41911,7 @@ async function dvmSchedule(event, dvm, relays, encrypted = true, waitForConfirma
   await scheduleEvent.sign();
   let res;
   if (waitForConfirmationForMs) {
-    res = event.ndk.subscribe(
+    res = ndk.subscribe(
       {
         kinds: [5905 /* DVMEventSchedule */ + 1e3, 7e3 /* DVMJobFeedback */],
         ...scheduleEvent.filter()
@@ -39915,14 +42082,19 @@ var NDKPool = class extends lib.EventEmitter {
   flappingRelays = /* @__PURE__ */ new Set();
   // A map to store timeouts for each flapping relay.
   backoffTimes = /* @__PURE__ */ new Map();
+  ndk;
   constructor(relayUrls = [], blacklistedRelayUrls = [], ndk, debug7) {
     super();
     this.debug = debug7 ?? ndk.debug.extend("pool");
+    this.ndk = ndk;
     for (const relayUrl of relayUrls) {
       const relay = new NDKRelay(relayUrl);
       this.addRelay(relay, false);
     }
     this.blacklistRelayUrls = new Set(blacklistedRelayUrls);
+  }
+  set name(name) {
+    this.debug = this.debug.extend(name);
   }
   /**
    * Adds a relay to the pool, and sets a timer to remove it if it is not used within the specified time.
@@ -39952,22 +42124,48 @@ var NDKPool = class extends lib.EventEmitter {
    * @param connect - Whether or not to connect to the relay.
    */
   addRelay(relay, connect = true) {
+    const isAlreadyInPool = this.relays.has(relay.url);
+    const isBlacklisted = this.blacklistRelayUrls?.has(relay.url);
+    const isCustomRelayUrl = relay.url.includes("/npub1");
     const relayUrl = relay.url;
-    if (this.blacklistRelayUrls?.has(relayUrl)) {
-      this.debug(`Relay ${relayUrl} is blacklisted`);
+    if (isAlreadyInPool) {
+      this.debug(`Refusing to add relay ${relayUrl}: already in the pool`);
       return;
     }
-    if (relayUrl.includes("/npub1")) {
-      this.debug(`Relay ${relayUrl} is a filter relay`);
+    if (isBlacklisted) {
+      this.debug(`Refusing to add relay ${relayUrl}: blacklisted`);
       return;
     }
-    relay.on("notice", async (relay2, notice) => this.emit("notice", relay2, notice));
+    if (isCustomRelayUrl) {
+      this.debug(`Refusing to add relay ${relayUrl}: is a filter relay`);
+      return;
+    }
+    if (this.ndk.cacheAdapter?.getRelayStatus) {
+      const info = this.ndk.cacheAdapter.getRelayStatus(relayUrl);
+      if (info && info.dontConnectBefore && info.dontConnectBefore > Date.now()) {
+        const delay = info.dontConnectBefore - Date.now();
+        this.debug(`Refusing to add relay ${relayUrl}: delayed connect for ${delay}ms`);
+        setTimeout(() => {
+          this.addRelay(relay, connect);
+        }, delay);
+        return;
+      }
+    }
+    this.debug(`Adding relay ${relayUrl} to the pool`);
+    relay.on("notice", async (notice) => this.emit("notice", relay, notice));
     relay.on("connect", () => this.handleRelayConnect(relayUrl));
     relay.on("ready", () => this.handleRelayReady(relay));
     relay.on("disconnect", async () => this.emit("relay:disconnect", relay));
     relay.on("flapping", () => this.handleFlapping(relay));
     relay.on("auth", async (challenge) => this.emit("relay:auth", relay, challenge));
     relay.on("authed", async () => this.emit("relay:authed", relay));
+    relay.on("delayed-connect", (delay) => {
+      if (this.ndk.cacheAdapter?.updateRelayStatus) {
+        this.ndk.cacheAdapter.updateRelayStatus(relay.url, {
+          dontConnectBefore: Date.now() + delay
+        });
+      }
+    });
     this.relays.set(relayUrl, relay);
     if (connect) {
       this.emit("relay:connecting", relay);
@@ -40333,6 +42531,16 @@ var Nip96 = class {
     return hashHex;
   }
 };
+var Nip96Aggregator = class {
+  pubkey;
+  explicitServers;
+  ndk;
+  constructor(pubkey, explicitServers, ndk) {
+    this.pubkey = pubkey;
+    this.explicitServers = explicitServers;
+    this.ndk = ndk;
+  }
+};
 
 // src/ndk/queue/index.ts
 var Queue = class {
@@ -40470,6 +42678,7 @@ var NDK = class extends lib.EventEmitter {
       opts.blacklistRelayUrls || DEFAULT_BLACKLISTED_RELAYS,
       this
     );
+    this.pool.name = "main";
     this.debug(`Starting with explicit relays: ${JSON.stringify(this.explicitRelayUrls)}`);
     this.pool.on("relay:auth", async (relay, challenge) => {
       if (this.relayAuthDefaultPolicy) {
@@ -40488,6 +42697,7 @@ var NDK = class extends lib.EventEmitter {
         this,
         this.debug.extend("outbox-pool")
       );
+      this.outboxPool.name = "outbox";
       this.outboxTracker = new OutboxTracker(this);
     }
     this.signer = opts.signer;
@@ -40816,6 +43026,12 @@ var NDK = class extends lib.EventEmitter {
    */
   getNip96(domain) {
     return new Nip96(domain, this);
+  }
+  /**
+   * Creates a new Nip96Aggregator instance for the given pubkey
+   */
+  getNip96Aggregator(pubkey, explicitServers = []) {
+    return new Nip96Aggregator(pubkey, explicitServers, this);
   }
   /**
    * Creates a new Nostr Wallet Connect instance for the given URI and waits for it to be ready.
