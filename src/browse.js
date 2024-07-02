@@ -65,6 +65,7 @@ function openNoteInEditor() {
 window.openNoteInEditor = openNoteInEditor;
 
 function renderDynamicContent() {
+    if (window.router.pageName !== Router.BROWSER) { return; }
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
     $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
         navigateToNote(e.target.title, e.target.innerText);

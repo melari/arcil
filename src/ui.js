@@ -24,7 +24,8 @@ $(window).on('DOMContentLoaded', async function () {
     await window.trySeamlessConnection().catch(() => { });
 
     if (window.router.pageName == "editor") {
-        window.loadNote();
+        loadNote();
+        fetchNotes();
     } else if (window.router.pageName == "browser") {
         window.browseNoteFromUrl();
     }
@@ -41,32 +42,24 @@ function startAutoSave() {
     }, 1000 * 1);
 }
 
-function restoreAutoSave() {
+function fetchAutoSave() {
     const autosave = localStorage.getItem('autosave');
     if (!autosave) { return; }
+    return JSON.parse(autosave);
+}
 
-    const parsed = JSON.parse(autosave);
-    newNote(parsed.title, parsed.content);
+function restoreAutoSave() {
+    const details = fetchAutoSave();
+    newNote(details.title, details.content);
 }
 
 // Connect UI button
 function connectWallet() {
     toggleConnect().then(() => {
-        if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
+        if (window.nip07signer && window.router.pageName === Router.EDITOR) { fetchNotes(); }
     })
 }
 window.connectWallet = connectWallet;
-
-function showMyNotes() {
-    $("#notes-list").empty();
-    ensureConnected().then(() => {
-        window.notesModal = new bootstrap.Modal('#myNotesModal', {});
-        window.notesModal.show();
-        $("#note-search-box").focus();
-        fetchNotes();
-    })
-}
-window.showMyNotes = showMyNotes;
 
 function showSettings() {
     window.settingsModal = new bootstrap.Modal('#settingsModal', {});
@@ -91,6 +84,7 @@ window.showPublishModal = showPublishModal;
 
 async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
+    if (!window.nostrUser?.hexpubkey) { return }
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023, 31234] }
 
     const subscription = await Relay.instance.subscribe(filter, async (e) => {
@@ -120,10 +114,9 @@ async function fetchNotes() {
 }
 
 // Load the note into the editor given by params
-function loadNote() {
+async function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
-        if (!!localStorage.getItem('autosave')) { return restoreAutoSave(); }
-        else if (!!window.nip07signer) { return showMyNotes(); }
+        if (!!fetchAutoSave()?.content) { return restoreAutoSave(); }
         else { return newNote('', INTRO_TEXT); }
     }
 
@@ -159,36 +152,33 @@ function colorForRelay(str) {
 
 function searchNotes() {
     if (!Database.instance.hasSearchableEntries()) {
-        $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
         return;
     }
 
     let notesListContent = "";
-    window.tooltipList.forEach(tooltip => tooltip.dispose());
 
     const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" ").filter(x => !!x));
 
-    let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
         const note = Database.instance.getNote(noteId);
         if (!note) { return; }
-        if (notesDisplayed > 20) { return; }
-        let noteRelays = "";
-        for (const relay of note.onRelays) {
-            const color = colorForRelay(relay.url);
-            noteRelays += `<div class="relay-indicator" style="background-color:#${color}" data-bs-toggle="tooltip" data-bs-title="${relay.url}">&nbsp;</div>`;
-        }
-        const privateIndicator = note.private ? "<i class='fa fa-solid fa-eye-slash'></i>" : "<i class='fa fa-cookie' style='width:16px'></i>";
-        notesListContent += "<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + privateIndicator + "&nbsp;" + note.title + "</div><div>" + noteRelays + "</div></button>";
-        notesDisplayed++;
+        const relayCount = note.onRelays.length;
+        const health = relayCount >= 4
+            ? 'health-good'
+            : relayCount >= 2
+            ? 'health-med'
+            : 'health-bad';
+        const privateIndicator = note.private
+            ? "<i class='fa fa-solid fa-eye-slash'></i>"
+            : note.title === 'homepage'
+            ? "<i class='fa fa-solid fa-home'></i>"
+            : "<i class='fa fa-cookie' style='width:16px'></i>";
+        notesListContent += `<button class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.id}')"><div>${privateIndicator}&nbsp;${note.title}</div></button></li>`;
     });
 
     $("#notes-list").html(notesListContent);
-    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    window.tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
 window.searchNotes = searchNotes;
-window.tooltipList = [];
 
 async function editNote(noteId) {
     PageContext.instance.setNote(Database.instance.getNote(noteId));

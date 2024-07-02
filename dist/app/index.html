@@ -149,10 +149,65 @@ table:not(.table) {
     vertical-align: middle;
 }
 
+.notes-header {
+    display: flex;
+    align-items: center;
+}
+
+.icon-button {
+    margin: 4px 0px 0px -6px;
+    padding: 6px;
+}
+
+.icon-button:hover {
+    cursor: pointer;
+    background: #e2b3e2;
+}
+
+#note-search-box {
+    padding: 0px 2px;
+    border: 1px solid #e5d0fa;
+    border-left: none;
+    border-radius: 0px;
+    margin: 3px 6px 3px 0px;
+    min-height: 24px;
+    flex-grow: 1;
+    background: inherit;
+    outline: none;
+}
+
+#search-icon {
+    max-height: 24px;
+    margin: 7px 0px 0px 0px;
+    border-radius: 0px;
+    padding: 0px 2px 0px 5px;
+    border: 1px solid #e5d0fa;
+    border-right: none;
+    background: inherit;
+    color: #8e30eb;
+}
+
 .note-list-button {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    white-space: nowrap;
+}
+
+.note-list-button:hover {
+    background: #f0e1f8;
+}
+
+.health-good {
+    color: #4c3652;
+}
+
+.health-med {
+    color: #978303;
+}
+
+.health-bad {
+    color: #970349;
 }
 
 .relay-indicator {
@@ -204,7 +259,7 @@ table:not(.table) {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 100px);
-    padding: 0px;
+    padding-left: 0px;
     border-left: 1px solid;
 }
 .notes-list {
@@ -274,10 +329,6 @@ table:not(.table) {
     border: none;
 }
 
-.container-fluid {
-    padding: 0px;
-}
-
 .dropdown-menu {
     float: right;
 }
@@ -306,6 +357,7 @@ table:not(.table) {
 }
 
 
+
 </style>
 </head>
 
@@ -317,14 +369,23 @@ table:not(.table) {
             <div class="d-flex flex-column flex-lg-row align-items-lg-center w-100">
                 <a href="/" class="navbar-brand mb-2 mb-lg-0 text-center text-lg-start d-none d-lg-block"><span class="jp">耕す</span> t a g a y a s u</a>
                 <div class="d-flex flex-row justify-content-between justify-content-lg-end mt-lg-0 ml-lg-auto w-100 w-lg-auto" style="height:38px;">
-                    <button class="btn btn-link mb-2 mb-lg-0" onclick="showMyNotes()">My Notes</button>
                     <button class="btn connect-wallet" onclick="connectWallet()">Connect</button>
                     <button class="btn btn-subtle avatar-main avatar" style="display:none" onclick="showSettings()"></button>
                 </div>
             </div>
         </nav>
         <div class="row">
-            <div class="col-lg-3">hello</div>
+            <div class="col-lg-3" style="padding-right:0px">
+                <div class="notes-header">
+                  <i class="fa fa-bars icon-button"></i>
+                  <i class="fa fa-plus icon-button"></i>
+                  <div class="input-group">
+                      <span class="input-group-text" id="search-icon"><i class="fa fa-search"></i></span>
+                      <input id="note-search-box" class="form-control-sm mr-sm-2" type="search" placeholder="Search" aria-label="Search" style="margin-top: 7px" oninput="searchNotes()"/>
+                  </div>
+                </div>
+                <div id="notes-list"></div>
+            </div>
             <div class="col-lg-9 notes-editor"><textarea></textarea></div>
         </div>
         <nav class="navbar fixed-bottom navbar-bottom">
@@ -387,33 +448,6 @@ table:not(.table) {
                     <button id="confirmActionNo" type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- Note search modal -->
-<div class="modal fade" id="myNotesModal" tabindex="-1" aria-labelledby="myNotesModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h1 class="modal-title fs-5" id="myNotesModalLabel">My Notes</h1>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <div class="row">
-                <form class="form-inline" action="#">
-                    <input id="note-search-box" class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search" style="margin-top: 7px" onkeyup="searchNotes()"/>
-                </form>
-            </div>
-            <div class="row">
-                <div id="notes-list" class="list-group" style="padding: 12px"></div>
-            </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn" onclick="newNote()">New Note</button>
         </div>
       </div>
     </div>
