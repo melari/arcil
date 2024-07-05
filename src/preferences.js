@@ -10,7 +10,7 @@ class Preferences {
 
     static DEFAULTS = {
         spellCheckEnabled: false,
-        aggressiveDelete: true,
+        aggressiveDelete: false,
     }
     current = Preferences.DEFAULTS;
 

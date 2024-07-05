@@ -1,4 +1,4 @@
-import { handleFor, delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, encryptSelf } from "./common.js"
+import { handleFor, delay, ensureConnected, ensureReadonlyConnected, toggleConnect, dtagFor, atagFor, naddrFor, encryptSelf } from "./common.js"
 import { showPending, showError, showNotice, ERROR_EVENT, NOTICE_EVENT, PENDING_EVENT } from "./error.js"
 import { startNostrMonitoring } from "./nostr.js";
 import { Database } from "./database.js";
@@ -173,12 +173,66 @@ function searchNotes() {
             : note.title === 'homepage'
             ? "<i class='fa fa-solid fa-home'></i>"
             : "<i class='fa fa-cookie' style='width:16px'></i>";
-        notesListContent += `<button class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.id}')"><div>${privateIndicator}&nbsp;${note.title}</div></button></li>`;
+        notesListContent += `
+            <div class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.id}')">
+                <div class='note-list-title'>${privateIndicator}&nbsp;${note.title}</div>
+                <i id='note-more-${note.id}' class='fa fa-solid fa-gears note-more' onclick="showNoteOptions(event, '${note.id}'); return true;"></i>
+                </div>
+            </div>
+        `;
     });
 
     $("#notes-list").html(notesListContent);
 }
 window.searchNotes = searchNotes;
+
+function showNoteOptions(event, noteId) {
+    const note = Database.instance.getNote(noteId);
+    $('#noteDetailsTitle').text(note.title);
+
+    const id = note.id;
+    const idPreview = id.slice(0, 4) + "…" + id.slice(id.length-4, id.length) + " <i class='fa fa-copy'></i>";
+    $('#noteDetailsId').html(idPreview);
+    $('#noteDetailsId').data('id', id);
+
+    const naddr = naddrFor(note.title, window.nostrUser.hexpubkey);
+    const naddrPreview = naddr.slice(0,10) + "…" + naddr.slice(naddr.length-5, naddr.length) + " <i class='fa fa-copy'></i>";
+    $('#noteDetailsNaddr').html(naddrPreview);
+    $('#noteDetailsNaddr').data('naddr', naddr);
+
+    $('#noteDetailsOpenInTagayasu').attr('href', window.router.urlFor(Router.BROWSER, note.handle));
+    $('#noteDetailsOpenInHabla').attr('href', `https://habla.news/a/${naddr}`);
+    $('#noteDetailsOpenInHighlighter').attr('href', `https://highlighter.com/a/${naddr}`);
+
+    $('#noteDetailsDelete').data('note-id', noteId);
+
+    let relayDetails = '<ul>';
+    note.onRelays.forEach(relay => {
+        relayDetails += `<li>${relay.url}</li>`;
+    });
+    relayDetails += '</ul>';
+    $('#noteDetailsRelays').html(relayDetails);
+
+    const publishedAt = new Date(note.createdAt * 1000).toLocaleString();
+    $('#noteDetailsDate').text(publishedAt);
+
+    window.noteDetailsModal = new bootstrap.Modal('#note-details-modal', {});
+    window.noteDetailsModal.show();
+    event.stopPropagation();
+}
+window.showNoteOptions = showNoteOptions;
+
+function copyNaddr() {
+    navigator.clipboard.writeText($('#noteDetailsNaddr').data('naddr'));
+    showNotice('copied naddr to clipboard');
+}
+window.copyNaddr = copyNaddr;
+
+function copyNoteId() {
+    navigator.clipboard.writeText($('#noteDetailsId').data('id'));
+    showNotice('copied ID to clipboard');
+}
+window.copyNoteId = copyNoteId;
 
 async function editNote(noteId) {
     PageContext.instance.setNote(Database.instance.getNote(noteId));
@@ -192,30 +246,36 @@ function newNote(title = "", content = "") {
 window.newNote = newNote;
 
 function deleteNote() {
-    if (!PageContext.instance.note.id) {
+    const noteId = $('#noteDetailsDelete').data('note-id');
+    if (!noteId) {
         showNotice("Nothing to do! Note was never published.");
         return;
     }
 
-    if (!!window.publishModal) { window.publishModal.hide(); }
-    confirmAction("Are you sure you want to delete this note?").then(() => {
+    const note = Database.instance.getNote(noteId);
+
+    if (!!window.noteDetailsModal) { window.noteDetailsModal.hide(); }
+    confirmAction('Are you sure you want to delete this note?', `Title: ${note.title}`).then(async () => {
         showPending("Deleting...");
 
-        const noteId = PageContext.instance.note.id;
+        if (noteId === PageContext.instance.note.id) {
+            window.MDEditor.value('');
+            $('#note-title').val('');
+        }
 
         // If aggressiveDelete mode is enabled,
         // Save a new version with removed content to encourage clients not to show old versions of the note
         // Then, publish a kind-5 delete request to purge the event entirely
-        window.MDEditor.value('');
         if (Preferences.instance.current.aggressiveDelete) {
-            publishNote('Your note has been deleted').then(() => {
-                $("#note-title").val("");
-                Relay.instance.del(noteId);
-            });
-        } else {
-            $("#note-title").val("");
-            Relay.instance.del(noteId);
+            note.update({ content: '' });
+            const event = await note.toNostrEvent()
+            await Relay.instance.publish(event);
         }
+
+        await Relay.instance.del(noteId);
+        Database.instance.deleteNote(noteId);
+        showNotice('Note has been deleted');
+        searchNotes();
     });
 }
 window.deleteNote = deleteNote;
@@ -500,10 +560,11 @@ window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
     $('#editor-prefs-aggressive-delete')[0].checked = prefs.aggressiveDelete;
 });
 
-function confirmAction(question) {
+function confirmAction(question, details = '') {
     return new Promise((resolve, reject) => {
         const modal = new bootstrap.Modal("#confirmActionModal", {});
         $("#confirmActionTitle").text(question);
+        $("#confirmActionDetails").text(details);
         modal.show();
 
         const confirmActionYes = document.getElementById('confirmActionYes');

@@ -8,6 +8,7 @@ import { Wallet } from "./wallet.js";
  *  if the notes are dropped by all relays.
  */
 export class Database {
+    // Map of noteId => Note class
     notes = {};
     noteTitleTrie = new Trie();
 
@@ -56,6 +57,12 @@ export class Database {
         this.addNote(note);
         this.pushStateToLocalStorage(window.nostrUser.npub);
         return note;
+    }
+
+    deleteNote(noteId) {
+        if (!this.notes[noteId]) { return; }
+        delete this.notes[noteId];
+        this.pushStateToLocalStorage(window.nostrUser.npub);
     }
 
     addNote(note) {

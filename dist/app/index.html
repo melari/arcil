@@ -198,6 +198,11 @@ table:not(.table) {
     background: #f0e1f8;
 }
 
+.note-list-title {
+    cursor: pointer;
+    overflow: hidden;
+}
+
 .health-good {
     color: #4c3652;
 }
@@ -208,6 +213,17 @@ table:not(.table) {
 
 .health-bad {
     color: #970349;
+}
+
+.note-more {
+    float: right;
+    margin-right: 6px;
+    cursor: pointer;
+    padding-left: 6px;
+}
+
+.note-list-button:not(:hover) .note-more {
+    display: none !important;
 }
 
 .relay-indicator {
@@ -356,6 +372,10 @@ table:not(.table) {
     cursor: pointer;
 }
 
+#noteDetailsNaddr:hover, #noteDetailsId:hover {
+    cursor: pointer;
+    color: #8e30eb;
+}
 
 
 </style>
@@ -440,6 +460,7 @@ table:not(.table) {
           <h1 class="modal-title fs-5" id="confirmActionTitle">Are you sure?</h1>
         </div>
         <div class="modal-body">
+            <div class="row"><div class="col-12" id="confirmActionDetails"></div></div>
             <div class="row">
                 <div class="col-6 text-end pe-2">
                     <button id="confirmActionYes" type="button" class="btn" data-bs-dismiss="modal">Confirm</button>
@@ -469,6 +490,38 @@ table:not(.table) {
                 <button class="list-group-item list-group-item-action" onclick="viewPublishedNote()">Open published <i class="fa fa-external-link" aria-hidden="true"></i></button>
                 <button class="list-group-item list-group-item-action" onclick="deleteNote()">Delete Note</button>
               </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Note Details modal -->
+<div class="modal fade" id="note-details-modal" tabindex="-1" aria-labelledby="noteDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+            <h1 class="modal-title fs-5" id="noteDetailsModalLabel"><span id="noteDetailsTitle"></span></h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="row">
+              <div class="col-6">
+                <h3>Note Details</h3>
+                <strong>Note ID:</strong> <span id='noteDetailsNaddr' data-naddr='' onclick='copyNaddr()'></span><br />
+                <strong>Revision ID:</strong> <span id='noteDetailsId' data-id='' onclick='copyNoteId()'></span><br />
+                <strong>Created At:</strong> <span id='noteDetailsDate'></span><br />
+                <strong>Open In:</strong><br />
+                &nbsp;&nbsp;&nbsp;&nbsp;<a href="#" target="_blank" id='noteDetailsOpenInTagayasu'>Tagayasu Reader</a><br />
+                &nbsp;&nbsp;&nbsp;&nbsp;<a href="#" target="_blank" id='noteDetailsOpenInHabla'>Habla News</a><br />
+                &nbsp;&nbsp;&nbsp;&nbsp;<a href="#" target="_blank" id='noteDetailsOpenInHighlighter'>Highlighter</a><br />
+              </div>
+              <div class="col-6">
+                <h3>Found on Relays</h3>
+                <div id='noteDetailsRelays'></div>
+                <button id='noteDetailsDelete' class='btn' data-note-id='' onclick="deleteNote()">Delete Note</button>
+              </div>
+            </div>
         </div>
       </div>
     </div>
@@ -656,7 +709,7 @@ table:not(.table) {
             </div>
 
             <div id="settings-page-editor-preferences" class="settings-page col-9" style="display:none">
-                <form class="form-inline" action="#">
+                <form class="form-inline">
                     <div class="modal-body">
                         <div class="row">
                             <h3>Editor Preferences</h3>
@@ -667,7 +720,7 @@ table:not(.table) {
                                 </div>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-aggressive-delete">
-                                    <label class="form-check-label" for="editor-prefs-aggressive-delete">Aggressive Delete <small>(empty out note content before deleting)</small></label>
+                                    <label class="form-check-label" for="editor-prefs-aggressive-delete">Aggressive Delete <small>(experimental - empty out note content before deleting)</small></label>
                                 </div>
                             </div>
                         </div>

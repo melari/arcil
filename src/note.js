@@ -1,4 +1,5 @@
-import { dtagFor, handleFor, decryptSelf } from "./common.js";
+import { dtagFor, handleFor, decryptSelf, encryptSelf } from "./common.js";
+import { Relay } from "./relay.js";
 
 export class Note {
     static async fromNostrEvent(event) {
@@ -27,6 +28,18 @@ export class Note {
         note.private = false;
         note.onRelays = [];
         return note;
+    }
+
+    // Applies an update to the note.
+    // opts is an object with optional keys for:
+    // title, private, content
+    // Any excluded key will not be modified
+    // Any update will bump the createdAt timestamp to the current time.
+    update(opts) {
+        this.title = opts.title ?? this.title;
+        this.private = opts.private ?? this.private;
+        this.content = opts.content ?? this.content;
+        this.createdAt = Math.floor(Date.now() / 1000);
     }
 
     get handle() {
@@ -59,5 +72,28 @@ export class Note {
         note.onRelays = [];
 
         return note;
+    }
+
+    async toNostrEvent(extraTags = []) {
+        const publicKind = 30023;
+        const tags = [
+            ["d", this.dtag],
+            ["title", this.title],
+            ["published_at", this.createdAt.toString()],
+            ...extraTags,
+        ];
+        const publicEvent = Relay.instance.buildEvent(publicKind, this.content, tags, this.authorPubkey);
+
+        if (this.private) {
+            const draftKind = 31234;
+            const payload = await encryptSelf(JSON.stringify(publicEvent.rawEvent()));
+            const wrapperTags = [
+                ['d', this.dtag],
+                ['k', publicKind.toString()],
+            ];
+            return Relay.instance.buildEvent(draftKind, payload, wrapperTags, this.authorPubkey);
+        } else {
+            return publicEvent;
+        }
     }
 }
