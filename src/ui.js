@@ -239,6 +239,40 @@ async function editNote(noteId) {
 }
 window.editNote = editNote
 
+let sidebarOpen = true;
+async function toggleSidebar() {
+    if (sidebarOpen === null) { return; } // transition in progress
+
+    const newState = !sidebarOpen;
+    sidebarOpen = null;
+
+    if (newState) {
+        $('#sidebar').width('revert-layer');
+        $('.notes-editor').width('revert-layer');
+        $('#notes-list').width('revert-layer');
+        $('#notes-list').css('opacity', 'revert-layer');
+        $('#search-bar').width('revert-layer');
+        $('#search-bar').css('opacity', 'revert-layer');
+        $('.notes-header').css('flex-direction', 'revert-layer');
+    } else {
+        $('#sidebar').width('38px');
+        $('.notes-editor').width('calc(100% - 50px)');
+        $('#notes-list').css('opacity', '0');
+        $('#search-bar').css('opacity', '0');
+
+        setTimeout(() => {
+            $('.notes-header').css('flex-direction', 'column');
+            $('#notes-list').width('0px');
+            $('#search-bar').width('0px');
+        }, 800);
+    }
+
+    setTimeout(() => {
+        sidebarOpen = newState;
+    }, 1000);
+}
+window.toggleSidebar = toggleSidebar;
+
 function newNote(title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
     PageContext.instance.setNote(Note.fromContent(title, content));
@@ -468,11 +502,6 @@ async function setAvatarOnConnected() {
           $(this).text(name);
       });
     }
-}
-
-function npubPreview() {
-    if (!window.nostrUser) { return "Connect"; }
-    return window.nostrUser.npub.slice(0,8) + "…" + window.nostrUser.npub.slice(59,63);
 }
 
 function updateOwnerOnly() {
