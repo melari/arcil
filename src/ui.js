@@ -473,6 +473,15 @@ function createMDE() {
         previewRender: MarkdownRenderer.instance.renderHtml,
         styleSelectedText: false // This works around a bug in SimpleMDE where text cannot be selected on mobile
     });
+
+    const publishButtons = `
+        <div class='btn-group publish-button-group' role='group'>
+          <button class='btn btn-sm' onclick="saveNote()">Publish</button>
+          <button class='btn btn-sm save-draft-button' onclick="savePrivateNote()">Draft</button>
+        </div>
+    `;
+
+    $('.editor-toolbar').append(publishButtons);
 }
 
 async function setAvatarOnConnected() {
@@ -742,3 +751,20 @@ function removeBlossomServer(url) {
     });
 }
 window.removeBlossomServer = removeBlossomServer;
+
+function showNewNoteModal() {
+    window.newNoteModal = new bootstrap.Modal('#new-note-modal', {});
+    window.newNoteModal.show();
+    $('#new-note-title').val('');
+    setTimeout(() => $('#new-note-title').focus(), 500);
+}
+window.showNewNoteModal = showNewNoteModal;
+
+function newNoteFromUi(type) {
+    window.newNoteModal.hide();
+    const title = $('#new-note-title').val();
+    newNote(title, `# ${title}\n`);
+    window.MDEditor.codemirror.focus();
+    window.MDEditor.codemirror.setCursor({line: 1, ch: 0})
+}
+window.newNoteFromUi = newNoteFromUi;
