@@ -36,7 +36,7 @@ $(window).on('DOMContentLoaded', async function () {
 function startAutoSave() {
     setInterval(() => {
         localStorage.setItem('autosave', JSON.stringify({
-            title: $("#note-title").val(),
+            title: PageContext.instance.note.title,
             content: window.MDEditor.value()
         }));
     }, 1000 * 1);
@@ -305,7 +305,6 @@ function deleteNote() {
 
         if (noteId === PageContext.instance.note.id) {
             window.MDEditor.value('');
-            $('#note-title').val('');
         }
 
         // If aggressiveDelete mode is enabled,
@@ -369,7 +368,7 @@ function savePrivateNote() {
 window.savePrivateNote = savePrivateNote;
 
 function buildNoteFromEditor() {
-    const title = $("#note-title").val();
+    const title = PageContext.instance.note.title;
     const dtag = dtagFor(title);
     if (dtag == "tagayasu-") {
         showError("Title cannot be empty");
@@ -418,7 +417,6 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     // editor
     window.MDEditor.value(note.content);
     if (!!window.notesModal) { window.notesModal.hide(); }
-    $("#note-title").val(note.title);
 });
 
 $('#myNotesModal').on('shown.bs.modal', function () {
