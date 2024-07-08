@@ -286,10 +286,10 @@ table:not(.table) {
 }
 
 #sidebar, .notes-editor, .icon-button {
-    transition: all 1s ease;
+    transition: all 0.3s ease;
 }
 #notes-list, #search-bar {
-    transition: opacity 1s;
+    transition: opacity 0.3s;
 }
 
 #search-bar {
@@ -445,6 +445,7 @@ table:not(.table) {
                 <div class="notes-header">
                   <i class="fa fa-bars icon-button" onclick="toggleSidebar()"></i>
                   <i class="fa fa-plus icon-button" onclick="showNewNoteModal()"></i>
+                  <i class="fa fa-gears icon-button" onclick="showCurrentNoteOptions()" id='show-current-note-options' style="display:none"></i>
                   <div id="search-bar" class="input-group">
                       <span class="input-group-text" id="search-icon"><i class="fa fa-search"></i></span>
                       <input id="note-search-box" class="form-control-sm mr-sm-2" type="search" placeholder="Search" aria-label="Search" style="margin-top: 7px" oninput="searchNotes()"/>

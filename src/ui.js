@@ -218,9 +218,15 @@ function showNoteOptions(event, noteId) {
 
     window.noteDetailsModal = new bootstrap.Modal('#note-details-modal', {});
     window.noteDetailsModal.show();
-    event.stopPropagation();
+    if (!!event) { event.stopPropagation(); }
 }
 window.showNoteOptions = showNoteOptions;
+
+function showCurrentNoteOptions() {
+    const noteId = PageContext.instance.note.id;
+    if (noteId) { showNoteOptions(undefined, noteId); }
+}
+window.showCurrentNoteOptions = showCurrentNoteOptions;
 
 function copyNaddr() {
     navigator.clipboard.writeText($('#noteDetailsNaddr').data('naddr'));
@@ -246,6 +252,9 @@ async function toggleSidebar() {
     const newState = !sidebarOpen;
     sidebarOpen = null;
 
+    // should equal the css transition timing
+    const transitionTime = 300;
+
     if (newState) {
         $('#sidebar').width('revert-layer');
         $('.notes-editor').width('revert-layer');
@@ -254,6 +263,7 @@ async function toggleSidebar() {
         $('#search-bar').width('revert-layer');
         $('#search-bar').css('opacity', 'revert-layer');
         $('.notes-header').css('flex-direction', 'revert-layer');
+        $('#show-current-note-options').hide();
     } else {
         $('#sidebar').width('38px');
         $('.notes-editor').width('calc(100% - 50px)');
@@ -264,12 +274,13 @@ async function toggleSidebar() {
             $('.notes-header').css('flex-direction', 'column');
             $('#notes-list').width('0px');
             $('#search-bar').width('0px');
-        }, 800);
+            $('#show-current-note-options').show();
+        }, transitionTime - 50);
     }
 
     setTimeout(() => {
         sidebarOpen = newState;
-    }, 1000);
+    }, transitionTime);
 }
 window.toggleSidebar = toggleSidebar;
 
