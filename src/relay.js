@@ -142,18 +142,23 @@ export class Relay {
     // filters are supported. The expectation is to have:
     // - EXACTLY ONE hexpubkey
     // - ONE OR MORE kind
-    // - EXACTLY ONE of:
+    // - EXACTLY ONE type of tag:
     //   - "#d" tag
     //   - other tag in INDEXED_TAGS
+    // - ONE OR MORE values for the tag
     //
-    // Performance: there will be one index lookup PER kind.
-    // 
     // Example structure of nostr filter:
     // {
-    //   #d: ['value'],
+    //   #d: ['value', 'sha1234abcd'],
     //   authors: ['hexpubkey'],
     //   kinds: [30023, 31234]
     // }
+    //
+    // Performance: there will be one index lookup PER kind/tag pair
+    // For the above example, we will 4 lookups:
+    // [['value', 30023], ['value', 31234], ['sha1234abcd', 30023], ['sha1234abcd', 31234]]
+    //
+    // TODO: support conjunctive normal form to reduce lookups
     readByFilter(filter) {
         const supportedTags = ['#d', ...Relay.INDEXED_TAGS.map(t => `#${t}`)];
         const tagsGiven = supportedTags.filter(t => !!filter[t]);
@@ -163,15 +168,18 @@ export class Relay {
 
         const tagToUse = tagsGiven[0];
 
-        if (filter.authors.length > 1 || filter[tagToUse].length > 1) {
+        if (filter.authors.length > 1) {
             return new Set();
         }
 
         const hexpubkey = filter.authors[0];
         const tagKind = tagToUse.slice(1);
-        const tagValue = filter[tagToUse][0];
+        const tagValues = filter[tagToUse];
+        const kinds = filter.kinds;
 
-        return filter.kinds.reduce((acc, kind) => {
+        const searchBranches = tagValues.flatMap(tagValue => kinds.map(kind => ({tagValue, kind})));
+
+        return searchBranches.reduce((acc, { tagValue, kind }) => {
             const result = tagToUse === '#d'
                 ? this.readPrimaryIndex(kind, hexpubkey, tagValue)
                 : this.readTagIndex(kind, hexpubkey, tagKind, tagValue);

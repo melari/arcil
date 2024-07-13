@@ -8,8 +8,8 @@ async function browseNoteFromUrl() {
 }
 window.browseNoteFromUrl = browseNoteFromUrl;
 
-async function navigateToNote(identifier, title) {
-    const url = window.router.urlFor(Router.BROWSER, `${identifier}?title=${title}`);
+async function navigateToNote(identifier) {
+    const url = window.router.urlFor(Router.BROWSER, identifier);
     const state = { identifier }
     history.pushState(state, '', url);
     await window.router.route();
@@ -27,14 +27,14 @@ async function browseNote(identifier) {
   Relay.instance.fetchEvent(filters).then(async (event) => {
       if (!!event) {
           if (!!event.tags.find(t => t[0] === "private") && event.pubkey !== window.nostrUser?.hexpubkey) {
-              PageContext.instance.setNote(Note.fromContent('', '### ❌ This note is private and cannot be decrypted.'));
+              PageContext.instance.setNote(Note.fromContent('private', '403', '### ❌ This note is private and cannot be decrypted.'));
               return;
           }
           await PageContext.instance.setNoteByNostrEvent(event);
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
               authors: [event.pubkey],
-              kinds: [30023, 31234],
+              kinds: Note.ALL_KINDS,
               "#d": aTags.map(t => t.split(':')[2])
           }
           Relay.instance.fetchEvents(filters);
@@ -42,12 +42,12 @@ async function browseNote(identifier) {
           const stubTitle = PageContext.instance.noteTitleFromUrl();
           if (!!PageContext.instance.noteIdentifierFromUrl()) {
               if (stubTitle) {
-                  PageContext.instance.setNote(Note.fromContent(stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet.`));
+                  PageContext.instance.setNote(Note.fromContent('topic', stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet.`));
               } else {
-                  PageContext.instance.setNote(Note.fromContent('', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+                  PageContext.instance.setNote(Note.fromContent('topic', '404', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
               }
           } else {
-              PageContext.instance.setNote(Note.fromContent('homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+              PageContext.instance.setNote(Note.fromContent('topic', 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
           }
       }
   });
@@ -55,11 +55,10 @@ async function browseNote(identifier) {
 window.browseNote = browseNote;
 
 function openNoteInEditor() {
-  const stubTitle = PageContext.instance.note.title;
   if (PageContext.instance.noteIdentifierFromUrl()) {
-    window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}?title=${stubTitle}`);
+    window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}`);
   } else {
-    window.location.href = window.router.urlFor(Router.EDITOR, `?title=${stubTitle}`);
+    window.location.href = window.router.urlFor(Router.EDITOR);
   }
 }
 window.openNoteInEditor = openNoteInEditor;
@@ -68,7 +67,7 @@ function renderDynamicContent() {
     if (window.router.pageName !== Router.BROWSER) { return; }
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
     $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
-        navigateToNote(e.target.title, e.target.innerText);
+        navigateToNote(e.target.title);
         return false; // block navigation
     });
 
@@ -88,6 +87,7 @@ function renderDynamicContent() {
 window.renderDynamicContent = renderDynamicContent;
 
 // When the browser back button is pressed
-window.addEventListener('popstate', (event) => {
-    browseNote(event.state?.identifier);
+window.addEventListener('popstate', async (event) => {
+    await window.router.route();
+    browseNoteFromUrl();
 });

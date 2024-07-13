@@ -1,6 +1,7 @@
 import NDK, { NDKNip07Signer, NDKEvent, NDKPrivateKeySigner } from "@nostr-dev-kit/ndk";
 import { nip19 } from "nostr-tools";
 import { showError } from "./error.js";
+import { Note } from "./note.js";
 window.buffer = require('buffer/').Buffer
 const crypto = require('crypto-js');
 
@@ -188,28 +189,32 @@ function connectNostrViaPassphrase() {
 }
 
 export function dtagFor(title) {
-  return `tagayasu-${crypto.SHA256(title.toLowerCase())}`;
+  return title.toLowerCase().replace(/\W/g, '-');
 }
 
-export function handleFor(title, hexpubkey) {
+export function draftDtagFor(title) {
+  return shortHash(dtagFor(title));
+}
+
+export function handleFor(kind, title, hexpubkey) {
   const dnslinkHexpubkey = PageContext.instance.dnslinkHexpubkey();
   if (dnslinkHexpubkey === hexpubkey) {
-    return title.replace(/ /g, "-");
+    return dtagFor(title);
   } else {
-    return naddrFor(title, hexpubkey);
+    return naddrFor(kind, title, hexpubkey);
   }
 }
 
-export function naddrFor(title, hexpubkey) {
+export function naddrFor(kind, title, hexpubkey) {
   const event = new NDKEvent(window.ndk);
-  event.kind = 30023;
+  event.kind = kind;
   event.pubkey = hexpubkey;
   event.tags = [["d", dtagFor(title)]];
   return event.encode();
 }
 
-export function atagFor(title, hexpubkey) {
-  return `30023:${hexpubkey}:${dtagFor(title)}`
+export function atagFor(kind, title, hexpubkey) {
+  return `${kind}:${hexpubkey}:${dtagFor(title)}`
 }
 
 export async function encryptSelf(text) {
@@ -258,20 +263,22 @@ export function noteFilterFromIdentifier(explicitIdentifier) {
     if (!explicitIdentifier) {
         return {
             authors: [hexpubkey],
-            kinds: [30023, 31234],
+            kinds: Note.ALL_KINDS,
             "#d": [dtagFor("homepage")]
         };
     }
 
     const potentialFilter = filterFromId(explicitIdentifier);
-    if (!potentialFilter.kinds || potentialFilter.kinds == [30023]) { potentialFilter.kinds = [30023, 31234]; }
+    if (!potentialFilter.kinds || Note.ALL_KINDS.includes(potentialFilter.kinds[0])) { potentialFilter.kinds = Note.ALL_KINDS; }
     if (!!potentialFilter["#d"]) { return potentialFilter; }
     if (!hexpubkey) { return null; }
 
+    const title = potentialFilter.ids[0].replace(/-/g, ' ')
+
     return {
         authors: [hexpubkey],
-        kinds: [30023, 31234],
-        "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
+        kinds: Note.ALL_KINDS,
+        "#d": [dtagFor(title), draftDtagFor(title)]
     };
 }
 

@@ -1,3 +1,4 @@
+import { Note } from "./note.js"
 import { handleFor, atagFor } from "./common.js"
 
 class MarkdownRenderer {
@@ -19,17 +20,18 @@ class MarkdownRenderer {
             const match = src.match(/^\[\[([^\]\n]+)\]\]/);
             if (match) {
                 this.lexer.state.inLink = true;
-                const handle = handleFor(match[1], PageContext.instance.note.authorPubkey);
+                const handle = handleFor(Note.SOME_KIND, match[1], PageContext.instance.note.authorPubkey);
                 const token = {
                     type: 'link',
                     raw: match[0],
-                    href: '#tagayasu-prefetch', // `javascript:browseNote('${handle}')`, //window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
+                    href: '#tagayasu-prefetch',
                     title: handle,
                     text: match[1],
                     tokens: this.lexer.inlineTokens(match[1])
                 }
                 this.lexer.state.inLink = false;
-                window._backrefs.push(atagFor(match[1], PageContext.instance.note.authorPubkey));
+                window._backrefs.push(atagFor(Note.ARTICLE_KIND, match[1], PageContext.instance.note.authorPubkey));
+                window._backrefs.push(atagFor(Note.TOPIC_KIND, match[1], PageContext.instance.note.authorPubkey));
                 return token;
             }
             return false;

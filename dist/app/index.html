@@ -444,6 +444,7 @@ table:not(.table) {
             <div id="sidebar" class="col-lg-3" style="padding-right:0px">
                 <div class="notes-header">
                   <i class="fa fa-bars icon-button" onclick="toggleSidebar()"></i>
+                  <i class="fa fa-refresh icon-button" onclick="" id='refresh-notes-list'></i>
                   <i class="fa fa-plus icon-button" onclick="showNewNoteModal()"></i>
                   <i class="fa fa-gears icon-button" onclick="showCurrentNoteOptions()" id='show-current-note-options' style="display:none"></i>
                   <div id="search-bar" class="input-group">
@@ -504,7 +505,7 @@ table:not(.table) {
         <div class="modal-body">
             <div class="list-group">
                 <button class="list-group-item list-group-item-action active" aria-current="true" onclick="saveNote()">Publish</button>
-                <button class="list-group-item list-group-item-action" onclick="savePrivateNote()">Save as private draft</button>
+                <button class="list-group-item list-group-item-action" onclick="saveDraftNote()">Save as private draft</button>
                 <button class="list-group-item list-group-item-action" onclick="viewPublishedNote()">Open published <i class="fa fa-external-link" aria-hidden="true"></i></button>
                 <button class="list-group-item list-group-item-action" onclick="deleteNote()">Delete Note</button>
               </div>
@@ -559,7 +560,7 @@ table:not(.table) {
             <div class="col-12">
               <div class="form-floating mb-3">
                 <input id="new-note-title" type="text" class="form-control" placeholder="Title or Topic">
-                <label for="new-note-title">Title or Topic</label>
+                <label for="new-note-title">Title or Concept</label>
               </div>
             </div>
           </div>
@@ -574,11 +575,11 @@ table:not(.table) {
               </button>
             </div>
             <div class="col-lg-4">
-              <button class='new-note-type-button' style='border-color: #48c77b' onclick="newNoteFromUi('standard')">
+              <button class='new-note-type-button' style='border-color: #48c77b' onclick="newNoteFromUi('topic')">
                 <i class='fa fa-leaf new-note-icon' style='color: #a6e4bf'></i><br />
-                <span class='new-note-type-title'>Standard Note</span><br />
+                <span class='new-note-type-title'>Topic</span><br />
                 <br />
-                public if linked to, not broadcast to followers
+                a wiki-like entry, list, or webpage
               </button>
             </div>
             <div class="col-lg-4">
@@ -586,7 +587,7 @@ table:not(.table) {
                 <i class='fa fa-bullhorn new-note-icon' style='color: #e680d3'></i><br />
                 <span class='new-note-type-title'>Article</span><br />
                 <br />
-                shows up in your nostr longform timeline
+                blog post or other longform content
               </button>
             </div>
           </div>
@@ -611,7 +612,7 @@ table:not(.table) {
             </div>
         </nav>
         <div class="row" id="custom-domain-row" style="display:none; font-family:monospace">
-            <span><a href='#' onclick='navigateToNote("", ""); return false;'><b id="custom-domain"></b></a></span>
+            <span><a href='#' onclick='navigateToNote(""); return false;'><b id="custom-domain"></b></a></span>
         </div>
         <div class="row" style="padding-top: 20px;">
             <div id="note-content" class="col-lg-8"></div>

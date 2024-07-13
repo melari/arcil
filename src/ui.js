@@ -35,10 +35,13 @@ $(window).on('DOMContentLoaded', async function () {
 
 function startAutoSave() {
     setInterval(() => {
-        localStorage.setItem('autosave', JSON.stringify({
-            title: PageContext.instance.note.title,
-            content: window.MDEditor.value()
-        }));
+        if (!!PageContext.instance.note) {
+          localStorage.setItem('autosave', JSON.stringify({
+              type: PageContext.instance.note.type,
+              title: PageContext.instance.note.title,
+              content: window.MDEditor.value()
+          }));
+        }
     }, 1000 * 1);
 }
 
@@ -50,7 +53,7 @@ function fetchAutoSave() {
 
 function restoreAutoSave() {
     const details = fetchAutoSave();
-    newNote(details.title, details.content);
+    newNote(details.type, details.title, details.content);
 }
 
 // Connect UI button
@@ -85,7 +88,7 @@ window.showPublishModal = showPublishModal;
 async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
     if (!window.nostrUser?.hexpubkey) { return }
-    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023, 31234] }
+    const filter = { authors: [window.nostrUser.hexpubkey], kinds: Note.ALL_KINDS }
 
     const subscription = await Relay.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
@@ -117,7 +120,7 @@ async function fetchNotes() {
 async function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
         if (!!fetchAutoSave()?.content) { return restoreAutoSave(); }
-        else { return newNote('', INTRO_TEXT); }
+        else { return newNote('topic', 'homepage', INTRO_TEXT); }
     }
 
     ensureConnected().then(async () => {
@@ -130,7 +133,7 @@ async function loadNote() {
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
-                newNote(title, `# ${title}`);
+                newNote('topic', title, `# ${title}`);
             }
         });
     });
@@ -168,14 +171,25 @@ function searchNotes() {
             : relayCount >= 2
             ? 'health-med'
             : 'health-bad';
-        const privateIndicator = note.private
-            ? "<i class='fa fa-solid fa-eye-slash'></i>"
-            : note.title === 'homepage'
+
+        const noteType = note.type;
+        const noteIcon = note.title === 'homepage'
             ? "<i class='fa fa-solid fa-home'></i>"
+            : noteType === Note.PRIVATE
+            ? "<i class='fa fa-solid fa-eye-slash'></i>"
+            : noteType === Note.TOPIC
+            ? "<i class='fa fa-leaf'></i>"
+            : noteType === Note.ARTICLE
+            ? "<i class='fa fa-bullhorn'></i>"
             : "<i class='fa fa-cookie' style='width:16px'></i>";
+
+        const isDraftOnly = note.draft && !note.private;
+        const preTitle = isDraftOnly ? '<i>draft: ' : '';
+        const postTitle = isDraftOnly ? '</i>' : '';
+
         notesListContent += `
             <div class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.id}')">
-                <div class='note-list-title'>${privateIndicator}&nbsp;${note.title}</div>
+                <div class='note-list-title'>${noteIcon}&nbsp;${preTitle}${note.title}${postTitle}</div>
                 <i id='note-more-${note.id}' class='fa fa-solid fa-gears note-more' onclick="showNoteOptions(event, '${note.id}'); return true;"></i>
                 </div>
             </div>
@@ -195,7 +209,7 @@ function showNoteOptions(event, noteId) {
     $('#noteDetailsId').html(idPreview);
     $('#noteDetailsId').data('id', id);
 
-    const naddr = naddrFor(note.title, window.nostrUser.hexpubkey);
+    const naddr = naddrFor(note.kind, note.title, window.nostrUser.hexpubkey);
     const naddrPreview = naddr.slice(0,10) + "…" + naddr.slice(naddr.length-5, naddr.length) + " <i class='fa fa-copy'></i>";
     $('#noteDetailsNaddr').html(naddrPreview);
     $('#noteDetailsNaddr').data('naddr', naddr);
@@ -264,6 +278,7 @@ async function toggleSidebar() {
         $('#search-bar').css('opacity', 'revert-layer');
         $('.notes-header').css('flex-direction', 'revert-layer');
         $('#show-current-note-options').hide();
+        $('#refresh-notes-list').show();
     } else {
         $('#sidebar').width('38px');
         $('.notes-editor').width('calc(100% - 50px)');
@@ -275,6 +290,7 @@ async function toggleSidebar() {
             $('#notes-list').width('0px');
             $('#search-bar').width('0px');
             $('#show-current-note-options').show();
+            $('#refresh-notes-list').hide();
         }, transitionTime - 50);
     }
 
@@ -284,9 +300,9 @@ async function toggleSidebar() {
 }
 window.toggleSidebar = toggleSidebar;
 
-function newNote(title = "", content = "") {
+function newNote(type, title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
-    PageContext.instance.setNote(Note.fromContent(title, content));
+    PageContext.instance.setNote(Note.fromContent(type, title, content));
 }
 window.newNote = newNote;
 
@@ -340,7 +356,7 @@ window.saveNote = saveNote;
 
 async function publishNote(message) {
     return ensureConnected().then(async () => {
-        const event = buildNoteFromEditor();
+        const event = await buildNoteFromEditor(false);
         return Relay.instance.publish(event).then(async (saveEvent) => {
             showNotice(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
@@ -348,46 +364,28 @@ async function publishNote(message) {
     });
 }
 
-function savePrivateNote() {
+function saveDraftNote() {
     showPending("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     ensureConnected().then(async () => {
-        const event = buildNoteFromEditor();
-        const payload = await encryptSelf(JSON.stringify(event.rawEvent()));
-        const tags = [
-            ['d', event.tags.find((t) => t[0] === 'd')[1]],
-            ['k', event.kind.toString()],
-        ];
-        const draftEvent = Relay.instance.buildEvent(31234, payload, tags);
-        Relay.instance.publish(draftEvent).then(async (saveEvent) => {
+        const event = await buildNoteFromEditor(true);
+        Relay.instance.publish(event).then(async (saveEvent) => {
             showNotice("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
-window.savePrivateNote = savePrivateNote;
+window.saveDraftNote = saveDraftNote;
 
-function buildNoteFromEditor() {
-    const title = PageContext.instance.note.title;
-    const dtag = dtagFor(title);
-    if (dtag == "tagayasu-") {
-        showError("Title cannot be empty");
-        return;
-    }
-
-    const kind = 30023;
+async function buildNoteFromEditor(draft) {
     const content = window.MDEditor.value();
-    const tags = [
-        ["d", dtag],
-        ["title", title],
-        ["published_at", Math.floor(Date.now() / 1000).toString()]
-    ];
-
+    const extraTags = [];
     MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-        tags.push(["a", backref]);
+        extraTags.push(["a", backref]);
     });
 
-    return Relay.instance.buildEvent(kind, content, tags);
+    PageContext.instance.note.update({ content, draft });
+    return await PageContext.instance.note.toNostrEvent(extraTags);
 }
 
 async function viewPublishedNote() {
@@ -409,7 +407,11 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     // browser
     const note = PageContext.instance.note;
     const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
-    const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
+    const html = note.private
+      ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}`
+      : note.draft
+      ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This version of the note is a draft and cannot be viewed by others.</div>${renderedContent}`
+      :renderedContent;
     $("#note-content").html(html);
     renderDynamicContent();
     loadBackrefs();
@@ -417,6 +419,13 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     // editor
     window.MDEditor.value(note.content);
     if (!!window.notesModal) { window.notesModal.hide(); }
+    if (note.private) {
+      $('#standard-publish-buttons').hide();
+      $('#draft-only-buttons').show();
+    } else {
+      $('#standard-publish-buttons').show();
+      $('#draft-only-buttons').hide();
+    }
 });
 
 $('#myNotesModal').on('shown.bs.modal', function () {
@@ -484,10 +493,11 @@ function createMDE() {
     });
 
     const publishButtons = `
-        <div class='btn-group publish-button-group' role='group'>
+        <div class='btn-group publish-button-group' role='group' id='standard-publish-buttons'>
           <button class='btn btn-sm' onclick="saveNote()">Publish</button>
-          <button class='btn btn-sm save-draft-button' onclick="savePrivateNote()">Draft</button>
+          <button class='btn btn-sm save-draft-button' onclick="saveDraftNote()">Draft</button>
         </div>
+        <button style="display:none" class='btn btn-sm publish-button-group' onclick="saveDraftNote()" id="draft-only-buttons">Save Privately</button>
     `;
 
     $('.editor-toolbar').append(publishButtons);
@@ -524,8 +534,8 @@ async function setAvatarOnConnected() {
 
 function updateOwnerOnly() {
     if (
-        !PageContext.instance.note.authorPubkey ||
-        PageContext.instance.note.authorPubkey == window.nostrUser?.hexpubkey
+        !PageContext.instance.note?.authorPubkey ||
+        PageContext.instance.note?.authorPubkey == window.nostrUser?.hexpubkey
     ) {
         $(".owner-only").show();
     } else {
@@ -541,19 +551,20 @@ async function loadBackrefs() {
     hideBackrefs();
     $("#backref-content").empty();
 
-    const hexpubkey = PageContext.instance.note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
-    const title = PageContext.instance.note.nostrEvent?.tags.find(t => t[0] === 'title')[1] ?? PageContext.instance.note.title;
+    const note = PageContext.instance.note;
+    const hexpubkey = note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
+    const title = note.nostrEvent?.tags.find(t => t[0] === 'title')[1] ?? PageContext.instance.note.title;
     if (!hexpubkey || !title) { return; }
 
     const filters = {
         authors: [hexpubkey],
-        kinds: [30023, 31234],
-        "#a": [atagFor(title, hexpubkey)]
+        kinds: Note.ALL_KINDS,
+        "#a": [atagFor(note.kind, title, hexpubkey)]
     };
     Relay.instance.fetchEvents(filters).then((events) => {
         events.forEach(function(event) {
             const title = event.tags.find(t => t[0] == "title")[1];
-            const handle = handleFor(title, event.pubkey);
+            const handle = handleFor(event.kind, title, event.pubkey);
             $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
             showBackrefs();
         });
@@ -772,7 +783,7 @@ window.showNewNoteModal = showNewNoteModal;
 function newNoteFromUi(type) {
     window.newNoteModal.hide();
     const title = $('#new-note-title').val();
-    newNote(title, `# ${title}\n`);
+    newNote(type, title, `# ${title}\n`);
     window.MDEditor.codemirror.focus();
     window.MDEditor.codemirror.setCursor({line: 1, ch: 0})
 }

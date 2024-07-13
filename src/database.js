@@ -1,5 +1,5 @@
 const Trie = require("triever");
-import { Note } from "./note.js";
+import { Note, NoteValidationError } from "./note.js";
 import { Wallet } from "./wallet.js";
 
 /**
@@ -52,11 +52,23 @@ export class Database {
     }
 
     async addFromNostrEvent(event) {
-        const note = await Note.fromNostrEvent(event);
-        if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
-        this.addNote(note);
-        this.pushStateToLocalStorage(window.nostrUser.npub);
-        return note;
+        try {
+            const note = await Note.fromNostrEvent(event);
+            if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
+            this.addNote(note);
+            this.pushStateToLocalStorage(window.nostrUser.npub);
+            return note;
+        } catch(e) {
+            if (e instanceof NoteValidationError) {
+                console.warn("Discarding event because it failed validation", { 
+                  reason: e.message,
+                  event
+                });
+                return null;
+            } else {
+                throw e;
+            }
+        }
     }
 
     deleteNote(noteId) {

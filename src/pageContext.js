@@ -10,7 +10,6 @@ class PageContext {
         if (!!PageContext.instance) { throw new Error('Use singleton instance'); }
     }
 
-    _note = new Note();
     get note() { return this._note; }
     setNote(note) { // note should be an instance of `Note`
         this._note = note;
