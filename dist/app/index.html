@@ -422,6 +422,16 @@ table:not(.table) {
     float: right;
 }
 
+.btn-link {
+    padding: 0px;
+    text-decoration: underline;
+    color: rgba(var(--bs-link-color-rgb),var(--bs-link-opacity,1));
+}
+.btn-link:hover {
+    color: var(--bs-link-hover-color);
+    text-decoration: underline;
+}
+
 
 
 </style>
@@ -555,7 +565,7 @@ table:not(.table) {
                 <span id='noteDetailsOpenInHabla'>&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" target="_blank">Habla News</a><br /></span>
                 <span id='noteDetailsOpenInHighlighter'>&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" target="_blank">Highlighter</a><br /></span>
                 <span id='noteDetailsOpenInWikifreedia'>&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" target="_blank">Wikifreedia</a><br /></span>
-                &nbsp;&nbsp;&nbsp;&nbsp;<a href="#" id='openRawEventLink' data-id='' onclick="openRawEventModal()">View Raw Event</a>
+                &nbsp;&nbsp;&nbsp;&nbsp;<button id='openRawEventLink' class='btn btn-link' data-id='' onclick="openRawEventModal()">View Raw Event</button>
               </div>
               <div class="col-6">
                 <h3>Found on Relays</h3>
@@ -680,24 +690,22 @@ table:not(.table) {
           <h1 class="modal-title fs-5" id="keyEntryModalLabel">Connect</h1>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <form class="form-inline" action="#">
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-12">
-                        <p>Looks like you don't have a key vault available. You can login by using a passphrase below, but for the most secure experience we recommend installing the <a href="https://www.getflamingo.org/" target="_blank">Flamingo</a> or <a href="https://chrome.google.com/webstore/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp" target="_blank">nos2x</a> browser extension (and then refresh this page).</p>
-                        <p>Be sure to choose a strong and <strong>unique</strong> Passphrase</p>
-                    </div>
-                </div>
-                <div class="row">
-                    <div clas="col-12">
-                        <input type="password" id="pass-phrase" class="form-control mr-sm-2" type="search" placeholder="Passphrase" aria-label="PassPhrase" style="margin-top: 7px" />
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <input type="submit" id="connectWithPassPhraseButton" class="btn" value="Login" />
-            </div>
-        </form>
+          <div class="modal-body">
+              <div class="row">
+                  <div class="col-12">
+                      <p>Looks like you don't have a key vault available. You can login by using a passphrase below, but for the most secure experience we recommend installing the <a href="https://www.getflamingo.org/" target="_blank">Flamingo</a> or <a href="https://chrome.google.com/webstore/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp" target="_blank">nos2x</a> browser extension (and then refresh this page).</p>
+                      <p>Be sure to choose a strong and <strong>unique</strong> Passphrase</p>
+                  </div>
+              </div>
+              <div class="row">
+                  <div clas="col-12">
+                      <input type="password" id="pass-phrase" class="form-control mr-sm-2" type="search" placeholder="Passphrase" aria-label="PassPhrase" style="margin-top: 7px" />
+                  </div>
+              </div>
+          </div>
+          <div class="modal-footer">
+              <button id="connectWithPassPhraseButton" class="btn" value="Login">Login</button>
+          </div>
       </div>
     </div>
 </div>
@@ -723,7 +731,6 @@ table:not(.table) {
             </div>
 
             <div id="settings-page-relays" class="settings-page col-9">
-                <form class="form-inline" action="#">
                     <div class="modal-body">
                         <div class="row" style="margin-bottom: 40px">
                             <div class="col-12">
@@ -738,7 +745,7 @@ table:not(.table) {
                                 <input class="form-control" type="text" placeholder="wss://" id="new-relay-url" />
                             </div>
                             <div class="col-2">
-                                <input type="submit" class="btn" value="Add" onclick="addRelayFromInput()" />
+                                <button class="btn" value="Add" onclick="addRelayFromInput()">Add</button>
                             </div>
                         </div>
 
@@ -756,70 +763,65 @@ table:not(.table) {
                             </div>
                         </div>
                     </div>
-                </form>
             </div>
 
             <div id="settings-page-file-storage" class="settings-page col-9" style="display:none">
-                <form class="form-inline" action="#">
-                    <div class="modal-body">
-                        <div class="row" style="margin-bottom: 40px">
-                            <div class="col-12">
-                                <h2>File Storage</h2>
-                                These servers store your images, video, and other files. For now, only Blossom is supported, but nip96 is coming soon.
-                            </div>
-                        </div>
-
-                        <div class="row" style="margin-bottom: 40px">
-                            <h4>Upload Protocol</h4>
-                            <div class="col-12">
-                                <select class="form-select form-select-lg mb-3">
-                                  <option selected value="blossom">Blossom</option>
-                                  <option value="nip96" disabled>nip96 (coming soon)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="row" style="margin-bottom: 40px">
-                            <h4>Add Blossom Server</h4>
-                            <div class="col-10">
-                                <input class="form-control" type="text" placeholder="https://" id="new-file-server-url" />
-                            </div>
-                            <div class="col-2">
-                                <input type="submit" class="btn" value="Add" onclick="addBlossomServerFromInput()" />
-                            </div>
-                        </div>
-
-                        <div class="row" style="margin-bottom: 40px">
-                            <h4>My Blossom Servers</h4>
-                            <div clas="col-12" id="my-file-servers">
-                                <i class="fa fa-spinner"></i> loading...
-                            </div>
+                <div class="modal-body">
+                    <div class="row" style="margin-bottom: 40px">
+                        <div class="col-12">
+                            <h2>File Storage</h2>
+                            These servers store your images, video, and other files. For now, only Blossom is supported, but nip96 is coming soon.
                         </div>
                     </div>
-                </form>
+
+                    <div class="row" style="margin-bottom: 40px">
+                        <h4>Upload Protocol</h4>
+                        <div class="col-12">
+                            <select class="form-select form-select-lg mb-3">
+                              <option selected value="blossom">Blossom</option>
+                              <option value="nip96" disabled>nip96 (coming soon)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-bottom: 40px">
+                        <h4>Add Blossom Server</h4>
+                        <div class="col-10">
+                            <input class="form-control" type="text" placeholder="https://" id="new-file-server-url" />
+                        </div>
+                        <div class="col-2">
+                            <button class="btn" value="Add" onclick="addBlossomServerFromInput()">Add</button>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-bottom: 40px">
+                        <h4>My Blossom Servers</h4>
+                        <div clas="col-12" id="my-file-servers">
+                            <i class="fa fa-spinner"></i> loading...
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="settings-page-editor-preferences" class="settings-page col-9" style="display:none">
-                <form class="form-inline">
-                    <div class="modal-body">
-                        <div class="row">
-                            <h3>Editor Preferences</h3>
-                            <div clas="col-12">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-spellcheck">
-                                    <label class="form-check-label" for="editor-prefs-spellcheck">Spellcheck Highlighting</label>
-                                </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-aggressive-delete">
-                                    <label class="form-check-label" for="editor-prefs-aggressive-delete">Aggressive Delete <small>(experimental - empty out note content before deleting)</small></label>
-                                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <h3>Editor Preferences</h3>
+                        <div clas="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-spellcheck">
+                                <label class="form-check-label" for="editor-prefs-spellcheck">Spellcheck Highlighting</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="editor-prefs-aggressive-delete">
+                                <label class="form-check-label" for="editor-prefs-aggressive-delete">Aggressive Delete <small>(experimental - empty out note content before deleting)</small></label>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <input type="submit" class="btn" value="Save" onclick="savePreferences()" />
-                    </div>
-                </form>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn" value="Save" onclick="savePreferences()">Save</button>
+                </div>
             </div>
 
             <div id="settings-page-dns-link" class="settings-page col-9" style="display:none">
