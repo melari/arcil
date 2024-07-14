@@ -12948,8 +12948,8 @@ async function browseNoteFromUrl() {
 }
 window.browseNoteFromUrl = browseNoteFromUrl;
 
-async function navigateToNote(identifier, title) {
-    const url = window.router.urlFor(Router.BROWSER, `${identifier}?title=${title}`);
+async function navigateToNote(identifier) {
+    const url = window.router.urlFor(Router.BROWSER, identifier);
     const state = { identifier }
     history.pushState(state, '', url);
     await window.router.route();
@@ -12967,14 +12967,14 @@ async function browseNote(identifier) {
   _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvent(filters).then(async (event) => {
       if (!!event) {
           if (!!event.tags.find(t => t[0] === "private") && event.pubkey !== window.nostrUser?.hexpubkey) {
-              PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('', '### ❌ This note is private and cannot be decrypted.'));
+              PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('private', '403', '### ❌ This note is private and cannot be decrypted.'));
               return;
           }
           await PageContext.instance.setNoteByNostrEvent(event);
           const aTags = event.tags.filter(t => t[0] === 'a').map(t => t[1]);
           const filters = {
               authors: [event.pubkey],
-              kinds: [30023, 31234],
+              kinds: _note_js__WEBPACK_IMPORTED_MODULE_1__.Note.ALL_KINDS,
               "#d": aTags.map(t => t.split(':')[2])
           }
           _relay_js__WEBPACK_IMPORTED_MODULE_2__/* .Relay */ .Z.instance.fetchEvents(filters);
@@ -12982,12 +12982,12 @@ async function browseNote(identifier) {
           const stubTitle = PageContext.instance.noteTitleFromUrl();
           if (!!PageContext.instance.noteIdentifierFromUrl()) {
               if (stubTitle) {
-                  PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent(stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet.`));
+                  PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('topic', stubTitle, `# ${stubTitle}\n\n⚠️ This note is a stub and does not exist yet.`));
               } else {
-                  PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
+                  PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('topic', '404', "# Note Not Found!\n\nEither this version of the note no longer exists or it's on a different nostr relay."));
               }
           } else {
-              PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
+              PageContext.instance.setNote(_note_js__WEBPACK_IMPORTED_MODULE_1__.Note.fromContent('topic', 'homepage', `# ${window.location.hostname}\n\nTo create a homepage for your digital garden, create a note with the title \`homepage\`.`));
           }
       }
   });
@@ -12995,19 +12995,19 @@ async function browseNote(identifier) {
 window.browseNote = browseNote;
 
 function openNoteInEditor() {
-  const stubTitle = PageContext.instance.note.title;
   if (PageContext.instance.noteIdentifierFromUrl()) {
-    window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}?title=${stubTitle}`);
+    window.location.href = window.router.urlFor(Router.EDITOR, `${PageContext.instance.noteIdentifierFromUrl()}`);
   } else {
-    window.location.href = window.router.urlFor(Router.EDITOR, `?title=${stubTitle}`);
+    window.location.href = window.router.urlFor(Router.EDITOR);
   }
 }
 window.openNoteInEditor = openNoteInEditor;
 
 function renderDynamicContent() {
+    if (window.router.pageName !== Router.BROWSER) { return; }
     $("a[href='#tagayasu-prefetch']").off('click.navigate');
     $("a[href='#tagayasu-prefetch']").on('click.navigate', (e) => {
-        navigateToNote(e.target.title, e.target.innerText);
+        navigateToNote(e.target.title);
         return false; // block navigation
     });
 
@@ -13027,8 +13027,9 @@ function renderDynamicContent() {
 window.renderDynamicContent = renderDynamicContent;
 
 // When the browser back button is pressed
-window.addEventListener('popstate', (event) => {
-    browseNote(event.state?.identifier);
+window.addEventListener('popstate', async (event) => {
+    await window.router.route();
+    browseNoteFromUrl();
 });
 
 
@@ -13044,17 +13045,19 @@ __webpack_require__.d(__webpack_exports__, {
   Mf: () => (/* binding */ atagFor),
   Gk: () => (/* binding */ decryptSelf),
   gw: () => (/* binding */ delay),
+  D3: () => (/* binding */ draftDtagFor),
   oF: () => (/* binding */ dtagFor),
   DE: () => (/* binding */ encryptSelf),
   zs: () => (/* binding */ ensureConnected),
   lD: () => (/* binding */ ensureReadonlyConnected),
   t4: () => (/* binding */ handleFor),
+  vK: () => (/* binding */ naddrFor),
   YX: () => (/* binding */ noteFilterFromIdentifier),
   e0: () => (/* binding */ npubToHexpubkey),
   Ti: () => (/* binding */ toggleConnect)
 });
 
-// UNUSED EXPORTS: NIP33_A_REGEX, filterFromId, naddrFor, shortHash
+// UNUSED EXPORTS: NIP33_A_REGEX, filterFromId, shortHash
 
 // NAMESPACE OBJECT: ./node_modules/nostr-tools/node_modules/@noble/curves/esm/abstract/utils.js
 var abstract_utils_namespaceObject = {};
@@ -19841,7 +19844,10 @@ async function validateEvent2(event, url, method, body) {
 
 // EXTERNAL MODULE: ./src/error.js
 var error = __webpack_require__(2171);
+// EXTERNAL MODULE: ./src/note.js
+var note = __webpack_require__(3797);
 ;// CONCATENATED MODULE: ./src/common.js
+
 
 
 
@@ -20032,28 +20038,32 @@ function connectNostrViaPassphrase() {
 }
 
 function dtagFor(title) {
-  return `tagayasu-${common_crypto.SHA256(title.toLowerCase())}`;
+  return title.toLowerCase().replace(/\W/g, '-');
 }
 
-function handleFor(title, hexpubkey) {
+function draftDtagFor(title) {
+  return shortHash(dtagFor(title));
+}
+
+function handleFor(kind, title, hexpubkey) {
   const dnslinkHexpubkey = PageContext.instance.dnslinkHexpubkey();
   if (dnslinkHexpubkey === hexpubkey) {
-    return title.replace(/ /g, "-");
+    return dtagFor(title);
   } else {
-    return naddrFor(title, hexpubkey);
+    return naddrFor(kind, title, hexpubkey);
   }
 }
 
-function naddrFor(title, hexpubkey) {
+function naddrFor(kind, title, hexpubkey) {
   const event = new dist/* NDKEvent */._C(window.ndk);
-  event.kind = 30023;
+  event.kind = kind;
   event.pubkey = hexpubkey;
   event.tags = [["d", dtagFor(title)]];
   return event.encode();
 }
 
-function atagFor(title, hexpubkey) {
-  return `30023:${hexpubkey}:${dtagFor(title)}`
+function atagFor(kind, title, hexpubkey) {
+  return `${kind}:${hexpubkey}:${dtagFor(title)}`
 }
 
 async function encryptSelf(text) {
@@ -20102,20 +20112,22 @@ function noteFilterFromIdentifier(explicitIdentifier) {
     if (!explicitIdentifier) {
         return {
             authors: [hexpubkey],
-            kinds: [30023, 31234],
+            kinds: note.Note.ALL_KINDS,
             "#d": [dtagFor("homepage")]
         };
     }
 
     const potentialFilter = filterFromId(explicitIdentifier);
-    if (!potentialFilter.kinds || potentialFilter.kinds == [30023]) { potentialFilter.kinds = [30023, 31234]; }
+    if (!potentialFilter.kinds || note.Note.ALL_KINDS.includes(potentialFilter.kinds[0])) { potentialFilter.kinds = note.Note.ALL_KINDS; }
     if (!!potentialFilter["#d"]) { return potentialFilter; }
     if (!hexpubkey) { return null; }
 
+    const title = potentialFilter.ids[0].replace(/-/g, ' ')
+
     return {
         authors: [hexpubkey],
-        kinds: [30023, 31234],
-        "#d": [dtagFor(potentialFilter.ids[0].replace(/-/g, ' '))]
+        kinds: note.Note.ALL_KINDS,
+        "#d": [dtagFor(title), draftDtagFor(title)]
     };
 }
 
@@ -20249,7 +20261,9 @@ function showPending(message) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
+/* harmony import */ var _note_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3797);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(308);
+
 
 
 class MarkdownRenderer {
@@ -20271,17 +20285,18 @@ class MarkdownRenderer {
             const match = src.match(/^\[\[([^\]\n]+)\]\]/);
             if (match) {
                 this.lexer.state.inLink = true;
-                const handle = (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .handleFor */ .t4)(match[1], PageContext.instance.note.authorPubkey);
+                const handle = (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .handleFor */ .t4)(_note_js__WEBPACK_IMPORTED_MODULE_0__.Note.SOME_KIND, match[1], PageContext.instance.note.authorPubkey);
                 const token = {
                     type: 'link',
                     raw: match[0],
-                    href: '#tagayasu-prefetch', // `javascript:browseNote('${handle}')`, //window.router.urlFor(Router.BROWSER, `${handle}?title=${match[1]}`),
+                    href: '#tagayasu-prefetch',
                     title: handle,
                     text: match[1],
                     tokens: this.lexer.inlineTokens(match[1])
                 }
                 this.lexer.state.inLink = false;
-                window._backrefs.push((0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .atagFor */ .Mf)(match[1], PageContext.instance.note.authorPubkey));
+                window._backrefs.push((0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .atagFor */ .Mf)(_note_js__WEBPACK_IMPORTED_MODULE_0__.Note.ARTICLE_KIND, match[1], PageContext.instance.note.authorPubkey));
+                window._backrefs.push((0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .atagFor */ .Mf)(_note_js__WEBPACK_IMPORTED_MODULE_0__.Note.TOPIC_KIND, match[1], PageContext.instance.note.authorPubkey));
                 return token;
             }
             return false;
@@ -20337,15 +20352,47 @@ function updateStats() {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   Note: () => (/* binding */ Note)
+/* harmony export */   Note: () => (/* binding */ Note),
+/* harmony export */   NoteValidationError: () => (/* binding */ NoteValidationError)
 /* harmony export */ });
 /* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(308);
+/* harmony import */ var _relay_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3894);
 
 
+
+class NoteValidationError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "NoteValidationError";
+    }
+}
+
+// There are 3 types of Tagayasu notes, which can be in 5 different save states.
+// They can be differentiated by a combination of their kind + the "private" tag.
+//
+// 1) Topic           (type: topic)   | kind: 30818         private: F  draft: F
+// 2) Draft Topic     (type: topic)   | kind: 31234(30818)  private: F  draft: T
+// 3) Article         (type: article) | kind: 30023         private: F  draft: F
+// 4) Draft Article   (type: article) | kind: 31234(30023)  private: F  draft: T
+// 5) Private Article (type: private) | kind: 31234(30023)  private: T  draft: T
 class Note {
+    static TOPIC = 'topic';
+    static ARTICLE = 'article';
+    static PRIVATE = 'private';
+
+    static DRAFT_KIND = 31234;
+    static ARTICLE_KIND = 30023;
+    static TOPIC_KIND = 30818;
+    static ALL_KINDS = [
+        Note.DRAFT_KIND,
+        Note.ARTICLE_KIND,
+        Note.TOPIC_KIND,
+    ];
+    static SOME_KIND = Note.ARTICLE_KIND;
+
     static async fromNostrEvent(event) {
         const nostrEvent =
-            event.kind === 31234
+            event.kind === Note.DRAFT_KIND
                 ? JSON.parse(await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .decryptSelf */ .Gk)(event.content))
                 : event.rawEvent();
 
@@ -20353,36 +20400,101 @@ class Note {
         note.id = nostrEvent.id;
         note.nostrEvent = nostrEvent;
         note.title = nostrEvent.tags.find(t => t[0] == "title")[1];
-        note.private = event.kind === 31234;
         note.content = nostrEvent.content;
         note.authorPubkey = nostrEvent.pubkey;
         note.createdAt = nostrEvent.created_at ?? event.created_at;
         note.onRelays = [];
 
+        const hasPrivateTag = !!(nostrEvent.tags.find(t => t[0] == "private")?.[1]);
+        note.draft   = event.kind === Note.DRAFT_KIND;
+        note.private = event.kind === Note.DRAFT_KIND && hasPrivateTag;
+        note.kind = nostrEvent.kind;
+
+        note.validate();
         return note;
     }
 
-    static fromContent(title, content) {
+    static fromContent(type, title, content) {
         const note = new Note();
         note.title = title;
         note.content = content;
-        note.private = false;
         note.onRelays = [];
+        note.draft = false;
+        note.private = false;
+
+        if (type === Note.ARTICLE) {
+            note.kind = Note.ARTICLE_KIND;
+        } else if (type === Note.TOPIC) {
+            note.kind = Note.TOPIC_KIND;
+        } else if (type === Note.PRIVATE) {
+            note.kind = Note.ARTICLE_KIND;
+            note.private = true;
+            note.draft = true;
+        }
+
+        note.validate();
         return note;
     }
 
+    get type() {
+        this.validate();
+        if (this.kind === Note.TOPIC_KIND) { return Note.TOPIC; }
+        if (this.private) { return Note.PRIVATE; }
+        return Note.ARTICLE;
+    }
+
+    validate() {
+        if (!this.title || this.title === '') {
+            throw new NoteValidationError("Must have a title");
+        }
+
+        if (![Note.TOPIC_KIND, Note.ARTICLE_KIND].includes(this.kind)) {
+            throw new NoteValidationError("Note must be one of TOPIC or ARTICLE");
+        }
+
+        if (this.kind === Note.TOPIC_KIND && this.private) {
+            throw new NoteValidationError("Note may not be TOPIC and PRIVATE");
+        }
+
+        if (this.private && !this.draft) {
+            throw new NoteValidationError("Private notes may only be drafts");
+        }
+    }
+
+    // Applies an update to the note.
+    // opts is an object with optional keys for:
+    // title, private, content
+    // Any excluded key will not be modified
+    // Any update will bump the createdAt timestamp to the current time.
+    update(opts) {
+        this.title = opts.title ?? this.title;
+        this.private = opts.private ?? this.private;
+        this.draft = opts.draft ?? this.draft;
+        this.kind = opts.kind ?? this.kind;
+        this.content = opts.content ?? this.content;
+        this.createdAt = Math.floor(Date.now() / 1000);
+
+        this.validate();
+    }
+
     get handle() {
-        return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .handleFor */ .t4)(this.title, this.authorPubkey);
+        return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .handleFor */ .t4)(this.kind, this.title, this.authorPubkey);
     }
 
     get dtag() {
         return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .dtagFor */ .oF)(this.title);
     }
 
+    get draftDtag() {
+        return (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .draftDtagFor */ .D3)(this.title);
+    }
+
     toPlain() {
         return {
             id: this.id,
             private: this.private,
+            draft: this.draft,
+            kind: this.kind,
             title: this.title,
             content: this.content,
             pubkey: this.authorPubkey,
@@ -20394,13 +20506,40 @@ class Note {
         const note = new Note();
         note.id = plain.id;
         note.private = plain.private;
+        note.draft = plain.draft;
+        note.kind = plain.kind;
         note.authorPubkey = plain.pubkey;
         note.content = plain.content;
         note.title = plain.title;
         note.createdAt = plain.createdAt;
         note.onRelays = [];
 
+        note.validate();
         return note;
+    }
+
+    async toNostrEvent(extraTags = []) {
+        this.validate();
+
+        const tags = [
+            ["d", this.dtag],
+            ["title", this.title],
+            ["published_at", this.createdAt.toString()],
+            ...(this.private ? [["private", "true"]] : []),
+            ...extraTags,
+        ];
+        const publicEvent = _relay_js__WEBPACK_IMPORTED_MODULE_1__/* .Relay */ .Z.instance.buildEvent(this.kind, this.content, tags, this.authorPubkey);
+
+        if (this.private || this.draft) {
+            const payload = await (0,_common_js__WEBPACK_IMPORTED_MODULE_0__/* .encryptSelf */ .DE)(JSON.stringify(publicEvent.rawEvent()));
+            const wrapperTags = [
+                ['d', this.draftDtag],
+                ['k', this.kind.toString()],
+            ];
+            return _relay_js__WEBPACK_IMPORTED_MODULE_1__/* .Relay */ .Z.instance.buildEvent(Note.DRAFT_KIND, payload, wrapperTags, this.authorPubkey);
+        } else {
+            return publicEvent;
+        }
     }
 }
 
@@ -20426,7 +20565,6 @@ class PageContext {
         if (!!PageContext.instance) { throw new Error('Use singleton instance'); }
     }
 
-    _note = new _note_js__WEBPACK_IMPORTED_MODULE_1__.Note();
     get note() { return this._note; }
     setNote(note) { // note should be an instance of `Note`
         this._note = note;
@@ -20498,7 +20636,7 @@ class Preferences {
 
     static DEFAULTS = {
         spellCheckEnabled: false,
-        aggressiveDelete: true,
+        aggressiveDelete: false,
     }
     current = Preferences.DEFAULTS;
 
@@ -20705,18 +20843,23 @@ class Relay {
     // filters are supported. The expectation is to have:
     // - EXACTLY ONE hexpubkey
     // - ONE OR MORE kind
-    // - EXACTLY ONE of:
+    // - EXACTLY ONE type of tag:
     //   - "#d" tag
     //   - other tag in INDEXED_TAGS
+    // - ONE OR MORE values for the tag
     //
-    // Performance: there will be one index lookup PER kind.
-    // 
     // Example structure of nostr filter:
     // {
-    //   #d: ['value'],
+    //   #d: ['value', 'sha1234abcd'],
     //   authors: ['hexpubkey'],
     //   kinds: [30023, 31234]
     // }
+    //
+    // Performance: there will be one index lookup PER kind/tag pair
+    // For the above example, we will 4 lookups:
+    // [['value', 30023], ['value', 31234], ['sha1234abcd', 30023], ['sha1234abcd', 31234]]
+    //
+    // TODO: support conjunctive normal form to reduce lookups
     readByFilter(filter) {
         const supportedTags = ['#d', ...Relay.INDEXED_TAGS.map(t => `#${t}`)];
         const tagsGiven = supportedTags.filter(t => !!filter[t]);
@@ -20726,15 +20869,18 @@ class Relay {
 
         const tagToUse = tagsGiven[0];
 
-        if (filter.authors.length > 1 || filter[tagToUse].length > 1) {
+        if (filter.authors.length > 1) {
             return new Set();
         }
 
         const hexpubkey = filter.authors[0];
         const tagKind = tagToUse.slice(1);
-        const tagValue = filter[tagToUse][0];
+        const tagValues = filter[tagToUse];
+        const kinds = filter.kinds;
 
-        return filter.kinds.reduce((acc, kind) => {
+        const searchBranches = tagValues.flatMap(tagValue => kinds.map(kind => ({tagValue, kind})));
+
+        return searchBranches.reduce((acc, { tagValue, kind }) => {
             const result = tagToUse === '#d'
                 ? this.readPrimaryIndex(kind, hexpubkey, tagValue)
                 : this.readTagIndex(kind, hexpubkey, tagKind, tagValue);
@@ -21000,6 +21146,7 @@ const Trie = __webpack_require__(9372);
  *  if the notes are dropped by all relays.
  */
 class Database {
+    // Map of noteId => Note class
     notes = {};
     noteTitleTrie = new Trie();
 
@@ -21043,15 +21190,37 @@ class Database {
     }
 
     async addFromNostrEvent(event) {
-        const note = await src_note.Note.fromNostrEvent(event);
-        if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
-        this.addNote(note);
+        try {
+            const note = await src_note.Note.fromNostrEvent(event);
+            if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
+            this.addNote(note);
+            this.pushStateToLocalStorage(window.nostrUser.npub);
+            return note;
+        } catch(e) {
+            if (e instanceof src_note.NoteValidationError) {
+                console.warn("Discarding event because it failed validation", { 
+                  reason: e.message,
+                  event
+                });
+                return null;
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    deleteNote(noteId) {
+        if (!this.notes[noteId]) { return; }
+        delete this.notes[noteId];
         this.pushStateToLocalStorage(window.nostrUser.npub);
-        return note;
     }
 
     addNote(note) {
-        if (this.notes[note.id]) { return; }
+        const existing = this.notes[note.id];
+        if (existing) {
+            if (!existing.nostrEvent) { existing.nostrEvent = note.nostrEvent; }
+            return;
+        }
 
         this.notes[note.id] = note;
         note.title.split(" ").forEach(word =>
@@ -21123,7 +21292,8 @@ $(window).on('DOMContentLoaded', async function () {
     await window.trySeamlessConnection().catch(() => { });
 
     if (window.router.pageName == "editor") {
-        window.loadNote();
+        loadNote();
+        fetchNotes();
     } else if (window.router.pageName == "browser") {
         window.browseNoteFromUrl();
     }
@@ -21133,39 +21303,34 @@ $(window).on('DOMContentLoaded', async function () {
 
 function startAutoSave() {
     setInterval(() => {
-        localStorage.setItem('autosave', JSON.stringify({
-            title: $("#note-title").val(),
-            content: window.MDEditor.value()
-        }));
+        if (!!PageContext.instance.note) {
+          localStorage.setItem('autosave', JSON.stringify({
+              type: PageContext.instance.note.type,
+              title: PageContext.instance.note.title,
+              content: window.MDEditor.value()
+          }));
+        }
     }, 1000 * 1);
 }
 
-function restoreAutoSave() {
+function fetchAutoSave() {
     const autosave = localStorage.getItem('autosave');
     if (!autosave) { return; }
+    return JSON.parse(autosave);
+}
 
-    const parsed = JSON.parse(autosave);
-    newNote(parsed.title, parsed.content);
+function restoreAutoSave() {
+    const details = fetchAutoSave();
+    newNote(details.type, details.title, details.content);
 }
 
 // Connect UI button
 function connectWallet() {
     (0,common/* toggleConnect */.Ti)().then(() => {
-        if (window.nip07signer && window.router.pageName === Router.EDITOR) { showMyNotes(); }
+        if (window.nip07signer && window.router.pageName === Router.EDITOR) { fetchNotes(); }
     })
 }
 window.connectWallet = connectWallet;
-
-function showMyNotes() {
-    $("#notes-list").empty();
-    (0,common/* ensureConnected */.zs)().then(() => {
-        window.notesModal = new bootstrap.Modal('#myNotesModal', {});
-        window.notesModal.show();
-        $("#note-search-box").focus();
-        fetchNotes();
-    })
-}
-window.showMyNotes = showMyNotes;
 
 function showSettings() {
     window.settingsModal = new bootstrap.Modal('#settingsModal', {});
@@ -21190,7 +21355,8 @@ window.showPublishModal = showPublishModal;
 
 async function fetchNotes() {
     searchNotes(); // show the notes we have in memory already, if any.
-    const filter = { authors: [window.nostrUser.hexpubkey], kinds: [30023, 31234] }
+    if (!window.nostrUser?.hexpubkey) { return }
+    const filter = { authors: [window.nostrUser.hexpubkey], kinds: src_note.Note.ALL_KINDS }
 
     const subscription = await relay/* Relay */.Z.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
@@ -21219,11 +21385,10 @@ async function fetchNotes() {
 }
 
 // Load the note into the editor given by params
-function loadNote() {
+async function loadNote() {
     if (!PageContext.instance.noteIdentifierFromUrl()) {
-        if (!!localStorage.getItem('autosave')) { return restoreAutoSave(); }
-        else if (!!window.nip07signer) { return showMyNotes(); }
-        else { return newNote('', INTRO_TEXT); }
+        if (!!fetchAutoSave()?.content) { return restoreAutoSave(); }
+        else { return newNote('topic', 'homepage', INTRO_TEXT); }
     }
 
     (0,common/* ensureConnected */.zs)().then(async () => {
@@ -21236,7 +21401,7 @@ function loadNote() {
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
-                newNote(title, `# ${title}`);
+                newNote('topic', title, `# ${title}`);
             }
         });
     });
@@ -21258,73 +21423,212 @@ function colorForRelay(str) {
 
 function searchNotes() {
     if (!Database.instance.hasSearchableEntries()) {
-        $("#notes-list").html("<div class='col-lg-12'>Looks like you don't have any notes yet.<br />Click \"new note\" to start your digital garden! 🌱</div>");
         return;
     }
 
     let notesListContent = "";
-    window.tooltipList.forEach(tooltip => tooltip.dispose());
 
     const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" ").filter(x => !!x));
 
-    let notesDisplayed = 0;
     sorted.forEach(function (noteId) {
         const note = Database.instance.getNote(noteId);
         if (!note) { return; }
-        if (notesDisplayed > 20) { return; }
-        let noteRelays = "";
-        for (const relay of note.onRelays) {
-            const color = colorForRelay(relay.url);
-            noteRelays += `<div class="relay-indicator" style="background-color:#${color}" data-bs-toggle="tooltip" data-bs-title="${relay.url}">&nbsp;</div>`;
-        }
-        const privateIndicator = note.private ? "<i class='fa fa-solid fa-eye-slash'></i>" : "<i class='fa fa-cookie' style='width:16px'></i>";
-        notesListContent += "<button class='list-group-item list-group-item-action note-list-button' onclick=\"editNote('" + note.id + "')\"><div>" + privateIndicator + "&nbsp;" + note.title + "</div><div>" + noteRelays + "</div></button>";
-        notesDisplayed++;
+        const relayCount = note.onRelays.length;
+        const health = relayCount >= 4
+            ? 'health-good'
+            : relayCount >= 2
+            ? 'health-med'
+            : 'health-bad';
+
+        const noteType = note.type;
+        const noteIcon = note.title === 'homepage'
+            ? "<i class='fa fa-solid fa-home'></i>"
+            : noteType === src_note.Note.PRIVATE
+            ? "<i class='fa fa-solid fa-eye-slash'></i>"
+            : noteType === src_note.Note.TOPIC
+            ? "<i class='fa fa-leaf'></i>"
+            : noteType === src_note.Note.ARTICLE
+            ? "<i class='fa fa-bullhorn'></i>"
+            : "<i class='fa fa-cookie' style='width:16px'></i>";
+
+        const isDraftOnly = note.draft && !note.private;
+        const preTitle = isDraftOnly ? '<i>draft: ' : '';
+        const postTitle = isDraftOnly ? '</i>' : '';
+
+        notesListContent += `
+            <div class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.id}')">
+                <div class='note-list-title'>${noteIcon}&nbsp;${preTitle}${note.title}${postTitle}</div>
+                <i id='note-more-${note.id}' class='fa fa-solid fa-gears note-more' onclick="showNoteOptions(event, '${note.id}'); return true;"></i>
+                </div>
+            </div>
+        `;
     });
 
     $("#notes-list").html(notesListContent);
-    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    window.tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
 window.searchNotes = searchNotes;
-window.tooltipList = [];
+
+function showNoteOptions(event, noteId) {
+    const note = Database.instance.getNote(noteId);
+    $('#noteDetailsTitle').text(note.title);
+
+    const id = note.id;
+    const idPreview = id.slice(0, 4) + "…" + id.slice(id.length-4, id.length) + " <i class='fa fa-copy'></i>";
+    $('#noteDetailsId').html(idPreview);
+    $('#noteDetailsId').data('id', id);
+    $('#openRawEventLink').data('id', id);
+
+    const naddr = (0,common/* naddrFor */.vK)(note.kind, note.title, window.nostrUser.hexpubkey);
+    const naddrPreview = naddr.slice(0,10) + "…" + naddr.slice(naddr.length-5, naddr.length) + " <i class='fa fa-copy'></i>";
+    $('#noteDetailsNaddr').html(naddrPreview);
+    $('#noteDetailsNaddr').data('naddr', naddr);
+
+    $('#noteDetailsOpenInTagayasu a').attr('href', window.router.urlFor(Router.BROWSER, note.handle));
+
+    $('#noteDetailsOpenInHabla').hide();
+    $('#noteDetailsOpenInHighlighter').hide();
+    $('#noteDetailsOpenInWikifreedia').hide();
+  
+    const noteType = note.type;
+    if (noteType === src_note.Note.ARTICLE) {
+        $('#noteDetailsOpenInHabla a').attr('href', `https://habla.news/a/${naddr}`);
+        $('#noteDetailsOpenInHighlighter a').attr('href', `https://highlighter.com/a/${naddr}`);
+        $('#noteDetailsOpenInHabla').show();
+        $('#noteDetailsOpenInHighlighter').show();
+    } else if (noteType === src_note.Note.TOPIC) {
+        $('#noteDetailsOpenInWikifreedia a').attr('href', `https://wikifreedia.xyz/${note.dtag}/${window.nostrUser.npub}`);
+        $('#noteDetailsOpenInWikifreedia').show();
+    }
+
+    $('#noteDetailsDelete').data('note-id', noteId);
+
+    let relayDetails = '<ul>';
+    note.onRelays.forEach(relay => {
+        relayDetails += `<li>${relay.url}</li>`;
+    });
+    relayDetails += '</ul>';
+    $('#noteDetailsRelays').html(relayDetails);
+
+    const publishedAt = new Date(note.createdAt * 1000).toLocaleString();
+    $('#noteDetailsDate').text(publishedAt);
+
+    window.noteDetailsModal = new bootstrap.Modal('#note-details-modal', {});
+    window.noteDetailsModal.show();
+    if (!!event) { event.stopPropagation(); }
+}
+window.showNoteOptions = showNoteOptions;
+
+function openRawEventModal() {
+    if (!!window.noteDetailsModal) { window.noteDetailsModal.hide(); }
+    const noteId = $('#openRawEventLink').data('id');
+    const note = Database.instance.getNote(noteId);
+    $('#raw-event').val(JSON.stringify(note.nostrEvent, null, 4));
+
+    window.rawEventModal = new bootstrap.Modal('#raw-event-modal', {});
+    window.rawEventModal.show();
+}
+window.openRawEventModal = openRawEventModal;
+
+function showCurrentNoteOptions() {
+    const noteId = PageContext.instance.note.id;
+    if (noteId) { showNoteOptions(undefined, noteId); }
+}
+window.showCurrentNoteOptions = showCurrentNoteOptions;
+
+function copyNaddr() {
+    navigator.clipboard.writeText($('#noteDetailsNaddr').data('naddr'));
+    (0,error/* showNotice */.s6)('copied naddr to clipboard');
+}
+window.copyNaddr = copyNaddr;
+
+function copyNoteId() {
+    navigator.clipboard.writeText($('#noteDetailsId').data('id'));
+    (0,error/* showNotice */.s6)('copied ID to clipboard');
+}
+window.copyNoteId = copyNoteId;
 
 async function editNote(noteId) {
     PageContext.instance.setNote(Database.instance.getNote(noteId));
 }
 window.editNote = editNote
 
-function newNote(title = "", content = "") {
+let sidebarOpen = true;
+async function toggleSidebar() {
+    if (sidebarOpen === null) { return; } // transition in progress
+
+    const newState = !sidebarOpen;
+    sidebarOpen = null;
+
+    // should equal the css transition timing
+    const transitionTime = 300;
+
+    if (newState) {
+        $('#sidebar').width('revert-layer');
+        $('.notes-editor').width('revert-layer');
+        $('#notes-list').width('revert-layer');
+        $('#notes-list').css('opacity', 'revert-layer');
+        $('#search-bar').width('revert-layer');
+        $('#search-bar').css('opacity', 'revert-layer');
+        $('.notes-header').css('flex-direction', 'revert-layer');
+        $('#show-current-note-options').hide();
+        $('#refresh-notes-list').show();
+    } else {
+        $('#sidebar').width('38px');
+        $('.notes-editor').width('calc(100% - 50px)');
+        $('#notes-list').css('opacity', '0');
+        $('#search-bar').css('opacity', '0');
+
+        setTimeout(() => {
+            $('.notes-header').css('flex-direction', 'column');
+            $('#notes-list').width('0px');
+            $('#search-bar').width('0px');
+            $('#show-current-note-options').show();
+            $('#refresh-notes-list').hide();
+        }, transitionTime - 50);
+    }
+
+    setTimeout(() => {
+        sidebarOpen = newState;
+    }, transitionTime);
+}
+window.toggleSidebar = toggleSidebar;
+
+function newNote(type, title = "", content = "") {
     if (!!window.notesModal) { window.notesModal.hide(); }
-    PageContext.instance.setNote(src_note.Note.fromContent(title, content));
+    PageContext.instance.setNote(src_note.Note.fromContent(type, title, content));
 }
 window.newNote = newNote;
 
 function deleteNote() {
-    if (!PageContext.instance.note.id) {
+    const noteId = $('#noteDetailsDelete').data('note-id');
+    if (!noteId) {
         (0,error/* showNotice */.s6)("Nothing to do! Note was never published.");
         return;
     }
 
-    if (!!window.publishModal) { window.publishModal.hide(); }
-    confirmAction("Are you sure you want to delete this note?").then(() => {
+    const note = Database.instance.getNote(noteId);
+
+    if (!!window.noteDetailsModal) { window.noteDetailsModal.hide(); }
+    confirmAction('Are you sure you want to delete this note?', `Title: ${note.title}`).then(async () => {
         (0,error/* showPending */.Si)("Deleting...");
 
-        const noteId = PageContext.instance.note.id;
+        if (noteId === PageContext.instance.note.id) {
+            window.MDEditor.value('');
+        }
 
         // If aggressiveDelete mode is enabled,
         // Save a new version with removed content to encourage clients not to show old versions of the note
         // Then, publish a kind-5 delete request to purge the event entirely
-        window.MDEditor.value('');
         if (Preferences.instance.current.aggressiveDelete) {
-            publishNote('Your note has been deleted').then(() => {
-                $("#note-title").val("");
-                relay/* Relay */.Z.instance.del(noteId);
-            });
-        } else {
-            $("#note-title").val("");
-            relay/* Relay */.Z.instance.del(noteId);
+            note.update({ content: '' });
+            const event = await note.toNostrEvent()
+            await relay/* Relay */.Z.instance.publish(event);
         }
+
+        await relay/* Relay */.Z.instance.del(noteId);
+        Database.instance.deleteNote(noteId);
+        (0,error/* showNotice */.s6)('Note has been deleted');
+        searchNotes();
     });
 }
 window.deleteNote = deleteNote;
@@ -21345,7 +21649,7 @@ window.saveNote = saveNote;
 
 async function publishNote(message) {
     return (0,common/* ensureConnected */.zs)().then(async () => {
-        const event = buildNoteFromEditor();
+        const event = await buildNoteFromEditor(false);
         return relay/* Relay */.Z.instance.publish(event).then(async (saveEvent) => {
             (0,error/* showNotice */.s6)(message);
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
@@ -21353,46 +21657,28 @@ async function publishNote(message) {
     });
 }
 
-function savePrivateNote() {
+function saveDraftNote() {
     (0,error/* showPending */.Si)("Encrypting and saving...");
     if (!!window.publishModal) { window.publishModal.hide(); }
     (0,common/* ensureConnected */.zs)().then(async () => {
-        const event = buildNoteFromEditor();
-        const payload = await (0,common/* encryptSelf */.DE)(JSON.stringify(event.rawEvent()));
-        const tags = [
-            ['d', event.tags.find((t) => t[0] === 'd')[1]],
-            ['k', event.kind.toString()],
-        ];
-        const draftEvent = relay/* Relay */.Z.instance.buildEvent(31234, payload, tags);
-        relay/* Relay */.Z.instance.publish(draftEvent).then(async (saveEvent) => {
+        const event = await buildNoteFromEditor(true);
+        relay/* Relay */.Z.instance.publish(event).then(async (saveEvent) => {
             (0,error/* showNotice */.s6)("Your note has been saved privately.");
             await PageContext.instance.setNoteByNostrEvent(saveEvent);
         })
     });
 }
-window.savePrivateNote = savePrivateNote;
+window.saveDraftNote = saveDraftNote;
 
-function buildNoteFromEditor() {
-    const title = $("#note-title").val();
-    const dtag = (0,common/* dtagFor */.oF)(title);
-    if (dtag == "tagayasu-") {
-        (0,error/* showError */.x2)("Title cannot be empty");
-        return;
-    }
-
-    const kind = 30023;
+async function buildNoteFromEditor(draft) {
     const content = window.MDEditor.value();
-    const tags = [
-        ["d", dtag],
-        ["title", title],
-        ["published_at", Math.floor(Date.now() / 1000).toString()]
-    ];
-
+    const extraTags = [];
     MarkdownRenderer.instance.parse(window.MDEditor.value()).backrefs.forEach(function (backref) {
-        tags.push(["a", backref]);
+        extraTags.push(["a", backref]);
     });
 
-    return relay/* Relay */.Z.instance.buildEvent(kind, content, tags);
+    PageContext.instance.note.update({ content, draft });
+    return await PageContext.instance.note.toNostrEvent(extraTags);
 }
 
 async function viewPublishedNote() {
@@ -21414,7 +21700,11 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     // browser
     const note = PageContext.instance.note;
     const renderedContent = MarkdownRenderer.instance.renderHtml(note.content);
-    const html = note.private ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}` : renderedContent;
+    const html = note.private
+      ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This note is private and cannot be viewed by others.</div>${renderedContent}`
+      : note.draft
+      ? `<div style="font-weight:bold; text-align: center; color: #aa0000">⚠️ This version of the note is a draft and cannot be viewed by others.</div>${renderedContent}`
+      :renderedContent;
     $("#note-content").html(html);
     renderDynamicContent();
     loadBackrefs();
@@ -21422,7 +21712,13 @@ window.addEventListener(PageContext.NOTE_IN_FOCUS_CHANGED, async function(e) {
     // editor
     window.MDEditor.value(note.content);
     if (!!window.notesModal) { window.notesModal.hide(); }
-    $("#note-title").val(note.title);
+    if (note.private) {
+      $('#standard-publish-buttons').hide();
+      $('#draft-only-buttons').show();
+    } else {
+      $('#standard-publish-buttons').show();
+      $('#draft-only-buttons').hide();
+    }
 });
 
 $('#myNotesModal').on('shown.bs.modal', function () {
@@ -21488,6 +21784,16 @@ function createMDE() {
         previewRender: MarkdownRenderer.instance.renderHtml,
         styleSelectedText: false // This works around a bug in SimpleMDE where text cannot be selected on mobile
     });
+
+    const publishButtons = `
+        <div class='btn-group publish-button-group' role='group' id='standard-publish-buttons'>
+          <button class='btn btn-sm' onclick="saveNote()">Publish</button>
+          <button class='btn btn-sm save-draft-button' onclick="saveDraftNote()">Draft</button>
+        </div>
+        <button style="display:none" class='btn btn-sm publish-button-group' onclick="saveDraftNote()" id="draft-only-buttons">Save Privately</button>
+    `;
+
+    $('.editor-toolbar').append(publishButtons);
 }
 
 async function setAvatarOnConnected() {
@@ -21519,15 +21825,10 @@ async function setAvatarOnConnected() {
     }
 }
 
-function npubPreview() {
-    if (!window.nostrUser) { return "Connect"; }
-    return window.nostrUser.npub.slice(0,8) + "…" + window.nostrUser.npub.slice(59,63);
-}
-
 function updateOwnerOnly() {
     if (
-        !PageContext.instance.note.authorPubkey ||
-        PageContext.instance.note.authorPubkey == window.nostrUser?.hexpubkey
+        !PageContext.instance.note?.authorPubkey ||
+        PageContext.instance.note?.authorPubkey == window.nostrUser?.hexpubkey
     ) {
         $(".owner-only").show();
     } else {
@@ -21543,19 +21844,20 @@ async function loadBackrefs() {
     hideBackrefs();
     $("#backref-content").empty();
 
-    const hexpubkey = PageContext.instance.note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
-    const title = PageContext.instance.note.nostrEvent?.tags.find(t => t[0] === 'title')[1] ?? PageContext.instance.note.title;
+    const note = PageContext.instance.note;
+    const hexpubkey = note.nostrEvent?.pubkey ?? PageContext.instance.dnslinkHexpubkey();
+    const title = note.nostrEvent?.tags.find(t => t[0] === 'title')[1] ?? PageContext.instance.note.title;
     if (!hexpubkey || !title) { return; }
 
     const filters = {
         authors: [hexpubkey],
-        kinds: [30023, 31234],
-        "#a": [(0,common/* atagFor */.Mf)(title, hexpubkey)]
+        kinds: src_note.Note.ALL_KINDS,
+        "#a": [(0,common/* atagFor */.Mf)(note.kind, title, hexpubkey)]
     };
     relay/* Relay */.Z.instance.fetchEvents(filters).then((events) => {
         events.forEach(function(event) {
             const title = event.tags.find(t => t[0] == "title")[1];
-            const handle = (0,common/* handleFor */.t4)(title, event.pubkey);
+            const handle = (0,common/* handleFor */.t4)(event.kind, title, event.pubkey);
             $("#backref-content").append(`<li><a title='${handle}' href='#tagayasu-prefetch'>${title}</a></li>`)
             showBackrefs();
         });
@@ -21609,10 +21911,11 @@ window.addEventListener(Preferences.PREFERENCES_CHANGED_EVENT, function (e) {
     $('#editor-prefs-aggressive-delete')[0].checked = prefs.aggressiveDelete;
 });
 
-function confirmAction(question) {
+function confirmAction(question, details = '') {
     return new Promise((resolve, reject) => {
         const modal = new bootstrap.Modal("#confirmActionModal", {});
         $("#confirmActionTitle").text(question);
+        $("#confirmActionDetails").text(details);
         modal.show();
 
         const confirmActionYes = document.getElementById('confirmActionYes');
@@ -21761,6 +22064,23 @@ function removeBlossomServer(url) {
     });
 }
 window.removeBlossomServer = removeBlossomServer;
+
+function showNewNoteModal() {
+    window.newNoteModal = new bootstrap.Modal('#new-note-modal', {});
+    window.newNoteModal.show();
+    $('#new-note-title').val('');
+    setTimeout(() => $('#new-note-title').focus(), 500);
+}
+window.showNewNoteModal = showNewNoteModal;
+
+function newNoteFromUi(type) {
+    window.newNoteModal.hide();
+    const title = $('#new-note-title').val();
+    newNote(type, title, `# ${title}\n`);
+    window.MDEditor.codemirror.focus();
+    window.MDEditor.codemirror.setCursor({line: 1, ch: 0})
+}
+window.newNoteFromUi = newNoteFromUi;
 
 
 /***/ }),
