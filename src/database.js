@@ -78,7 +78,11 @@ export class Database {
     }
 
     addNote(note) {
-        if (this.notes[note.id]) { return; }
+        const existing = this.notes[note.id];
+        if (existing) {
+            if (!existing.nostrEvent) { existing.nostrEvent = note.nostrEvent; }
+            return;
+        }
 
         this.notes[note.id] = note;
         note.title.split(" ").forEach(word =>

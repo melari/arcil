@@ -208,6 +208,7 @@ function showNoteOptions(event, noteId) {
     const idPreview = id.slice(0, 4) + "…" + id.slice(id.length-4, id.length) + " <i class='fa fa-copy'></i>";
     $('#noteDetailsId').html(idPreview);
     $('#noteDetailsId').data('id', id);
+    $('#openRawEventLink').data('id', id);
 
     const naddr = naddrFor(note.kind, note.title, window.nostrUser.hexpubkey);
     const naddrPreview = naddr.slice(0,10) + "…" + naddr.slice(naddr.length-5, naddr.length) + " <i class='fa fa-copy'></i>";
@@ -248,6 +249,17 @@ function showNoteOptions(event, noteId) {
     if (!!event) { event.stopPropagation(); }
 }
 window.showNoteOptions = showNoteOptions;
+
+function openRawEventModal() {
+    if (!!window.noteDetailsModal) { window.noteDetailsModal.hide(); }
+    const noteId = $('#openRawEventLink').data('id');
+    const note = Database.instance.getNote(noteId);
+    $('#raw-event').val(JSON.stringify(note.nostrEvent, null, 4));
+
+    window.rawEventModal = new bootstrap.Modal('#raw-event-modal', {});
+    window.rawEventModal.show();
+}
+window.openRawEventModal = openRawEventModal;
 
 function showCurrentNoteOptions() {
     const noteId = PageContext.instance.note.id;
