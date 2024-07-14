@@ -214,9 +214,22 @@ function showNoteOptions(event, noteId) {
     $('#noteDetailsNaddr').html(naddrPreview);
     $('#noteDetailsNaddr').data('naddr', naddr);
 
-    $('#noteDetailsOpenInTagayasu').attr('href', window.router.urlFor(Router.BROWSER, note.handle));
-    $('#noteDetailsOpenInHabla').attr('href', `https://habla.news/a/${naddr}`);
-    $('#noteDetailsOpenInHighlighter').attr('href', `https://highlighter.com/a/${naddr}`);
+    $('#noteDetailsOpenInTagayasu a').attr('href', window.router.urlFor(Router.BROWSER, note.handle));
+
+    $('#noteDetailsOpenInHabla').hide();
+    $('#noteDetailsOpenInHighlighter').hide();
+    $('#noteDetailsOpenInWikifreedia').hide();
+  
+    const noteType = note.type;
+    if (noteType === Note.ARTICLE) {
+        $('#noteDetailsOpenInHabla a').attr('href', `https://habla.news/a/${naddr}`);
+        $('#noteDetailsOpenInHighlighter a').attr('href', `https://highlighter.com/a/${naddr}`);
+        $('#noteDetailsOpenInHabla').show();
+        $('#noteDetailsOpenInHighlighter').show();
+    } else if (noteType === Note.TOPIC) {
+        $('#noteDetailsOpenInWikifreedia a').attr('href', `https://wikifreedia.xyz/${note.dtag}/${window.nostrUser.npub}`);
+        $('#noteDetailsOpenInWikifreedia').show();
+    }
 
     $('#noteDetailsDelete').data('note-id', noteId);
 
