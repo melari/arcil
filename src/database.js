@@ -8,22 +8,26 @@ import { Wallet } from "./wallet.js";
  *  if the notes are dropped by all relays.
  */
 export class Database {
-    // Map of noteId => Note class
+    // Map of databaseId => Note class
+    // The primary key is given by Note.databaseId and contains kind & dtag
     notes = {};
     noteTitleTrie = new Trie();
 
-    // Drafts are stored as a wrapper note with an encrypted note inside.
-    // Therefore the ID of the wrapper note will not match the actual inner note
-    // To support looking up a note by the wrapper ID, we keep a map of wrapper -> inner IDs
-    draftIdMap = {};
+    // A secondary key mapping nostr event IDs to note primary keys
+    // Draft IDs will also point to their inner note databaseId
+    nostrIdMap = {};
 
     static instance = new Database();
     constructor() {
         if (!!Database.instance) { throw new Error('Use singleton instance'); }
     }
 
-    getNote(id) {
-        return this.notes[id] ?? this.notes[this.draftIdMap[id]];
+    getNoteByPrimaryId(id) {
+        return this.notes[id];
+    }
+
+    getNoteByNostrId(id) {
+        return this.notes[this.nostrIdMap[id]];
     }
 
     clear() {
@@ -54,7 +58,7 @@ export class Database {
     async addFromNostrEvent(event) {
         try {
             const note = await Note.fromNostrEvent(event);
-            if (event.id !== note.id) { this.draftIdMap[event.id] = note.id; }
+            if (event.id !== note.id) { this.nostrIdMap[event.id] = note.databaseId; }
             this.addNote(note);
             this.pushStateToLocalStorage(window.nostrUser.npub);
             return note;
@@ -78,22 +82,19 @@ export class Database {
     }
 
     addNote(note) {
-        const existing = this.notes[note.id];
-        if (existing) {
-            if (!existing.nostrEvent) { existing.nostrEvent = note.nostrEvent; }
-            return;
+        if (note.id) { this.nostrIdMap[note.id] = note.databaseId; }
+
+        const existing = this.notes[note.databaseId];
+
+        if (!existing) {
+            note.title.split(" ").forEach(word =>
+                this.noteTitleTrie.add(word.toLowerCase(), note.databaseId)
+            );
         }
 
-        this.notes[note.id] = note;
-        note.title.split(" ").forEach(word =>
-            this.noteTitleTrie.add(word.toLowerCase(), note.id)
-        );
-
-        Object.values(this.notes)
-            .filter(n => n.dtag === note.dtag)
-            .sort((a, b) => a.createdAt - b.createdAt)
-            .slice(0, -1)
-            .forEach(n => delete this.notes[n.id]);
+        if (!existing || note.createdAt >= existing.createdAt) {
+            this.notes[note.databaseId] = note;
+        }
     }
 
     pushStateToLocalStorage(userId) {

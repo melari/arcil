@@ -118,10 +118,17 @@ export class Note {
         this.validate();
     }
 
+    // Fully Qualified Identifier
     get handle() {
         return handleFor(this.kind, this.title, this.authorPubkey);
     }
 
+    // Identifier with author assumed
+    get databaseId() {
+        return `${this.kind}:${this.dtag}`;
+    }
+
+    // Identifier with author AND kind assumed
     get dtag() {
         return dtagFor(this.title);
     }

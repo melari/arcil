@@ -104,7 +104,7 @@ async function fetchNotes() {
         let foundNew = false;
         subscription.eventsPerRelay.forEach((eventIds, relay) => {
             for (const eventId of eventIds) {
-                const note = Database.instance.getNote(eventId);
+                const note = Database.instance.getNoteByNostrId(eventId);
                 if (note && !note.onRelays.includes(relay)) {
                     note.onRelays.push(relay);
                     foundNew = true;
@@ -129,7 +129,7 @@ async function loadNote() {
             if (!!event) {
                 if (event.pubkey == window.nostrUser.hexpubkey) {
                     const note = await Database.instance.addFromNostrEvent(event);
-                    editNote(note.id);
+                    editNote(note.databaseId);
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
@@ -163,7 +163,7 @@ function searchNotes() {
     const sorted = Database.instance.search($("#note-search-box").val().toLowerCase().split(" ").filter(x => !!x));
 
     sorted.forEach(function (noteId) {
-        const note = Database.instance.getNote(noteId);
+        const note = Database.instance.getNoteByPrimaryId(noteId);
         if (!note) { return; }
         const relayCount = note.onRelays.length;
         const health = relayCount >= 4
@@ -188,9 +188,9 @@ function searchNotes() {
         const postTitle = isDraftOnly ? '</i>' : '';
 
         notesListContent += `
-            <div class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.id}')">
+            <div class='${health} list-group-item list-group-item-action note-list-button' onclick="editNote('${note.databaseId}')">
                 <div class='note-list-title'>${noteIcon}&nbsp;${preTitle}${note.title}${postTitle}</div>
-                <i id='note-more-${note.id}' class='fa fa-solid fa-gears note-more' onclick="showNoteOptions(event, '${note.id}'); return true;"></i>
+                <i id='note-more-${note.databaseId}' class='fa fa-solid fa-gears note-more' onclick="showNoteOptions(event, '${note.databaseId}'); return true;"></i>
                 </div>
             </div>
         `;
@@ -201,14 +201,14 @@ function searchNotes() {
 window.searchNotes = searchNotes;
 
 function showNoteOptions(event, noteId) {
-    const note = Database.instance.getNote(noteId);
+    const note = Database.instance.getNoteByPrimaryId(noteId);
     $('#noteDetailsTitle').text(note.title);
 
     const id = note.id;
     const idPreview = id.slice(0, 4) + "…" + id.slice(id.length-4, id.length) + " <i class='fa fa-copy'></i>";
     $('#noteDetailsId').html(idPreview);
     $('#noteDetailsId').data('id', id);
-    $('#openRawEventLink').data('id', id);
+    $('#openRawEventLink').data('id', note.databaseId);
 
     const naddr = naddrFor(note.kind, note.title, window.nostrUser.hexpubkey);
     const naddrPreview = naddr.slice(0,10) + "…" + naddr.slice(naddr.length-5, naddr.length) + " <i class='fa fa-copy'></i>";
@@ -253,7 +253,7 @@ window.showNoteOptions = showNoteOptions;
 function openRawEventModal() {
     if (!!window.noteDetailsModal) { window.noteDetailsModal.hide(); }
     const noteId = $('#openRawEventLink').data('id');
-    const note = Database.instance.getNote(noteId);
+    const note = Database.instance.getNoteByPrimaryId(noteId);
     $('#raw-event').val(JSON.stringify(note.nostrEvent, null, 4));
 
     window.rawEventModal = new bootstrap.Modal('#raw-event-modal', {});
@@ -262,7 +262,7 @@ function openRawEventModal() {
 window.openRawEventModal = openRawEventModal;
 
 function showCurrentNoteOptions() {
-    const noteId = PageContext.instance.note.id;
+    const noteId = PageContext.instance.note.databaseId;
     if (noteId) { showNoteOptions(undefined, noteId); }
 }
 window.showCurrentNoteOptions = showCurrentNoteOptions;
@@ -280,7 +280,7 @@ function copyNoteId() {
 window.copyNoteId = copyNoteId;
 
 async function editNote(noteId) {
-    const note = Database.instance.getNote(noteId);
+    const note = Database.instance.getNoteByPrimaryId(noteId);
     const url = window.router.urlFor(Router.EDITOR, note.handle)
     history.replaceState({ identifier: note.handle }, '', url);
     PageContext.instance.setNote(note);
@@ -341,13 +341,13 @@ function deleteNote() {
         return;
     }
 
-    const note = Database.instance.getNote(noteId);
+    const note = Database.instance.getNoteByPrimaryId(noteId);
 
     if (!!window.noteDetailsModal) { window.noteDetailsModal.hide(); }
     confirmAction('Are you sure you want to delete this note?', `Title: ${note.title}`).then(async () => {
         showPending("Deleting...");
 
-        if (noteId === PageContext.instance.note.id) {
+        if (noteId === PageContext.instance.note.databaseId) {
             window.MDEditor.value('');
         }
 
