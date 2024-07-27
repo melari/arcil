@@ -64,7 +64,7 @@ class Router {
             this._parseInlineParams(urlParts.slice(1));
             return this;
         }
-        
+
         this._pageName = this._defaultPageName;
         this._parseInlineParams(urlParts);
         return this;

@@ -280,7 +280,10 @@ function copyNoteId() {
 window.copyNoteId = copyNoteId;
 
 async function editNote(noteId) {
-    PageContext.instance.setNote(Database.instance.getNote(noteId));
+    const note = Database.instance.getNote(noteId);
+    const url = window.router.urlFor(Router.EDITOR, note.handle)
+    history.replaceState({ identifier: note.handle }, '', url);
+    PageContext.instance.setNote(note);
 }
 window.editNote = editNote
 

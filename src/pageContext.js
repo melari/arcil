@@ -16,8 +16,7 @@ class PageContext {
         window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
     }
     async setNoteByNostrEvent(event) {
-        this._note = await Note.fromNostrEvent(event);
-        window.dispatchEvent(new Event(PageContext.NOTE_IN_FOCUS_CHANGED));
+        this.setNote(await Note.fromNostrEvent(event));
     }
 
     _dnslinkNpub = null;
