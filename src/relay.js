@@ -98,9 +98,9 @@ export class Relay {
     // Publishes a kind 5 (delete request) event to relays,
     // and removes the event from the cache as well.
     // Returns a Promise that is fulfilled once the deletion event has been pushed to external relays
-    async del(noteId) {
+    async del(noteIds) {
         Object.keys(this.primaryIndex).forEach((dTag) => {
-            if (this.primaryIndex[dTag].id === noteId) {
+            if (noteIds.includes(this.primaryIndex[dTag].id)) {
                 delete this.primaryIndex[dTag];
                 Object.keys(this.tagIndex).forEach((tagIndexKey) => {
                     this.tagIndex[tagIndexKey].delete(dTag);
@@ -108,7 +108,9 @@ export class Relay {
             }
         });
 
-        return this.buildAndPublish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', [['e', noteId]]);
+        const tags = [];
+        noteIds.forEach(noteId => tags.push(['e', noteId]));
+        return this.buildAndPublish(Relay.DELETE_EVENT_KIND, 'This note has been deleted', tags);
     }
 
     write(note) {

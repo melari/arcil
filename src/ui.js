@@ -205,7 +205,10 @@ function showNoteOptions(event, noteId) {
     $('#noteDetailsTitle').text(note.title);
 
     const id = note.id;
-    const idPreview = id.slice(0, 4) + "…" + id.slice(id.length-4, id.length) + " <i class='fa fa-copy'></i>";
+    const idPreview = id
+        ? id.slice(0, 4) + "…" + id.slice(id.length-4, id.length) + " <i class='fa fa-copy'></i>"
+        : '(none - not saved)';
+
     $('#noteDetailsId').html(idPreview);
     $('#noteDetailsId').data('id', id);
     $('#openRawEventLink').data('id', note.databaseId);
@@ -360,7 +363,7 @@ function deleteNote() {
             await Relay.instance.publish(event);
         }
 
-        await Relay.instance.del(noteId);
+        await Relay.instance.del(note.altIds);
         Database.instance.deleteNote(noteId);
         showNotice('Note has been deleted');
         searchNotes();
@@ -811,8 +814,16 @@ window.showNewNoteModal = showNewNoteModal;
 function newNoteFromUi(type) {
     window.newNoteModal.hide();
     const title = $('#new-note-title').val();
-    newNote(type, title, `# ${title}\n`);
+    const content = `# ${title}\n`;
+    const hexpubkey = window.nostrUser.hexpubkey;
+    const note = Note.fromContent(type, title, content, hexpubkey);
+    const url = window.router.urlFor(Router.EDITOR, note.handle)
+    history.replaceState({ identifier: note.handle }, '', url);
+    Database.instance.addNote(note);
+    PageContext.instance.setNote(note);
+    if (!!window.notesModal) { window.notesModal.hide(); }
     window.MDEditor.codemirror.focus();
     window.MDEditor.codemirror.setCursor({line: 1, ch: 0})
+    searchNotes();
 }
 window.newNoteFromUi = newNoteFromUi;

@@ -9,7 +9,7 @@ import { Wallet } from "./wallet.js";
  */
 export class Database {
     // Map of databaseId => Note class
-    // The primary key is given by Note.databaseId and contains kind & dtag
+    // The primary key is given by Note.databaseId and contains type & dtag
     notes = {};
     noteTitleTrie = new Trie();
 
@@ -59,6 +59,7 @@ export class Database {
         try {
             const note = await Note.fromNostrEvent(event);
             if (event.id !== note.id) { this.nostrIdMap[event.id] = note.databaseId; }
+            if (!note.altIds.includes(event.id)) { note.altIds.push(event.id); }
             this.addNote(note);
             this.pushStateToLocalStorage(window.nostrUser.npub);
             return note;

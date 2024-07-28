@@ -1,6 +1,10 @@
 import { dtagFor, draftDtagFor, handleFor, decryptSelf, encryptSelf } from "./common.js";
 import { Relay } from "./relay.js";
 
+function now() {
+    return Math.floor(Date.now() / 1000);
+}
+
 export class NoteValidationError extends Error {
     constructor(message) {
         super(message);
@@ -39,6 +43,7 @@ export class Note {
 
         const note = new Note();
         note.id = nostrEvent.id;
+        note.altIds = [nostrEvent.id];
         note.nostrEvent = nostrEvent;
         note.title = nostrEvent.tags.find(t => t[0] == "title")[1];
         note.content = nostrEvent.content;
@@ -55,8 +60,11 @@ export class Note {
         return note;
     }
 
-    static fromContent(type, title, content) {
+    static fromContent(type, title, content, hexpubkey) {
         const note = new Note();
+        note.altIds = [];
+        note.authorPubkey = hexpubkey;
+        note.createdAt = now();
         note.title = title;
         note.content = content;
         note.onRelays = [];
@@ -113,7 +121,7 @@ export class Note {
         this.draft = opts.draft ?? this.draft;
         this.kind = opts.kind ?? this.kind;
         this.content = opts.content ?? this.content;
-        this.createdAt = Math.floor(Date.now() / 1000);
+        this.createdAt = now();
 
         this.validate();
     }
@@ -125,7 +133,7 @@ export class Note {
 
     // Identifier with author assumed
     get databaseId() {
-        return `${this.kind}:${this.dtag}`;
+        return `${this.type}:${this.dtag}`;
     }
 
     // Identifier with author AND kind assumed
@@ -161,6 +169,7 @@ export class Note {
         note.title = plain.title;
         note.createdAt = plain.createdAt;
         note.onRelays = [];
+        note.altIds = [];
 
         note.validate();
         return note;
