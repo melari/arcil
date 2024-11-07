@@ -5,7 +5,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@nostr-dev-kit/ndk": "^2.8.2",
+    "@nostr-dev-kit/ndk": "^2.10.5",
     "buffer": "^6.0.3",
     "crypto-js": "^4.1.1",
     "nostr-tools": "^2.5.2",

@@ -93,7 +93,7 @@ export async function ensureConnected() {
     }
   });
 }
-  
+
 export async function ensureReadonlyConnected() {
   if (!isNostrConnectionHealthy()) {
     window.ndk = new NDK({explicitRelayUrls: window.relays.active});
@@ -107,7 +107,7 @@ function isNostrConnectionHealthy() {
   const connectionStats = window.ndk.pool.stats();
   return connectionStats.connected / connectionStats.total >= 0.5
 }
-  
+
 async function connectNostr(nip07signer) {
   window.nip07signer = nip07signer;
   window.ndk = new NDK({ signer: window.nip07signer, explicitRelayUrls: window.relays.active });
