@@ -12897,7 +12897,7 @@ class Blossom {
         const hash = crypto.SHA256(wordArray).toString(crypto.enc.Hex);
 
         const fileSize = blob.size;
-        const auth = await this._nostrUploadAuth(fileSize);
+        const auth = await this._nostrUploadAuth(fileSize, hash);
 
         const headers = new Headers();
         headers.append('Authorization', auth);
@@ -12926,7 +12926,7 @@ class Blossom {
         return Promise.resolve({ hash, downloadUrls });
     }
 
-    async _nostrUploadAuth(fileSize) {
+    async _nostrUploadAuth(fileSize, hash) {
         const unixTime = Math.floor(Date.now() / 1000);
         const expiration = unixTime + (60 * 5);
 
@@ -12935,6 +12935,7 @@ class Blossom {
         event.content = 'File Upload';
         event.tags = [
             ['t', 'upload'],
+            ['x', hash],
             ['size', fileSize],
             ['expiration', expiration]
         ];
