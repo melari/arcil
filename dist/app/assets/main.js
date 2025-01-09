@@ -13658,7 +13658,7 @@ class Note {
         note.content = nostrEvent.content;
         note.authorPubkey = nostrEvent.pubkey;
         note.createdAt = nostrEvent.created_at ?? event.created_at;
-        note.onRelays = [];
+        note.ndkEvent = event;
 
         const hasPrivateTag = !!(nostrEvent.tags.find(t => t[0] == "private")?.[1]);
         note.draft   = event.kind === Note.DRAFT_KIND;
@@ -13676,7 +13676,6 @@ class Note {
         note.createdAt = now();
         note.title = title;
         note.content = content;
-        note.onRelays = [];
         note.draft = false;
         note.private = false;
 
@@ -13692,6 +13691,10 @@ class Note {
 
         note.validate();
         return note;
+    }
+
+    get onRelays() {
+      return this.ndkEvent?.onRelays ?? [];
     }
 
     get type() {
@@ -13777,7 +13780,6 @@ class Note {
         note.content = plain.content;
         note.title = plain.title;
         note.createdAt = plain.createdAt;
-        note.onRelays = [];
         note.altIds = [];
 
         note.validate();
@@ -14472,6 +14474,9 @@ class Database {
                   event
                 });
                 return null;
+            } else if (e.message === "Malformed UTF-8 data") {
+              console.warn("Discarding event because it could not be decrypted (malformed)");
+              return null;
             } else {
                 throw e;
             }
@@ -14630,22 +14635,16 @@ async function fetchNotes() {
 
     // Well keep the subscription around for 5 seconds after the last event is received,
     // or if no events are received, for 5 seconds after the subscription is created.
+    let lastEventReceivedAt;
     const startAt = Date.now();
     while (
         Date.now() - startAt < 1000 * 5
         || (!!subscription.lastEventReceivedAt && Date.now() - subscription.lastEventReceivedAt < 1000 * 5)
     ) {
-        let foundNew = false;
-        subscription.eventsPerRelay.forEach((eventIds, relay) => {
-            for (const eventId of eventIds) {
-                const note = Database.instance.getNoteByNostrId(eventId);
-                if (note && !note.onRelays.includes(relay)) {
-                    note.onRelays.push(relay);
-                    foundNew = true;
-                }
-            }
-        });
-        if (foundNew) { searchNotes(); }
+        if (subscription.lastEventReceivedAt != lastEventReceivedAt) {
+          lastEventReceivedAt = subscription.lastEventReceivedAt;
+          searchNotes();
+        }
         await (0,common/* delay */.cb)(100);
     }
 }
@@ -14667,7 +14666,7 @@ async function loadNote() {
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
-                newNote('topic', title, `# ${title}`);
+                if (!!title) { newNote('topic', title, `# ${title}`); }
             }
         });
     });

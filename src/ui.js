@@ -96,22 +96,16 @@ async function fetchNotes() {
 
     // Well keep the subscription around for 5 seconds after the last event is received,
     // or if no events are received, for 5 seconds after the subscription is created.
+    let lastEventReceivedAt;
     const startAt = Date.now();
     while (
         Date.now() - startAt < 1000 * 5
         || (!!subscription.lastEventReceivedAt && Date.now() - subscription.lastEventReceivedAt < 1000 * 5)
     ) {
-        let foundNew = false;
-        subscription.eventsPerRelay.forEach((eventIds, relay) => {
-            for (const eventId of eventIds) {
-                const note = Database.instance.getNoteByNostrId(eventId);
-                if (note && !note.onRelays.includes(relay)) {
-                    note.onRelays.push(relay);
-                    foundNew = true;
-                }
-            }
-        });
-        if (foundNew) { searchNotes(); }
+        if (subscription.lastEventReceivedAt != lastEventReceivedAt) {
+          lastEventReceivedAt = subscription.lastEventReceivedAt;
+          searchNotes();
+        }
         await delay(100);
     }
 }
@@ -133,7 +127,7 @@ async function loadNote() {
                 }
             } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
                 const title = PageContext.instance.noteTitleFromUrl();
-                newNote('topic', title, `# ${title}`);
+                if (!!title) { newNote('topic', title, `# ${title}`); }
             }
         });
     });

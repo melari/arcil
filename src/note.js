@@ -49,7 +49,7 @@ export class Note {
         note.content = nostrEvent.content;
         note.authorPubkey = nostrEvent.pubkey;
         note.createdAt = nostrEvent.created_at ?? event.created_at;
-        note.onRelays = [];
+        note.ndkEvent = event;
 
         const hasPrivateTag = !!(nostrEvent.tags.find(t => t[0] == "private")?.[1]);
         note.draft   = event.kind === Note.DRAFT_KIND;
@@ -67,7 +67,6 @@ export class Note {
         note.createdAt = now();
         note.title = title;
         note.content = content;
-        note.onRelays = [];
         note.draft = false;
         note.private = false;
 
@@ -83,6 +82,10 @@ export class Note {
 
         note.validate();
         return note;
+    }
+
+    get onRelays() {
+      return this.ndkEvent?.onRelays ?? [];
     }
 
     get type() {
@@ -168,7 +171,6 @@ export class Note {
         note.content = plain.content;
         note.title = plain.title;
         note.createdAt = plain.createdAt;
-        note.onRelays = [];
         note.altIds = [];
 
         note.validate();

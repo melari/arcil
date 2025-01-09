@@ -70,6 +70,9 @@ export class Database {
                   event
                 });
                 return null;
+            } else if (e.message === "Malformed UTF-8 data") {
+              console.warn("Discarding event because it could not be decrypted (malformed)");
+              return null;
             } else {
                 throw e;
             }
