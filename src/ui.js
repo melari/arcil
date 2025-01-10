@@ -85,30 +85,35 @@ function showPublishModal() {
 }
 window.showPublishModal = showPublishModal;
 
+let fetchNotesSubscription;
 async function fetchNotes() {
+    fetchNotesSubscription?.stop();
+    Database.instance.clear();
+
     searchNotes(); // show the notes we have in memory already, if any.
     if (!window.nostrUser?.hexpubkey) { return }
+
+    // We will update the UI every 500ms continuously until 10s have
+    // passed since we last saw an event. A new event will resume the continuous updates
+    let lastEventTime;
+    let timer;
+    const refreshUi = () => {
+      searchNotes();
+
+      timer = null;
+      if (Date.now() - lastEventTime < 10 * 1000) {
+        timer = setTimeout(() => { refreshUi(); }, 500);
+      }
+    };
+
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: Note.ALL_KINDS }
-
-    const subscription = await Relay.instance.subscribe(filter, async (e) => {
+    fetchNotesSubscription = await Relay.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
-    });
-
-    // Well keep the subscription around for 5 seconds after the last event is received,
-    // or if no events are received, for 5 seconds after the subscription is created.
-    let lastEventReceivedAt;
-    const startAt = Date.now();
-    while (
-        Date.now() - startAt < 1000 * 5
-        || (!!subscription.lastEventReceivedAt && Date.now() - subscription.lastEventReceivedAt < 1000 * 5)
-    ) {
-        if (subscription.lastEventReceivedAt != lastEventReceivedAt) {
-          lastEventReceivedAt = subscription.lastEventReceivedAt;
-          searchNotes();
-        }
-        await delay(100);
-    }
+        lastEventTime = Date.now();
+        if (!timer) { timer = setTimeout(() => { refreshUi(); }, 1); }
+    }, false);
 }
+window.fetchNotes = fetchNotes;
 
 // Load the note into the editor given by params
 async function loadNote() {

@@ -1,4 +1,5 @@
-import NDK, { NDKEvent, NDKRelay } from "@nostr-dev-kit/ndk";
+import NDK, { NDKEvent, NDKRelay, NDKRelayStatus } from "@nostr-dev-kit/ndk";
+import { delay } from "./common.js"
 
 /**
  *  A low level cache of raw nostr events. These can belong to any user and will not be decrypted.
@@ -51,8 +52,8 @@ export class Relay {
 
     // subscribe does a combination of checking cache and external relays
     // cached results trigger the callback immediately but don't block pulling events from external relays.
-    async subscribe(filters, callback) {
-        const subscription = await window.ndk.subscribe(filters, { closeOnEose: true });
+    async subscribe(filters, callback, closeOnEose = true) {
+        const subscription = await window.ndk.subscribe(filters, { closeOnEose: closeOnEose });
         subscription.on("event", async (event) => {
             this.write(event)
             callback(event);
@@ -132,12 +133,20 @@ export class Relay {
         });
     }
 
-    // Returns true if the relay could be connected to within 1 second.
-    async getRelayStatus(url) {
-        window.ndk.pool.addRelay(new NDKRelay(url), false);
+    // True if the relay is online, false otherwise.
+    // If the relay requires auth, this returns true without attempting or requiring a successful auth.
+    async getRelayStatus(url, timeout = 10000) {
+        window.ndk.pool.addRelay(new NDKRelay(url, undefined, window.ndk), false);
         const relay = window.ndk.pool.relays.get(url);
-        try { await relay.connect(5000, false); } catch {}
-        return relay.connectivity.status === 1;
+        try { await relay.connect(timeout, false); } catch (e) {}
+
+        const check_freq = 10; // we'll check for connection status every 10ms until timeout
+        for (let i = 0; i < timeout / check_freq; i++) {
+          await delay(check_freq)
+          if (relay.connectivity.status >= NDKRelayStatus.CONNECTED) { return true; }
+        }
+
+        return false;
     }
 
     // Tries to load events from the cache using the filter. Not all possible

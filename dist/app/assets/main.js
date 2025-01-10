@@ -13117,7 +13117,6 @@ window.relays = {
     "wss://nostr.bitcoiner.social/",
     "wss://thecitadel.nostr1.com/",
     "wss://nostr.wine/",
-    "wss://nostr.land/",
   ],
   active: [],
   recommended: [
@@ -13126,7 +13125,6 @@ window.relays = {
     "wss://thecitadel.nostr1.com/",
     "wss://nos.lol/",
     "wss://nostr.wine/",
-    "wss://nostr.land/",
   ]
 }
 window.relays.active = window.relays.default;
@@ -13694,7 +13692,8 @@ class Note {
     }
 
     get onRelays() {
-      return this.ndkEvent?.onRelays ?? [];
+      // ndkEvent can have duplicates, which we remove
+      return [...new Set(this.ndkEvent?.onRelays ?? [])];
     }
 
     get type() {
@@ -13966,6 +13965,8 @@ window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, async function (e) {
 /* harmony export */   W: () => (/* binding */ Relay)
 /* harmony export */ });
 /* harmony import */ var _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(4504);
+/* harmony import */ var _common_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6727);
+
 
 
 /**
@@ -14019,8 +14020,8 @@ class Relay {
 
     // subscribe does a combination of checking cache and external relays
     // cached results trigger the callback immediately but don't block pulling events from external relays.
-    async subscribe(filters, callback) {
-        const subscription = await window.ndk.subscribe(filters, { closeOnEose: true });
+    async subscribe(filters, callback, closeOnEose = true) {
+        const subscription = await window.ndk.subscribe(filters, { closeOnEose: closeOnEose });
         subscription.on("event", async (event) => {
             this.write(event)
             callback(event);
@@ -14100,12 +14101,20 @@ class Relay {
         });
     }
 
-    // Returns true if the relay could be connected to within 1 second.
-    async getRelayStatus(url) {
-        window.ndk.pool.addRelay(new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKRelay */ .vd(url), false);
+    // True if the relay is online, false otherwise.
+    // If the relay requires auth, this returns true without attempting or requiring a successful auth.
+    async getRelayStatus(url, timeout = 10000) {
+        window.ndk.pool.addRelay(new _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKRelay */ .vd(url, undefined, window.ndk), false);
         const relay = window.ndk.pool.relays.get(url);
-        try { await relay.connect(5000, false); } catch {}
-        return relay.connectivity.status === 1;
+        try { await relay.connect(timeout, false); } catch (e) {}
+
+        const check_freq = 10; // we'll check for connection status every 10ms until timeout
+        for (let i = 0; i < timeout / check_freq; i++) {
+          await (0,_common_js__WEBPACK_IMPORTED_MODULE_1__/* .delay */ .cb)(check_freq)
+          if (relay.connectivity.status >= _nostr_dev_kit_ndk__WEBPACK_IMPORTED_MODULE_0__/* .NDKRelayStatus */ .jI.CONNECTED) { return true; }
+        }
+
+        return false;
     }
 
     // Tries to load events from the cache using the filter. Not all possible
@@ -14624,30 +14633,35 @@ function showPublishModal() {
 }
 window.showPublishModal = showPublishModal;
 
+let fetchNotesSubscription;
 async function fetchNotes() {
+    fetchNotesSubscription?.stop();
+    Database.instance.clear();
+
     searchNotes(); // show the notes we have in memory already, if any.
     if (!window.nostrUser?.hexpubkey) { return }
+
+    // We will update the UI every 500ms continuously until 10s have
+    // passed since we last saw an event. A new event will resume the continuous updates
+    let lastEventTime;
+    let timer;
+    const refreshUi = () => {
+      searchNotes();
+
+      timer = null;
+      if (Date.now() - lastEventTime < 10 * 1000) {
+        timer = setTimeout(() => { refreshUi(); }, 500);
+      }
+    };
+
     const filter = { authors: [window.nostrUser.hexpubkey], kinds: src_note.Note.ALL_KINDS }
-
-    const subscription = await relay/* Relay */.W.instance.subscribe(filter, async (e) => {
+    fetchNotesSubscription = await relay/* Relay */.W.instance.subscribe(filter, async (e) => {
         await Database.instance.addFromNostrEvent(e);
-    });
-
-    // Well keep the subscription around for 5 seconds after the last event is received,
-    // or if no events are received, for 5 seconds after the subscription is created.
-    let lastEventReceivedAt;
-    const startAt = Date.now();
-    while (
-        Date.now() - startAt < 1000 * 5
-        || (!!subscription.lastEventReceivedAt && Date.now() - subscription.lastEventReceivedAt < 1000 * 5)
-    ) {
-        if (subscription.lastEventReceivedAt != lastEventReceivedAt) {
-          lastEventReceivedAt = subscription.lastEventReceivedAt;
-          searchNotes();
-        }
-        await (0,common/* delay */.cb)(100);
-    }
+        lastEventTime = Date.now();
+        if (!timer) { timer = setTimeout(() => { refreshUi(); }, 1); }
+    }, false);
 }
+window.fetchNotes = fetchNotes;
 
 // Load the note into the editor given by params
 async function loadNote() {
@@ -15412,10 +15426,11 @@ __webpack_require__.d(__webpack_exports__, {
   uk: () => (/* binding */ NDKNip07Signer),
   YX: () => (/* binding */ NDKPrivateKeySigner),
   vd: () => (/* binding */ NDKRelay),
+  jI: () => (/* binding */ NDKRelayStatus),
   Ay: () => (/* binding */ NDK)
 });
 
-// UNUSED EXPORTS: BECH32_REGEX, DEFAULT_ENCRYPTION_SCHEME, NDKAppHandlerEvent, NDKAppSettings, NDKArticle, NDKCashuMintList, NDKClassified, NDKDVMJobFeedback, NDKDVMJobResult, NDKDVMRequest, NDKDraft, NDKDvmJobFeedbackStatus, NDKHighlight, NDKKind, NDKList, NDKListKinds, NDKNip46Backend, NDKNip46Signer, NDKNostrRpc, NDKNutzap, NDKNwc, NDKPublishError, NDKRelayAuthPolicies, NDKRelayList, NDKRelaySet, NDKRelayStatus, NDKRepost, NDKSimpleGroup, NDKSimpleGroupMemberList, NDKSimpleGroupMetadata, NDKSubscription, NDKSubscriptionCacheUsage, NDKSubscriptionReceipt, NDKSubscriptionStart, NDKSubscriptionTier, NDKTranscriptionDVM, NDKUser, NDKVideo, NDKWiki, NDKZapper, NIP33_A_REGEX, calculateRelaySetFromEvent, calculateTermDurationInSeconds, compareFilter, defaultOpts, deserialize, dvmSchedule, eventHasETagMarkers, eventIsPartOfThread, eventIsReply, eventReplies, eventThreadIds, eventThreads, eventsBySameAuthor, filterAndRelaySetFromBech32, filterFingerprint, filterForEventsTaggingId, filterFromId, generateSubId, generateZapRequest, getEventReplyIds, getNip57ZapSpecFromLud, getRelayListForUser, getRelayListForUsers, getReplyTag, getRootEventId, getRootTag, isEventOriginalPost, isNip33AValue, mergeFilters, newAmount, normalize, normalizeRelayUrl, parseTagToSubscriptionAmount, pinEvent, possibleIntervalFrequencies, profileFromEvent, queryFullyFilled, relayListFromKind3, relaysFromBech32, serialize, serializeProfile, tryNormalizeRelayUrl, zapInvoiceFromEvent
+// UNUSED EXPORTS: BECH32_REGEX, DEFAULT_ENCRYPTION_SCHEME, NDKAppHandlerEvent, NDKAppSettings, NDKArticle, NDKCashuMintList, NDKClassified, NDKDVMJobFeedback, NDKDVMJobResult, NDKDVMRequest, NDKDraft, NDKDvmJobFeedbackStatus, NDKHighlight, NDKKind, NDKList, NDKListKinds, NDKNip46Backend, NDKNip46Signer, NDKNostrRpc, NDKNutzap, NDKNwc, NDKPublishError, NDKRelayAuthPolicies, NDKRelayList, NDKRelaySet, NDKRepost, NDKSimpleGroup, NDKSimpleGroupMemberList, NDKSimpleGroupMetadata, NDKSubscription, NDKSubscriptionCacheUsage, NDKSubscriptionReceipt, NDKSubscriptionStart, NDKSubscriptionTier, NDKTranscriptionDVM, NDKUser, NDKVideo, NDKWiki, NDKZapper, NIP33_A_REGEX, calculateRelaySetFromEvent, calculateTermDurationInSeconds, compareFilter, defaultOpts, deserialize, dvmSchedule, eventHasETagMarkers, eventIsPartOfThread, eventIsReply, eventReplies, eventThreadIds, eventThreads, eventsBySameAuthor, filterAndRelaySetFromBech32, filterFingerprint, filterForEventsTaggingId, filterFromId, generateSubId, generateZapRequest, getEventReplyIds, getNip57ZapSpecFromLud, getRelayListForUser, getRelayListForUsers, getReplyTag, getRootEventId, getRootTag, isEventOriginalPost, isNip33AValue, mergeFilters, newAmount, normalize, normalizeRelayUrl, parseTagToSubscriptionAmount, pinEvent, possibleIntervalFrequencies, profileFromEvent, queryFullyFilled, relayListFromKind3, relaysFromBech32, serialize, serializeProfile, tryNormalizeRelayUrl, zapInvoiceFromEvent
 
 // NAMESPACE OBJECT: ./node_modules/@nostr-dev-kit/ndk/node_modules/@noble/curves/esm/abstract/utils.js
 var abstract_utils_namespaceObject = {};

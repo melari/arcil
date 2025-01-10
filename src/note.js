@@ -85,7 +85,8 @@ export class Note {
     }
 
     get onRelays() {
-      return this.ndkEvent?.onRelays ?? [];
+      // ndkEvent can have duplicates, which we remove
+      return [...new Set(this.ndkEvent?.onRelays ?? [])];
     }
 
     get type() {
