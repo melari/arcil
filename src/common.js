@@ -18,7 +18,6 @@ window.relays = {
     "wss://nostr.bitcoiner.social/",
     "wss://thecitadel.nostr1.com/",
     "wss://nostr.wine/",
-    "wss://nostr.land/",
   ],
   active: [],
   recommended: [
@@ -27,7 +26,6 @@ window.relays = {
     "wss://thecitadel.nostr1.com/",
     "wss://nos.lol/",
     "wss://nostr.wine/",
-    "wss://nostr.land/",
   ]
 }
 window.relays.active = window.relays.default;
