@@ -119,6 +119,8 @@ async function loadNote() {
         else { return newNote('topic', 'homepage', INTRO_TEXT); }
     }
 
+    // TODO: This does not load encrypted (private/draft) notes because we
+    // are querying the relay directly but the note of interest is wrapped in an ecrypted event on the relay.
     ensureConnected().then(async () => {
         const filter = PageContext.instance.noteFilterFromUrl();
         Relay.instance.fetchEvent(filter).then(async (event) => {
@@ -127,7 +129,7 @@ async function loadNote() {
                     const note = await Database.instance.addFromNostrEvent(event);
                     editNote(note.databaseId);
                 }
-            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
+            } else {
                 const title = PageContext.instance.noteTitleFromUrl();
                 if (!!title) { newNote('topic', title, `# ${title}`); }
             }
@@ -280,8 +282,7 @@ window.copyNoteId = copyNoteId;
 
 async function editNote(noteId) {
     const note = Database.instance.getNoteByPrimaryId(noteId);
-    const url = window.router.urlFor(Router.EDITOR, note.handle)
-    history.replaceState({ identifier: note.handle }, '', url);
+    await window.router.replaceState(Router.EDITOR, note.handle);
     PageContext.instance.setNote(note);
 }
 window.editNote = editNote

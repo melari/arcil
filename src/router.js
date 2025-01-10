@@ -83,6 +83,12 @@ class Router {
         }
     }
 
+    async replaceState(pageName, postFix) {
+        const url = this.urlFor(pageName, postFix)
+        history.replaceState({ identifier: postFix }, '', url);
+        await this.route();
+    }
+
     _parseInlineParams(urlParts) {
         this._inlineParams = {};
         this._inlineParams[PageContext.NADDR_PARAM_NAME] = urlParts[0];

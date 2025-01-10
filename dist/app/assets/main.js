@@ -13865,7 +13865,9 @@ class PageContext {
     }
 
     noteTitleFromUrl() {
-        return this._urlParam("title");
+        const filter = this.noteFilterFromUrl();
+        if (!filter) { return ''; }
+        return filter["#d"][0];
     }
 
     _urlParam(name) {
@@ -14312,6 +14314,7 @@ class RelayConfig {
 class Router {
     editorDomains = [
         'app.tagayasu.xyz',
+        '127.0.0.1',
     ];
 
     static EDITOR = 'editor';
@@ -14383,6 +14386,12 @@ class Router {
         } else {
             return window.location.origin + "/" + pageName + postFixWithSlash;
         }
+    }
+
+    async replaceState(pageName, postFix) {
+        const url = this.urlFor(pageName, postFix)
+        history.replaceState({ identifier: postFix }, '', url);
+        await this.route();
     }
 
     _parseInlineParams(urlParts) {
@@ -14667,6 +14676,8 @@ async function loadNote() {
         else { return newNote('topic', 'homepage', INTRO_TEXT); }
     }
 
+    // TODO: This does not load encrypted (private/draft) notes because we
+    // are querying the relay directly but the note of interest is wrapped in an ecrypted event on the relay.
     (0,common/* ensureConnected */.ck)().then(async () => {
         const filter = PageContext.instance.noteFilterFromUrl();
         relay/* Relay */.W.instance.fetchEvent(filter).then(async (event) => {
@@ -14675,7 +14686,7 @@ async function loadNote() {
                     const note = await Database.instance.addFromNostrEvent(event);
                     editNote(note.databaseId);
                 }
-            } else if (filter["#d"] && filter["#d"][0].startsWith("tagayasu-")) { // editing a non-existant note, prepoluate fields based on the title param present
+            } else {
                 const title = PageContext.instance.noteTitleFromUrl();
                 if (!!title) { newNote('topic', title, `# ${title}`); }
             }
@@ -14828,8 +14839,7 @@ window.copyNoteId = copyNoteId;
 
 async function editNote(noteId) {
     const note = Database.instance.getNoteByPrimaryId(noteId);
-    const url = window.router.urlFor(Router.EDITOR, note.handle)
-    history.replaceState({ identifier: note.handle }, '', url);
+    await window.router.replaceState(Router.EDITOR, note.handle);
     PageContext.instance.setNote(note);
 }
 window.editNote = editNote

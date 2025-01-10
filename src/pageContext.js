@@ -43,7 +43,9 @@ class PageContext {
     }
 
     noteTitleFromUrl() {
-        return this._urlParam("title");
+        const filter = this.noteFilterFromUrl();
+        if (!filter) { return ''; }
+        return filter["#d"][0];
     }
 
     _urlParam(name) {
