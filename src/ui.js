@@ -25,7 +25,6 @@ $(window).on('DOMContentLoaded', async function () {
 
     if (window.router.pageName == "editor") {
         loadNote();
-        fetchNotes();
     } else if (window.router.pageName == "browser") {
         window.browseNoteFromUrl();
     }
@@ -58,9 +57,7 @@ function restoreAutoSave() {
 
 // Connect UI button
 function connectWallet() {
-    toggleConnect().then(() => {
-        if (window.nip07signer && window.router.pageName === Router.EDITOR) { fetchNotes(); }
-    })
+    toggleConnect();
 }
 window.connectWallet = connectWallet;
 
@@ -424,6 +421,7 @@ async function viewPublishedNote() {
 window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
+    fetchNotes();
     setAvatarOnConnected();
 });
 

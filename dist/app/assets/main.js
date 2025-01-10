@@ -14573,7 +14573,6 @@ $(window).on('DOMContentLoaded', async function () {
 
     if (window.router.pageName == "editor") {
         loadNote();
-        fetchNotes();
     } else if (window.router.pageName == "browser") {
         window.browseNoteFromUrl();
     }
@@ -14606,9 +14605,7 @@ function restoreAutoSave() {
 
 // Connect UI button
 function connectWallet() {
-    (0,common/* toggleConnect */.Hp)().then(() => {
-        if (window.nip07signer && window.router.pageName === Router.EDITOR) { fetchNotes(); }
-    })
+    (0,common/* toggleConnect */.Hp)();
 }
 window.connectWallet = connectWallet;
 
@@ -14972,6 +14969,7 @@ async function viewPublishedNote() {
 window.viewPublishedNote = viewPublishedNote
 
 window.addEventListener(Wallet.WALLET_CONNECTED_EVENT, function(e) {
+    fetchNotes();
     setAvatarOnConnected();
 });
 
